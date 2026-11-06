@@ -133,7 +133,7 @@ function account(a) {
   [a.label, state, `${a.channels} of 3`, n(a.votes), n(a.floods)].forEach((text, i) => {
     const td = document.createElement('td');
     td.textContent = text;
-    if (i === 1 && /login|error/.test(state)) td.className = 'bad';
+    if (i === 1 && /login|error|failed/.test(state)) td.className = 'bad';
     if (i === 1 && /waiting/.test(state)) td.className = 'wait';
     tr.append(td);
   });

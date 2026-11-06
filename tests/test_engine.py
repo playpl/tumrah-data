@@ -182,6 +182,59 @@ class Voting(Base):
         self.assertEqual(self.c.execute("SELECT state FROM accounts").fetchone()["state"], "needs login")
 
 
+class Joining(unittest.TestCase):
+    class Client:
+        def __init__(self, ids=None, fail=None):
+            self.ids, self.fail, self.joined = ids or engine.CHANNELS, fail, []
+
+        async def get_entity(self, name):
+            return NS(id=self.ids[name], name=name)
+
+        async def __call__(self, request):
+            if self.fail:
+                raise self.fail
+            self.joined.append(request)
+
+    def run_join(self, client, have):
+        return asyncio.run(engine.join_missing(client, have, NS(JoinChannelRequest=lambda ent: ent.name)))
+
+    def test_joins_only_what_is_missing(self):
+        client, have = self.Client(), {"Batch58ATM": "ent"}
+        self.assertEqual(self.run_join(client, have), "")
+        self.assertEqual(sorted(client.joined), ["ZAG_59_Polls", "zagpolls58"])
+        self.assertEqual(len(have), 3)
+
+    def test_failed_join_is_reported_and_keeps_the_rest(self):
+        have = {"Batch58ATM": "ent"}
+        problem = self.run_join(self.Client(fail=Exception("CHANNELS_TOO_MUCH")), have)
+        self.assertIn("CHANNELS_TOO_MUCH", problem)
+        self.assertEqual(list(have), ["Batch58ATM"])
+
+    def test_never_joins_a_username_that_moved_to_another_chat(self):
+        client = self.Client(ids=dict(engine.CHANNELS, zagpolls58=1))
+        problem = self.run_join(client, {"Batch58ATM": "e", "ZAG_59_Polls": "e"})
+        self.assertIn("another chat", problem)
+        self.assertEqual(client.joined, [])
+
+
+class LateLogin(unittest.TestCase):
+    def test_account_that_logs_in_joins_the_running_job(self):
+        ran = []
+
+        async def work(name, seconds):
+            await asyncio.sleep(seconds)
+            ran.append(name)
+
+        async def go():
+            async def retry():
+                return [asyncio.create_task(work("late", 0))] if "late" not in ran else []
+            await engine.run_voters(lambda: [asyncio.create_task(work("first", 2.2))], retry, every=1)
+
+        asyncio.run(go())
+        self.assertIn("late", ran)
+        self.assertIn("first", ran)
+
+
 class Ready(Base):
     def raw(self, chat, rows):
         d = Path(self.dir.name) / "raw" / chat

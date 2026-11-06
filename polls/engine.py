@@ -291,9 +291,40 @@ async def vote_one(client, c, label, ent, chat, mid, msg, tg):
     return got["key"] is not None
 
 
+async def join_missing(client, have, tg):
+    """Put an account in every polls channel, so nobody sits idle. Returns what went wrong, or an empty string."""
+    problem = ""
+    for chat, channel_id in CHANNELS.items():
+        if chat in have:
+            continue
+        try:
+            ent = await client.get_entity(chat)
+            if ent.id != channel_id:
+                raise ValueError(f"{chat} now points at another chat")
+            await client(tg.JoinChannelRequest(ent))
+            have[chat] = ent
+            await asyncio.sleep(2)
+        except Exception as e:  # noqa: BLE001 - the account still votes in the channels it has
+            problem = f"join failed: {str(e)[:70]}"
+    return problem
+
+
+async def run_voters(start, retry, every=60):
+    """Wait for all voters; every minute, an account that logged in meanwhile joins the running job."""
+    tasks = start()
+    waited = 0
+    while any(not t.done() for t in tasks):
+        await asyncio.sleep(1)
+        waited += 1
+        if waited >= every:
+            waited = 0
+            tasks += await retry()
+
+
 async def voter(label, client, entities, c, tg, shared):
     chats = [chat for chat in CHANNELS if chat in entities]
     scale, no_flag = 1.0, 0
+    client.flood_sleep_threshold = 0  # FloodWait reaches this loop, which waits and slows this account down
     c.execute("UPDATE accounts SET state='voting' WHERE label=?", (label,))
     try:
         while not STOP.exists() and not shared["halt"]:
@@ -306,7 +337,10 @@ async def voter(label, client, entities, c, tg, shared):
                     messages = await client.get_messages(entities[chat], ids=ids)
                 except tg.FloodWaitError as e:
                     tg.check_fatal(e, label)
+                    scale = min(scale * 1.5, 8)
                     release(c, label)
+                    c.execute("UPDATE accounts SET floods=floods+1, state=? WHERE label=?",
+                              (f"waiting {e.seconds} s", label))
                     await pause(e.seconds + 2)
                     break
                 for mid, msg in zip(ids, messages):
@@ -359,12 +393,13 @@ async def main():
     from export_telegram_raw import format_raw_message
     from reveal_keys_round3 import VOTING_ACCOUNTS_PATH
     from telethon.errors import FloodWaitError
+    from telethon.tl.functions.channels import JoinChannelRequest
     from telethon.tl.functions.messages import SendVoteRequest
     import tg as telegram
 
     class tg:  # what voter() needs from Telegram
         pass
-    tg.FloodWaitError, tg.SendVoteRequest = FloodWaitError, SendVoteRequest
+    tg.FloodWaitError, tg.SendVoteRequest, tg.JoinChannelRequest = FloodWaitError, SendVoteRequest, JoinChannelRequest
     tg.Stop, tg.check_fatal = telegram.Stop, telegram.check_fatal
 
     c = db()
@@ -372,19 +407,36 @@ async def main():
     release(c)
     put(c, "note", "")
     put(c, "stage", "connecting")
-    clients, entities = {}, {}
+    clients, entities, signed_out = {}, {}, []
     wanted = {cid: name for name, cid in CHANNELS.items()}
-    for acc in json.loads(VOTING_ACCOUNTS_PATH.read_text(encoding="utf-8")):
-        label = acc["label"]
-        c.execute("INSERT OR IGNORE INTO accounts(label) VALUES(?)", (label,))
+
+    async def attach(label):
+        """Connect one account and put it in every channel. False while it needs a login."""
         try:
             client = await telegram.connect(label)
-            entities[label] = {wanted[d.entity.id]: d.entity async for d in client.iter_dialogs() if d.entity.id in wanted}
-            clients[label] = client
-            c.execute("UPDATE accounts SET state='idle', channels=? WHERE label=?", (len(entities[label]), label))
-        except telegram.Stop:
+            have = {wanted[d.entity.id]: d.entity async for d in client.iter_dialogs() if d.entity.id in wanted}
+        except Exception:  # noqa: BLE001 - signed out, or its session is busy with a login right now
             c.execute("UPDATE accounts SET state='needs login', channels=0 WHERE label=?", (label,))
+            return False
+        problem = await join_missing(client, have, tg)
+        clients[label], entities[label] = client, have
+        c.execute("UPDATE accounts SET state=?, channels=? WHERE label=?", (problem or "idle", len(have), label))
+        return True
+
+    for acc in json.loads(VOTING_ACCOUNTS_PATH.read_text(encoding="utf-8")):
+        c.execute("INSERT OR IGNORE INTO accounts(label) VALUES(?)", (acc["label"],))
+        if not await attach(acc["label"]):
+            signed_out.append(acc["label"])
     shared = {"halt": None}
+
+    def start_voter(label):
+        return asyncio.create_task(voter(label, clients[label], entities[label], c, tg, shared))
+
+    async def late_logins():
+        back = [label for label in list(signed_out) if await attach(label)]
+        signed_out[:] = [label for label in signed_out if label not in back]
+        return [start_voter(label) for label in back if entities[label]]
+
     try:
         for stage in ("first scrape", "vote", "last scrape", "vote"):
             put(c, "stage", stage)
@@ -395,10 +447,7 @@ async def main():
                     seed_old_keys(c)
                     mark_dupes(c)
             else:
-                for client in clients.values():
-                    client.flood_sleep_threshold = 0  # FloodWait reaches voter(), which slows that account down
-                await asyncio.gather(*(voter(label, clients[label], entities[label], c, tg, shared)
-                                       for label in clients if entities[label]))
+                await run_voters(lambda: [start_voter(label) for label in clients if entities[label]], late_logins)
             if STOP.exists() or shared["halt"]:
                 break
         if shared["halt"] or STOP.exists():
