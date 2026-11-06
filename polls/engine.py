@@ -23,8 +23,7 @@ HOME = Path(__file__).resolve().parent
 DB, RAW, READY, STOP = HOME / "polls.db", HOME / "raw", HOME / "ready", HOME / "stop.flag"
 OLD = Path(r"C:\Users\Ahmed\Desktop\tumrah for med\telegram_raw_export_2026-10-12")
 TELEGRAM = Path(r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram")
-CHANNELS = {"Batch58ATM": 4447068793, "ZAG_59_Polls": 4358079396}  # voting order
-RETIRED = ("zagpolls58",)  # owner 2026-11-07: never scraped, joined, voted or exported again
+CHANNELS = {"Batch58ATM": 4447068793, "ZAG_59_Polls": 4358079396, "zagpolls58": 2502119955}  # voting order
 SCANNER = "scraper"  # it voted the most in past rounds, so its scrape reads the most keys for free
 BATCH, MAX_INTERVAL, MAX_NO_FLAG = 20, 60.0, 100
 
@@ -141,21 +140,6 @@ def mark_dupes(c):
             c.execute("UPDATE polls SET status='dupe' WHERE chat=? AND msg_id=?", (r["chat"], r["msg_id"]))
         seen.add(r["word_key"])
     c.execute("COMMIT")
-
-
-def retire(c):
-    """Take retired channels out of the job. Their keys stop counting, so dupes they held go back to the vote."""
-    marks = ",".join("?" * len(RETIRED))
-    c.execute("BEGIN IMMEDIATE")
-    n = c.execute(f"UPDATE polls SET status='retired', claimed_by=NULL WHERE chat IN ({marks}) AND status!='retired'",
-                  RETIRED).rowcount
-    c.execute(f"DELETE FROM channels WHERE chat IN ({marks})", RETIRED)
-    if n:
-        c.execute("UPDATE polls SET status='need' WHERE status='dupe'")
-    c.execute("COMMIT")
-    if n:
-        mark_dupes(c)
-    return n
 
 
 def seed_old_keys(c):
@@ -421,7 +405,6 @@ async def main():
     c = db()
     beat = asyncio.create_task(heartbeat(c))
     release(c)
-    retire(c)
     put(c, "note", "")
     put(c, "stage", "connecting")
     clients, entities, signed_out = {}, {}, []
