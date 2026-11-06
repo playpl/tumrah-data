@@ -1,0 +1,9 @@
+{
+  "lanes": { "zero": "transcribe", "work": "pointers", "personal": "books", "other": "links" },
+  "slots": { "zero": 4, "work": 2, "personal": 2, "other": 2 },
+  "poll_channels": { "1": ["ZAG_59_Polls"], "2": ["zagpolls58", "Batch58ATM"] },
+  "pointer_order": ["doctor", "quiz", "past_exam", "ai"],
+  "audit_sample": 0.05,
+  "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
+  "db_name": "tumrah"
+}
