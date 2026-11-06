@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polls</title>
+<style>
+:root {
+  --base: #e9edf2; --raised: #f3f6f9; --ink: #1f2933; --soft: #5f6c7b; --edge: #cfd6de; --accent: #2f6f62;
+  --on-accent: #fff; --stop: #a33a3a; --well: #dde3ea; --warn: #8a5a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --base: #171c22; --raised: #1f262e; --ink: #e8edf2; --soft: #9aa7b5; --edge: #2e3742; --accent: #5cb8a4;
+    --on-accent: #0f1a17; --stop: #e07a7a; --well: #12161b; --warn: #e0b35c;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--ink); font: 1rem/1.45 system-ui, "Segoe UI", sans-serif; }
+main { max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; display: grid; gap: 1rem; }
+header { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin: 0 0 0.75rem; font-size: 1rem; }
+.chip { padding: 0.15rem 0.7rem; border-radius: 999px; background: var(--well); color: var(--soft); font-size: 0.875rem; }
+.grow { flex: 1; }
+.card { background: var(--raised); border: 2px solid var(--edge); border-bottom-width: 4px; border-radius: 1.25rem; padding: 1.25rem; }
+button { font: inherit; font-weight: 600; min-width: 7rem; padding: 0.6rem 1.25rem; border-radius: 0.75rem; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); border: 0; border-bottom: 3px solid rgb(0 0 0 / 25%); }
+button:active { transform: translateY(2px); border-bottom-width: 1px; }
+button.stop { background: var(--stop); }
+button:disabled { opacity: 0.55; cursor: default; }
+label { display: flex; align-items: center; gap: 0.5rem; color: var(--soft); font-size: 0.875rem; }
+input { width: 4.5rem; font: inherit; padding: 0.45rem 0.5rem; border-radius: 0.75rem; border: 2px solid var(--edge);
+  background: var(--well); color: var(--ink); }
+.bar-row { display: grid; grid-template-columns: 8rem 1fr 6.5rem; gap: 0.75rem; align-items: center; margin-top: 0.6rem; }
+.bar { height: 0.8rem; border-radius: 999px; background: var(--well); overflow: hidden; }
+.fill { height: 100%; width: 0; background: var(--accent); transition: width 0.6s; }
+.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--soft); font-size: 0.875rem; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem; }
+.stat b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.stat span { color: var(--soft); font-size: 0.875rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+th { text-align: left; color: var(--soft); font-weight: 500; padding-bottom: 0.4rem; }
+td { padding: 0.3rem 0; font-variant-numeric: tabular-nums; }
+th:nth-child(n+3), td:nth-child(n+3) { text-align: right; }
+.bad { color: var(--stop); }
+.wait { color: var(--warn); }
+#note { color: var(--stop); margin: 0; font-weight: 600; }
+#note:empty { display: none; }
+pre { margin: 0.75rem 0 0; color: var(--soft); font-size: 0.8125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+pre:empty { display: none; }
+@media (max-width: 30rem) { .bar-row { grid-template-columns: 1fr; gap: 0.25rem; } .num { text-align: left; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Polls</h1>
+    <span class="chip" id="stage">idle</span>
+    <span class="grow"></span>
+    <label>Seconds per vote <input id="interval" type="number" min="3" max="60" step="1" value="8"></label>
+    <button id="go">Start</button>
+  </header>
+  <p id="note"></p>
+
+  <section class="card">
+    <h2>Votes</h2>
+    <div class="bar-row"><span>Keys</span><div class="bar"><div class="fill" id="keys"></div></div><span class="num" id="keysNum"></span></div>
+    <div class="stats" style="margin-top:1rem">
+      <div class="stat"><b id="left">0</b><span>To vote</span></div>
+      <div class="stat"><b id="rate">0</b><span>Votes per hour</span></div>
+      <div class="stat"><b id="eta">-</b><span>Hours left</span></div>
+      <div class="stat"><b id="held">0</b><span>No key</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Scrape</h2>
+    <div id="channels"></div>
+  </section>
+
+  <section class="card">
+    <h2>Accounts</h2>
+    <table>
+      <thead><tr><th>Account</th><th>State</th><th>Channels</th><th>Votes</th><th>Waits</th></tr></thead>
+      <tbody id="accounts"></tbody>
+    </table>
+  </section>
+
+  <section class="card" id="readyCard" hidden>
+    <h2>Ready</h2>
+    <div class="stats">
+      <div class="stat"><b id="rQ">0</b><span>Questions</span></div>
+      <div class="stat"><b id="rH">0</b><span>No key</span></div>
+      <div class="stat"><b id="rC">0</b><span>Keys disagree</span></div>
+    </div>
+  </section>
+  <pre id="log"></pre>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const n = (v) => Number(v || 0).toLocaleString('en-US');
+let state = { running: false };
+let editing = false;
+
+const post = (path) => fetch(path, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ interval: Number($('interval').value) }),
+});
+
+function row(name, done, total) {
+  const line = document.createElement('div');
+  line.className = 'bar-row';
+  const label = document.createElement('span');
+  label.textContent = name;
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  const fill = document.createElement('div');
+  fill.className = 'fill';
+  fill.style.width = `${total ? Math.min(100, (done / total) * 100) : 0}%`;
+  bar.append(fill);
+  const num = document.createElement('span');
+  num.className = 'num';
+  num.textContent = total ? `${Math.floor(Math.min(100, (done / total) * 100))}%` : '-';
+  line.append(label, bar, num);
+  return line;
+}
+
+function account(a) {
+  const tr = document.createElement('tr');
+  const state = a.state || 'idle';
+  [a.label, state, `${a.channels} of 3`, n(a.votes), n(a.floods)].forEach((text, i) => {
+    const td = document.createElement('td');
+    td.textContent = text;
+    if (i === 1 && /login|error/.test(state)) td.className = 'bad';
+    if (i === 1 && /waiting/.test(state)) td.className = 'wait';
+    tr.append(td);
+  });
+  return tr;
+}
+
+async function refresh() {
+  try {
+    const s = await (await fetch('/status')).json();
+    state = s;
+    const p = s.polls;
+    const keyed = p.keyed || 0;
+    const total = keyed + s.to_vote;
+    $('stage').textContent = s.stopping && s.running ? 'stopping' : s.stage;
+    $('go').textContent = s.running ? 'Stop' : 'Start';
+    $('go').className = s.running ? 'stop' : '';
+    $('go').disabled = s.stopping && s.running;
+    $('note').textContent = s.note;
+    $('keys').style.width = `${total ? (keyed / total) * 100 : 0}%`;
+    $('keysNum').textContent = total ? `${n(keyed)} of ${n(total)}` : '-';
+    $('left').textContent = n(s.to_vote);
+    $('rate').textContent = n(s.per_hour);
+    $('eta').textContent = s.eta_hours === null ? '-' : s.eta_hours;
+    $('held').textContent = n(p.held);
+    if (!editing) $('interval').value = s.interval;
+    $('channels').replaceChildren(...s.channels.map((c) => row(c.chat, c.last_id, c.top_id)));
+    $('accounts').replaceChildren(...s.accounts.map(account));
+    $('readyCard').hidden = !s.ready;
+    if (s.ready) {
+      $('rQ').textContent = n(s.ready.questions);
+      $('rH').textContent = n(s.ready.held);
+      $('rC').textContent = n(s.ready.conflicts);
+    }
+    $('log').textContent = s.running ? '' : s.log.join('\n');
+  } catch {
+    $('stage').textContent = 'page server off';
+  }
+}
+
+$('go').onclick = async () => {
+  $('go').disabled = true;
+  await post(state.running ? '/stop' : '/start');
+  await refresh();
+  $('go').disabled = false;
+};
+$('interval').onfocus = () => { editing = true; };
+$('interval').onchange = async () => { editing = false; await post('/interval'); };
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
