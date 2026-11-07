@@ -40,6 +40,7 @@ def pid_alive(pid):
 
 class Queue:
     def __init__(self, path=DB):
+        self.path = Path(path)
         self.db = sqlite3.connect(path, timeout=30, isolation_level=None, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.execute("PRAGMA journal_mode=WAL")

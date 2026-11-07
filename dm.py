@@ -46,6 +46,20 @@ def cmd_lines(args):
           f"{kinds['page']} pages with no text, {sum(v is None for v in printed.values())} pages without a printed number")
 
 
+def cmd_run(args):
+    import dispatch
+    import flows
+    import queue_db
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    q = queue_db.Queue()
+    d = dispatch.Dispatcher(q, slots=cfg["slots"], lanes=cfg["lanes"], flows=flows.REGISTRY, jobs_root=ROOT / "jobs")
+    (ROOT / "jobs" / "stop.flag").unlink(missing_ok=True)
+    print(f"dispatcher: {sum(cfg['slots'].values())} slots, flows: {', '.join(flows.REGISTRY) or 'none yet'}"
+          f"{' (until the queue is empty)' if args.once else ' (create jobs/stop.flag or Ctrl+C to stop)'}", flush=True)
+    print(json.dumps(d.run(once=args.once)))
+    q.close()
+
+
 def main():
     ap = argparse.ArgumentParser(prog="dm.py")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -53,6 +67,9 @@ def main():
     p = sub.add_parser("lines", help="split modules/<code>/handout.pdf into modules/<code>/lines.jsonl")
     p.add_argument("module")
     p.set_defaults(fn=cmd_lines)
+    p = sub.add_parser("run", help="run queued jobs across the fleet accounts")
+    p.add_argument("--once", action="store_true", help="stop when nothing is queued or running")
+    p.set_defaults(fn=cmd_run)
     args = ap.parse_args()
     args.fn(args)
 
