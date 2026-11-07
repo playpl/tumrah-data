@@ -69,6 +69,8 @@ class Dispatcher:
             q.finish(job["id"], "failed", "; ".join(errors)[:500])
             return "failed"
         q.finish(job["id"], "passed")
+        for flow_name, jobs in (flow.then(job, job_dir) if hasattr(flow, "then") else []):
+            q.add_jobs(flow_name, jobs)  # the next step of a chain (transcribe, then clean and link)
         return "passed"
 
     def slot(self, account, once):

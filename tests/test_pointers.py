@@ -83,7 +83,7 @@ class TestPointerJob(unittest.TestCase):
             tool = [sys.executable, "-I", str(job_dir / "tools" / "check.py")]
             self.assertIn("FAIL: out.jsonl does not exist", subprocess.run(tool, capture_output=True, text=True).stderr)
             common.write_jsonl(job_dir / "out.jsonl", GOOD)
-            self.assertIn("PASS: 2 rows", subprocess.run(tool, capture_output=True, text=True).stdout)
+            self.assertIn("PASS: 2 checked", subprocess.run(tool, capture_output=True, text=True).stdout)
             self.assertEqual(flow.check(job, job_dir), [])
             self.assertTrue((job_dir / "pointers.jsonl").exists())
             page = subprocess.run([sys.executable, "-I", str(job_dir / "tools" / "page.py"), "12"], capture_output=True, text=True).stdout

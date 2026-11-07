@@ -97,6 +97,26 @@ def cmd_add(args):
     print(f"{args.flow}: {len(jobs)} jobs, {added} new")
 
 
+def cmd_lecture(args):
+    import lectures
+    import queue_db
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    if not (args.file or args.youtube):
+        sys.exit("give --file <audio or video> or --youtube <url>")
+    pages = [int(x) for x in args.pages.split("-")] if args.pages else None
+    nxt = lectures.add(args.id, args.module, args.title or args.id, cfg["lecture_audio_kbps"], file=args.file,
+                       url=args.youtube, lesson=args.lesson, pdf_pages=pages, transcribe=not args.no_transcribe)
+    meta = lectures.load(args.id)
+    print(f"{args.id}: {meta['duration_s']} s, transcript from {meta['source'].get('transcript', 'the fleet')}")
+    if nxt:
+        q = queue_db.Queue()
+        q.add_jobs(nxt, [{"key": args.id, "payload": {"lecture": args.id}}])
+        q.close()
+        print(f"queued {nxt}")
+    else:
+        print("not queued: Transcribe is off for this lecture")
+
+
 def cmd_run(args):
     import dispatch
     import flows
@@ -125,6 +145,16 @@ def main():
     p.add_argument("--book", help="book id (books)")
     p.add_argument("--pages", help="first-last book pages (books); default all")
     p.set_defaults(fn=cmd_add)
+    p = sub.add_parser("lecture", help="add a lecture: --file <audio> or --youtube <url>; queues transcription")
+    p.add_argument("id")
+    p.add_argument("--module", required=True)
+    p.add_argument("--title")
+    p.add_argument("--file")
+    p.add_argument("--youtube")
+    p.add_argument("--lesson", help="site lesson id")
+    p.add_argument("--pages", help="first-last handout pdf pages of the lecture")
+    p.add_argument("--no-transcribe", action="store_true", help="register only (an old recording kept as a taste)")
+    p.set_defaults(fn=cmd_lecture)
     import sources
     sources.add_parser(sub)
     p = sub.add_parser("run", help="run queued jobs across the fleet accounts")

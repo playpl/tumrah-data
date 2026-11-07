@@ -12,15 +12,24 @@ from handout import JOB, lines, read_jsonl, reference  # noqa: E402
 
 sys.stdout.reconfigure(encoding="utf-8")
 job = json.loads((JOB / "job.json").read_text(encoding="utf-8"))
-out = JOB / job["output"]
-if not out.exists():
-    sys.exit(f"FAIL: {job['output']} does not exist")
-try:
-    rows = read_jsonl(out)
-except ValueError as e:
-    sys.exit(f"FAIL: {job['output']} has a line that is not JSON ({e})")
-errors = getattr(checks, job["checker"])(rows, read_jsonl(JOB / job["batch"]), lines(), reference())
+if job["checker"] == "check_transcript":
+    out = JOB / job["output"]
+    errors = checks.check_transcript(out.read_text(encoding="utf-8"), job["duration_s"]) if out.exists() \
+        else [f"{job['output']} does not exist"]
+    rows = []
+elif job["checker"] == "check_lecture_dir":
+    errors = checks.check_lecture_dir(JOB, lines(), job["duration_s"], job.get("pdf_pages"))
+    rows = []
+else:
+    out = JOB / job["output"]
+    if not out.exists():
+        sys.exit(f"FAIL: {job['output']} does not exist")
+    try:
+        rows = read_jsonl(out)
+    except ValueError as e:
+        sys.exit(f"FAIL: {job['output']} has a line that is not JSON ({e})")
+    errors = getattr(checks, job["checker"])(rows, read_jsonl(JOB / job["batch"]), lines(), reference())
 for e in errors[:40]:
     print(e)
-print(f"FAIL: {len(errors)} errors" if errors else f"PASS: {len(rows)} rows")
+print(f"FAIL: {len(errors)} errors" if errors else f"PASS: {len(rows) or 'all'} checked")
 sys.exit(1 if errors else 0)

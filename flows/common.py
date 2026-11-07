@@ -30,7 +30,7 @@ def module_dir(code):
     return d
 
 
-def build(job_dir, module, batch, checker, output, brief, extra_inputs=()):
+def build(job_dir, module, batch, checker, output, brief, extra_inputs=(), extra=None):
     tools, inputs = job_dir / "tools", job_dir / "inputs"
     tools.mkdir(parents=True, exist_ok=True)
     inputs.mkdir(exist_ok=True)
@@ -42,7 +42,7 @@ def build(job_dir, module, batch, checker, output, brief, extra_inputs=()):
             shutil.copy2(src / name, inputs / name)
     write_jsonl(job_dir / "batch.jsonl", batch)
     (job_dir / "job.json").write_text(json.dumps({"module": module, "batch": "batch.jsonl", "checker": checker,
-                                                  "output": output}), encoding="utf-8")
+                                                  "output": output, **(extra or {})}), encoding="utf-8")
     (job_dir / "BRIEF.md").write_text(brief, encoding="utf-8")
 
 

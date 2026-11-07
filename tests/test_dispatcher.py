@@ -103,6 +103,15 @@ class TestDispatcher(unittest.TestCase):
         self.assertTrue(dispatch.cooling(self.state, "personal"))
         self.assertFalse(dispatch.cooling(self.state, "work"))
 
+    def test_a_passed_job_queues_its_next_step(self):
+        class Chain(EchoFlow):
+            def then(self, job, job_dir):
+                return [("books", [{"key": "next-" + job["key"], "payload": job["payload"]}])]
+        self.d.flows["pointers"] = Chain()
+        self.add("pointers", 1, ["good"])
+        self.d.run(once=True)
+        self.assertEqual(self.q.progress(), {"pointers": {"passed": 1}, "books": {"passed": 1}})
+
     def test_unknown_flow_is_held_not_run(self):
         self.q.add_jobs("nope", [{"key": "x", "payload": {}}])
         self.d.run(once=True)

@@ -68,7 +68,7 @@ class TestAlignmentChecks(unittest.TestCase):
                 flow.prepare(job, job_dir)
             common.write_jsonl(job_dir / "out.jsonl", good())
             run = subprocess.run([sys.executable, "-I", str(job_dir / "tools" / "check.py")], capture_output=True, text=True)
-            self.assertIn("PASS: 2 rows", run.stdout)
+            self.assertIn("PASS: 2 checked", run.stdout)
             self.assertEqual(flow.check(job, job_dir), [])
             self.assertTrue((job_dir / "aligned.jsonl").exists())
             shown = subprocess.run([sys.executable, "-I", str(job_dir / "tools" / "book.py"), "4"], capture_output=True, text=True).stdout
