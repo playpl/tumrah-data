@@ -5,5 +5,9 @@
   "pointer_order": ["doctor", "quiz", "past_exam", "ai"],
   "audit_sample": 0.05,
   "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
-  "db_name": "tumrah"
+  "db_name": "tumrah",
+  "module_windows": {
+    "year1-musculoskeletal": [{ "batch": 58, "from": "2025-11-01", "to": "2026-01-31" }, { "batch": 59, "from": "2026-11-04" }],
+    "year2-cns": [{ "batch": 58, "from": "2026-11-04" }]
+  }
 }

@@ -125,6 +125,8 @@ def main():
     p.add_argument("--book", help="book id (books)")
     p.add_argument("--pages", help="first-last book pages (books); default all")
     p.set_defaults(fn=cmd_add)
+    import sources
+    sources.add_parser(sub)
     p = sub.add_parser("run", help="run queued jobs across the fleet accounts")
     p.add_argument("--once", action="store_true", help="stop when nothing is queued or running")
     p.set_defaults(fn=cmd_run)
