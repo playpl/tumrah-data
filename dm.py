@@ -155,6 +155,11 @@ def cmd_cover(args):
     print(f"fleet: {len(items)} questions with candidates in {len(jobs)} jobs; {len(left) - len(items)} have none (new)")
 
 
+def cmd_voters(args):
+    import voters
+    print(json.dumps(voters.run(apply=args.apply), indent=1))
+
+
 def cmd_run(args):
     import dispatch
     import flows
@@ -199,6 +204,9 @@ def main():
     p.add_argument("--again", action="store_true", help="check a file that was already covered")
     p.add_argument("--refresh", action="store_true", help="re-read the site's questions")
     p.set_defaults(fn=cmd_cover)
+    p = sub.add_parser("voters", help="re-read vote counts (no voting) and update the site's stats")
+    p.add_argument("--apply", action="store_true", help="write the site (dry run without it)")
+    p.set_defaults(fn=cmd_voters)
     import sources
     sources.add_parser(sub)
     p = sub.add_parser("run", help="run queued jobs across the fleet accounts")
