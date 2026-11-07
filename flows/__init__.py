@@ -3,8 +3,11 @@
 (jobs to queue next when it passes)."""
 from flows.books import BookFlow
 from flows.cover import CoverFlow
+from flows.labels import LabelFlow
 from flows.lecture import LectureLinkFlow, TranscribeFlow
 from flows.pointers import PointerFlow
+from flows.reference import ReferenceFlow
 
 REGISTRY = {"pointers": PointerFlow(), "books": BookFlow(), "transcribe": TranscribeFlow(),
-            "lecture_links": LectureLinkFlow(), "cover": CoverFlow()}
+            "lecture_links": LectureLinkFlow(), "cover": CoverFlow(),
+            "reference": ReferenceFlow(), "labels": LabelFlow()}

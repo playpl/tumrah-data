@@ -262,6 +262,108 @@ def check_transcript(text, duration_s, end_slack=90, chars_per_min=None):
     return errors
 
 
+# Timing pass (spike 2026-11-07: a worker's own [mm:ss] overshoot or fall short by minutes). The audio is cut into
+# CHUNK_SECONDS pieces with known offsets; the worker names where each piece's first words sit in its transcript,
+# and every paragraph's time is set between those anchors by word position.
+CHUNK_SECONDS = 300
+TIMING_KEYS = {"chunk", "paragraph", "first_words", "silent"}
+TIMING_MIN_WORDS = 4
+
+
+def timing_anchors(text, rows, chunks, chunk_s=CHUNK_SECONDS):
+    """(errors, [(word index, seconds)]). Errors give chunk and paragraph numbers, never words."""
+    paras = paragraphs(text)
+    if not paras:
+        return ["no [mm:ss] paragraphs"], []
+    words, starts = [], []
+    for _, body in paras:
+        starts.append(len(words))
+        words += [t.lower() for t in TOKEN.findall(body)]
+    starts.append(len(words))
+    if [r.get("chunk") if isinstance(r, dict) else None for r in rows] != list(range(chunks)):
+        return [f"timing.jsonl needs one row per chunk, chunk 0 to {chunks - 1} in order; it has {len(rows)} rows"], []
+    errors, anchors = [], []
+    for r in rows:
+        c = r["chunk"]
+        if set(r) - TIMING_KEYS:
+            errors.append(f"chunk {c}: unknown fields {sorted(set(r) - TIMING_KEYS)}")
+            continue
+        if r.get("silent") is True:
+            continue
+        p = r.get("paragraph")
+        if not isinstance(p, int) or isinstance(p, bool) or not 1 <= p <= len(paras):
+            errors.append(f"chunk {c}: paragraph must be 1 to {len(paras)}")
+            continue
+        want = [t.lower() for t in TOKEN.findall(str(r.get("first_words") or ""))]
+        if len(want) < TIMING_MIN_WORDS:
+            errors.append(f"chunk {c}: first_words needs at least {TIMING_MIN_WORDS} words copied from the transcript")
+            continue
+        hits = [i for i in range(starts[p - 1], starts[p]) if words[i:i + len(want)] == want]
+        later = [i for i in hits if not anchors or i > anchors[-1][0]]
+        if not hits:
+            errors.append(f"chunk {c}: first_words are not in paragraph {p} word for word")
+        elif not later:
+            errors.append(f"chunk {c}: its words come before the previous chunk's; chunks follow each other")
+        else:
+            anchors.append((later[0], c * chunk_s))
+    if not errors and not anchors:
+        errors.append("every chunk is silent")
+    return errors, anchors
+
+
+def retime(text, anchors, duration_s):
+    """text with each paragraph's [mm:ss] set by word position between the anchors (start 0 s, end duration_s)."""
+    total = sum(len(TOKEN.findall(body)) for _, body in paragraphs(text))
+    pts = sorted(anchors)
+    if pts[0][0] > 0:
+        pts.insert(0, (0, 0))
+    if pts[-1][0] < total:
+        pts.append((total, max(duration_s, pts[-1][1])))
+
+    def at(w):
+        for (w0, t0), (w1, t1) in zip(pts, pts[1:]):
+            if w0 <= w <= w1:
+                return t0 if w1 == w0 else t0 + (t1 - t0) * (w - w0) / (w1 - w0)
+        return pts[-1][1]
+
+    out, seen, started = [], 0, False  # words before the first stamp are not in paragraphs(), so not counted
+    for line in text.splitlines():
+        m = STAMP.match(line)
+        if m:
+            started, t = True, int(at(seen))
+            line = f"[{t // 60:02d}:{t % 60:02d}]" + line[m.end():]
+        if started:
+            seen += len(TOKEN.findall(STAMP.sub("", line, count=1)))
+        out.append(line)
+    return "\n".join(out) + ("\n" if text.endswith("\n") else "")
+
+
+def check_timed_transcript(text, rows, duration_s, chunks, chunk_s=CHUNK_SECONDS):
+    """(errors, retimed text): the timing rows, then the usual transcript check on the retimed text."""
+    errors, anchors = timing_anchors(text, rows, chunks, chunk_s)
+    if errors:
+        return errors, None
+    timed = retime(text, anchors, duration_s)
+    return check_transcript(timed, duration_s), timed
+
+
+def check_job_transcript(job_dir):
+    """(errors, retimed text) for a transcribe job folder: transcript.txt, timing.jsonl and job.json."""
+    from pathlib import Path
+    import json
+    d = Path(job_dir)
+    job = json.loads((d / "job.json").read_text(encoding="utf-8"))
+    need = [n for n in ("transcript.txt", "timing.jsonl") if not (d / n).exists()]
+    if need:
+        return [f"{' and '.join(need)} missing"], None
+    try:
+        rows = [json.loads(x) for x in (d / "timing.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+    except ValueError as e:
+        return [f"a line of timing.jsonl is not JSON ({e})"], None
+    return check_timed_transcript((d / "transcript.txt").read_text(encoding="utf-8"), rows, job["duration_s"],
+                                  job["chunks"], job.get("chunk_s", CHUNK_SECONDS))
+
+
 def tokens(text):
     """Words, lowercased, with each line's leading [mm:ss] left out."""
     return [t.lower() for line in str(text).splitlines() for t in TOKEN.findall(STAMP.sub("", line, count=1))]
@@ -412,6 +514,90 @@ def check_cover(rows, batch, lines=None, reference=None):
             errors.append(f"item {r['i']}: match must be null or one of its listed candidates")
         seen.add(r["i"])
     missing = set(allowed) - seen
+    if missing:
+        errors.append(f"{len(missing)} items have no row")
+    return errors
+
+
+# ---- module lecture list and labels (plan task 13) ------------------------------------------------------------
+LECTURE_KEYS = {"lecture_id", "title", "subject", "pdf_pages"}
+REFERENCE_GAP = 0.05      # share of the handout's text pages (inside the lectures' span) that may sit in no lecture
+
+
+def check_reference(ref, module, lines):
+    """reference.json: lectures in handout order, ids <module>:L01.., ascending pdf ranges that may share an edge page."""
+    lecs = ref.get("lectures") if isinstance(ref, dict) else None
+    if not isinstance(lecs, list) or not lecs:
+        return ['reference.json needs a non-empty "lectures" list']
+    top = max((ln["page"] for ln in lines), default=0)
+    text_pages = {ln["page"] for ln in lines if ln.get("figure") is None and len((ln.get("text") or "").strip()) > 3}
+    errors, covered, prev_end = [], set(), 0
+    for i, lec in enumerate(lecs, 1):
+        if not isinstance(lec, dict):
+            errors.append(f"lecture {i}: not an object")
+            continue
+        if set(lec) - LECTURE_KEYS:
+            errors.append(f"lecture {i}: unknown fields {sorted(set(lec) - LECTURE_KEYS)}")
+        if lec.get("lecture_id") != f"{module}:L{i:02d}":
+            errors.append(f"lecture {i}: lecture_id must be {module}:L{i:02d}")
+        for k in ("title", "subject"):
+            if not isinstance(lec.get(k), str) or not lec[k].strip():
+                errors.append(f"lecture {i}: {k} is empty")
+        pp = lec.get("pdf_pages")
+        if not (isinstance(pp, list) and len(pp) == 2 and all(isinstance(x, int) and not isinstance(x, bool) for x in pp)
+                and 1 <= pp[0] <= pp[1] <= top):
+            errors.append(f"lecture {i}: pdf_pages must be [first, last] inside 1-{top}")
+        elif pp[0] < prev_end:
+            errors.append(f"lecture {i}: starts on pdf page {pp[0]}, before lecture {i - 1} ends ({prev_end})")
+        else:
+            prev_end = pp[1]
+            covered |= set(range(pp[0], pp[1] + 1))
+    if not errors:
+        span = {p for p in text_pages if lecs[0]["pdf_pages"][0] <= p <= prev_end}
+        gap = sorted(span - covered)
+        if len(gap) > REFERENCE_GAP * max(len(span), 1):
+            errors.append(f"{len(gap)} text pages sit in no lecture (pdf pages {gap[:15]}): every teaching page "
+                          "belongs to its lecture")
+    return errors
+
+
+LABEL_KINDS = {"doctor", "past_exam", "ai", "student", "other"}
+HEADER_LABEL_KEYS = {"hid", "module", "lecture_id", "doctor", "kind"}
+POLL_LABEL_KEYS = {"wid", "module", "lecture_id"}
+
+
+def check_labels(rows, batch, lines=None, reference=None):
+    """Header rows {hid, module, lecture_id, doctor, kind} or question rows {wid, module, lecture_id}; every label
+    from the closed lists in reference.json (modules, lectures per module, doctors). "mixed" only for a header."""
+    ref = reference or {}
+    modules, lectures = set(ref.get("modules") or {}), ref.get("lectures") or {}
+    doctors = set(ref.get("doctors") or [])
+    idf = "hid" if batch and "hid" in batch[0] else "wid"
+    keys = HEADER_LABEL_KEYS if idf == "hid" else POLL_LABEL_KEYS
+    allowed = modules | {"none"} | ({"mixed"} if idf == "hid" else set())
+    want = [b[idf] for b in batch]
+    errors, seen = [], []
+    for n, r in enumerate(rows, 1):
+        if not isinstance(r, dict) or set(r) != keys:
+            errors.append(f"row {n}: must have exactly the fields {sorted(keys)}")
+            continue
+        rid = r[idf]
+        seen.append(rid)
+        if rid not in want:
+            errors.append(f"row {n}: {idf} {rid} is not in the batch")
+            continue
+        if r["module"] not in allowed:
+            errors.append(f"{idf} {rid}: module must be one of {sorted(allowed)}")
+        elif r["lecture_id"] is not None and r["lecture_id"] not in {x["lecture_id"] for x in lectures.get(r["module"], [])}:
+            errors.append(f"{idf} {rid}: lecture_id must be null or a lecture of {r['module']} in reference.json")
+        if idf == "hid":
+            if r["doctor"] is not None and r["doctor"] not in doctors:
+                errors.append(f"hid {rid}: doctor must be null or a name from the doctors list")
+            if r["kind"] not in LABEL_KINDS:
+                errors.append(f"hid {rid}: kind must be one of {sorted(LABEL_KINDS)}")
+    if len(seen) != len(set(seen)):
+        errors.append("an id has more than one row")
+    missing = set(want) - set(seen)
     if missing:
         errors.append(f"{len(missing)} items have no row")
     return errors

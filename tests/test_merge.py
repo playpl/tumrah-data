@@ -37,6 +37,15 @@ class TestMerge(unittest.TestCase):
         self.assertTrue(q["key_conflict"])
         self.assertEqual(q["key"], 0)
 
+    def test_a_source_rows_own_conflict_survives(self):
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as t:
+            p = Path(t) / "q.jsonl"
+            p.write_text(json.dumps({"question": "Q?", "options": ["a", "b"], "key": 0, "votes": [1, 1], "total": 2,
+                                     "key_conflict": True, "sightings": [{"chat": "c", "msg_id": 1}]}) + "\n", encoding="utf-8")
+            self.assertTrue(merge.merge(merge.load_polls(p))[0]["key_conflict"])
+
     def test_telegram_links(self):
         self.assertEqual(merge.telegram_link("Batch58ATM", 12), "https://t.me/Batch58ATM/12")
         self.assertEqual(merge.telegram_link("id2516282829", 3), "https://t.me/c/2516282829/3")

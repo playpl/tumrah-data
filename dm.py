@@ -80,7 +80,11 @@ def cmd_add(args):
     cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
     if not (MODULES / args.module / "lines.jsonl").exists():
         sys.exit(f"run `py dm.py lines {args.module}` first")
-    if args.flow == "pointers":
+    if args.flow == "reference":
+        jobs = [{"key": args.module, "payload": {"module": args.module}}]
+    elif not args.file:
+        sys.exit("--file is required")
+    elif args.flow == "pointers":
         from flows.common import read_jsonl
         jobs = pointer_jobs(args.module, read_jsonl(args.file), cfg["pointer_order"])
     else:
@@ -155,6 +159,11 @@ def cmd_cover(args):
     print(f"fleet: {len(items)} questions with candidates in {len(jobs)} jobs; {len(left) - len(items)} have none (new)")
 
 
+def cmd_labels(_):
+    import labels
+    labels.step(json.loads((ROOT / "config.json").read_text(encoding="utf-8")))
+
+
 def cmd_voters(args):
     import voters
     print(json.dumps(voters.run(apply=args.apply), indent=1))
@@ -201,10 +210,11 @@ def main():
     p = sub.add_parser("lines", help="split modules/<code>/handout.pdf into modules/<code>/lines.jsonl")
     p.add_argument("module")
     p.set_defaults(fn=cmd_lines)
-    p = sub.add_parser("add", help="queue work: pointers <module> --file questions.jsonl | books <module> --book <id> --file book.pdf")
-    p.add_argument("flow", choices=["pointers", "books"])
+    p = sub.add_parser("add", help="queue work: pointers <module> --file questions.jsonl | books <module> --book <id> "
+                                   "--file book.pdf | reference <module> (its lecture list from the handout)")
+    p.add_argument("flow", choices=["pointers", "books", "reference"])
     p.add_argument("module")
-    p.add_argument("--file", required=True)
+    p.add_argument("--file")
     p.add_argument("--book", help="book id (books)")
     p.add_argument("--pages", help="first-last book pages (books); default all")
     p.set_defaults(fn=cmd_add)
@@ -225,6 +235,11 @@ def main():
     p.add_argument("--again", action="store_true", help="check a file that was already covered")
     p.add_argument("--refresh", action="store_true", help="re-read the site's questions")
     p.set_defaults(fn=cmd_cover)
+    p = sub.add_parser("importfile", help="bank/import_<msk|cns>.json for importSfQuestions.ts (dry run it first)")
+    p.add_argument("module")
+    p.set_defaults(fn=lambda a: __import__("importfile").run(a.module))
+    p = sub.add_parser("labels", help="module, lecture and doctor labels for the bank: one step each run")
+    p.set_defaults(fn=cmd_labels)
     p = sub.add_parser("voters", help="re-read vote counts (no voting) and update the site's stats")
     p.add_argument("--apply", action="store_true", help="write the site (dry run without it)")
     p.set_defaults(fn=cmd_voters)

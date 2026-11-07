@@ -44,6 +44,7 @@ def load_polls(path, doctors=None):
     out = []
     for q in read_jsonl(path):
         out.append({"question": q["question"], "options": q["options"], "key": q["key"], "solution": q.get("solution"),
+                    "key_conflict": bool(q.get("key_conflict")),  # the polls engine's own conflict (reposts disagree)
                     "votes": q.get("votes") or [0] * len(q["options"]), "total": q.get("total", 0),
                     "sightings": [{"source": "poll", "chat": s["chat"], "msg_id": s["msg_id"], "date": s.get("date"),
                                    "header": s.get("header"), "doctor": doctors.get((s["chat"], s["msg_id"])),
@@ -99,6 +100,7 @@ def merge(rows):
             key = mine[r["key"]]
             q["key_conflict"] = q["key_conflict"] or (q["key"] is not None and q["key"] != key)
             q["key"] = key if q["key"] is None else q["key"]
+        q["key_conflict"] = q["key_conflict"] or bool(r.get("key_conflict"))
         q["solution"] = q["solution"] or r.get("solution")
         for i, v in enumerate(r.get("votes") or []):
             if i < len(mine) and mine[i] is not None:

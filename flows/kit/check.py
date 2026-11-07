@@ -13,8 +13,15 @@ from handout import JOB, lines, read_jsonl, reference  # noqa: E402
 sys.stdout.reconfigure(encoding="utf-8")
 job = json.loads((JOB / "job.json").read_text(encoding="utf-8"))
 if job["checker"] == "check_transcript":
+    errors, _ = checks.check_job_transcript(JOB)
+    rows = []
+elif job["checker"] == "check_reference":
     out = JOB / job["output"]
-    errors = checks.check_transcript(out.read_text(encoding="utf-8"), job["duration_s"]) if out.exists() \
+    try:
+        ref = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
+    except ValueError as e:
+        sys.exit(f"FAIL: {job['output']} is not JSON ({e})")
+    errors = checks.check_reference(ref, job["module"], lines()) if ref is not None \
         else [f"{job['output']} does not exist"]
     rows = []
 elif job["checker"] == "check_lecture_dir":

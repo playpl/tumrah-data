@@ -28,6 +28,45 @@ class TestTranscript(unittest.TestCase):
         self.assertEqual(checks.stamp_seconds("[75:10] x"), 4510)
 
 
+class TestTiming(unittest.TestCase):
+    # worker stamps are wrong on purpose: the chunk offsets must replace them
+    HEARD = "[00:00] today we talk about the pain control system\n[09:00] the raphe magnus nucleus sends fibers\n" \
+            "[20:00] down to the dorsal horn of the spinal cord"
+    ROWS = [{"chunk": 0, "paragraph": 1, "first_words": "today we talk about"},
+            {"chunk": 1, "paragraph": 2, "first_words": "the raphe magnus nucleus"}]
+
+    def test_times_come_from_the_chunks(self):
+        errors, timed = checks.check_timed_transcript(self.HEARD, self.ROWS, 100, chunks=2, chunk_s=60)
+        self.assertEqual(errors, [])
+        # 3rd paragraph: word 14 lies between (word 8, 60 s) and (word 23, 100 s) -> 76 s
+        self.assertEqual([s for s, _ in checks.paragraphs(timed)], [0, 60, 76])
+        self.assertEqual([t for _, t in checks.paragraphs(timed)], [t for _, t in checks.paragraphs(self.HEARD)])
+
+    def test_silent_chunk_and_words_found_across_a_paragraph_end(self):
+        rows = [self.ROWS[0], {"chunk": 1, "silent": True},
+                {"chunk": 2, "paragraph": 2, "first_words": "sends fibers down to"}]
+        errors, timed = checks.check_timed_transcript(self.HEARD, rows, 150, chunks=3, chunk_s=60)
+        self.assertEqual(errors, [])
+        self.assertEqual(checks.stamp_seconds(timed.splitlines()[1]), 80)  # word 8 between (0, 0 s) and (12, 120 s)
+
+    def test_bad_rows_fail_without_showing_words(self):
+        def err(rows, chunks=2):
+            return checks.check_timed_transcript(self.HEARD, rows, 100, chunks=chunks, chunk_s=60)[0]
+        self.assertIn("one row per chunk", err(self.ROWS[:1])[0])
+        self.assertIn("paragraph must be 1 to 3", err([self.ROWS[0], dict(self.ROWS[1], paragraph=9)])[0])
+        self.assertIn("at least 4 words", err([self.ROWS[0], dict(self.ROWS[1], first_words="the raphe")])[0])
+        wrong = err([self.ROWS[0], dict(self.ROWS[1], paragraph=3)])[0]
+        self.assertIn("not in paragraph 3", wrong)
+        self.assertNotIn("raphe", wrong)
+        self.assertIn("follow each other", err([dict(self.ROWS[1], chunk=0), dict(self.ROWS[0], chunk=1)])[0])
+        self.assertIn("unknown fields", err([self.ROWS[0], dict(self.ROWS[1], at=5)])[0])
+        self.assertIn("every chunk is silent", err([{"chunk": 0, "silent": True}, {"chunk": 1, "silent": True}])[0])
+
+    def test_retimed_text_still_meets_the_transcript_check(self):
+        errors, _ = checks.check_timed_transcript(self.HEARD, self.ROWS, 600, chunks=2, chunk_s=60)
+        self.assertIn("the end is missing", errors[0])
+
+
 class TestClean(unittest.TestCase):
     CLEAN = ("[00:00] Today we talk about the pain control system.\n\n"
              "[00:40] The raphe magnus nucleus sends fibers down to the dorsal horn of the spinal cord.")

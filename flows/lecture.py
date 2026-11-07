@@ -14,12 +14,37 @@ import checks
 import lectures
 from flows import common
 
-TRANSCRIBE = """Open {audio} with read_file: you can hear audio files directly. Do not run any shell commands and do not
-split the file. Write a verbatim transcript of the WHOLE recording to transcript.txt: every word as spoken (Arabic
-speech in Arabic script, English terms in English), with a [mm:ss] timestamp at the start of each paragraph and a new
-paragraph at least every minute. Never summarise, translate, correct or skip a part, and keep going to the very end.
-Then run `python tools/check.py` and fix what it reports by listening again. Final reply: the PASS line and the last
-timestamp you wrote."""
+TRANSCRIBE = """Step 1. Open {audio} with read_file: you can hear audio files directly. Do not split or convert it. Write a
+verbatim transcript of the WHOLE recording to transcript.txt: every word as spoken (Arabic speech in Arabic script,
+English terms in English), with a [mm:ss] timestamp at the start of each paragraph and a new paragraph at least every
+minute. Never summarise, translate, correct or skip a part, and keep going to the very end. Your timestamps only need
+to be rough: step 2 sets the real times.
+
+Step 2. Timing. The same recording is cut into {chunks} pieces of {minutes} minutes in chunks/: c00.ogg starts at 0:00,
+c01.ogg at {minutes}:00, and so on. For EVERY piece, open it with read_file, listen to its first spoken words, find them
+in transcript.txt (`python tools/paras.py` prints each paragraph's number), and write one line to timing.jsonl:
+{{"chunk": 0, "paragraph": <number of the paragraph where those words are>, "first_words": "<the first 6 or more words
+of the piece, copied exactly from transcript.txt>"}}
+A piece that starts in the middle of a word: begin at the next whole word. A piece with no speech at all:
+{{"chunk": <n>, "silent": true}}. You may give pieces to subagents (each needs its piece and transcript.txt).
+
+Run `python tools/check.py` and fix what it reports by listening again. Final reply: the PASS line."""
+
+PARAS = '''"""Prints each paragraph of transcript.txt with its number and its first words.
+
+    python tools/paras.py
+"""
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import checks  # noqa: E402
+
+sys.stdout.reconfigure(encoding="utf-8")
+text = (Path(__file__).resolve().parent.parent / "transcript.txt").read_text(encoding="utf-8")
+for n, (_, body) in enumerate(checks.paragraphs(text), 1):
+    print(n, "|", body[:80])
+'''
 
 BRIEF = """# Brief: lay out a lecture transcript and link it to the handout
 
@@ -83,23 +108,25 @@ class TranscribeFlow:
     def prepare(self, job, job_dir: Path):
         meta = lectures.load(job["payload"]["lecture"])
         src = lectures.folder(meta["id"]) / "audio.ogg"
-        common.build(job_dir, meta["module"], [], "check_transcript", "transcript.txt", "", extra={"duration_s": meta["duration_s"]})
         if not (job_dir / "audio.ogg").exists():
+            job_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, job_dir / "audio.ogg")
+        n = lectures.chunks(job_dir / "audio.ogg", job_dir / "chunks", checks.CHUNK_SECONDS)
+        common.build(job_dir, meta["module"], [], "check_transcript", "transcript.txt", "",
+                     extra={"duration_s": meta["duration_s"], "chunks": n, "chunk_s": checks.CHUNK_SECONDS})
+        (job_dir / "tools" / "paras.py").write_text(PARAS, encoding="utf-8")
         prompt = job_dir / "prompt.md"
-        prompt.write_text(TRANSCRIBE.format(audio="audio.ogg"), encoding="utf-8")
+        prompt.write_text(TRANSCRIBE.format(audio="audio.ogg", chunks=n, minutes=checks.CHUNK_SECONDS // 60),
+                          encoding="utf-8")
         return prompt
 
     def check(self, job, job_dir: Path):
         meta = lectures.load(job["payload"]["lecture"])
-        out = job_dir / "transcript.txt"
-        if not out.exists():
-            return ["transcript.txt is missing"]
-        errors = checks.check_transcript(out.read_text(encoding="utf-8"), meta["duration_s"])
+        errors, timed = checks.check_job_transcript(job_dir)
         if not errors:
             raw = lectures.folder(meta["id"]) / "raw.txt"
-            if not raw.exists():  # raw.txt is written once and never edited after
-                shutil.copy2(out, raw)
+            if not raw.exists():  # raw.txt (times from the audio) is written once and never edited after
+                raw.write_text(timed, encoding="utf-8")
         return errors
 
     def then(self, job, job_dir):

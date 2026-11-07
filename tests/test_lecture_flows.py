@@ -9,6 +9,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tests"))
+import checks  # noqa: E402
 import lectures  # noqa: E402
 from flows import common, lecture  # noqa: E402
 from test_lecture_checks import RAW, TestClean  # noqa: E402
@@ -54,21 +55,41 @@ class Base(unittest.TestCase):
         return subprocess.run([sys.executable, "-I", str(self.dir / "tools" / "check.py")], capture_output=True, text=True)
 
 
+class TestChunks(unittest.TestCase):
+    def test_pieces_have_exact_lengths(self):
+        with tempfile.TemporaryDirectory() as t:
+            src = Path(t) / "a.ogg"
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=duration=7", "-c:a", "libopus",
+                            "-b:a", "16k", str(src)], check=True)
+            self.assertEqual(lectures.chunks(src, Path(t) / "chunks", 3), 3)
+            lengths = [lectures.duration(p) for p in sorted((Path(t) / "chunks").glob("c*.ogg"))]
+            self.assertAlmostEqual(lengths[0], 3, delta=0.05)
+            self.assertAlmostEqual(sum(lengths), 7, delta=0.1)
+            self.assertEqual(lectures.chunks(src, Path(t) / "chunks", 3), 3)  # already cut: counted, not cut again
+
+
 class TestTranscribe(Base):
     def test_raw_is_written_once_and_the_links_job_follows(self):
         flow = lecture.TranscribeFlow()
-        prompt = flow.prepare(self.job, self.dir)
+        with mock.patch.object(lectures, "chunks", return_value=1):
+            prompt = flow.prepare(self.job, self.dir)
         self.assertIn("WHOLE recording", prompt.read_text())
+        self.assertIn("cut into 1 pieces", prompt.read_text())
         self.assertTrue((self.dir / "audio.ogg").exists())
-        self.assertEqual(flow.check(self.job, self.dir), ["transcript.txt is missing"])
+        self.assertEqual(flow.check(self.job, self.dir), ["transcript.txt and timing.jsonl missing"])
         (self.dir / "transcript.txt").write_text(RAW, encoding="utf-8")
+        common.write_jsonl(self.dir / "timing.jsonl", [{"chunk": 0, "paragraph": 1, "first_words": "today we talk about"}])
         self.assertIn("PASS", self.kit_check().stdout)
+        self.assertIn("1 | today we talk", subprocess.run([sys.executable, "-I", str(self.dir / "tools" / "paras.py")],
+                                                          capture_output=True, text=True).stdout)
         self.assertEqual(flow.check(self.job, self.dir), [])
         raw = lectures.folder("pain1") / "raw.txt"
-        self.assertEqual(raw.read_text(encoding="utf-8"), RAW)
+        first = raw.read_text(encoding="utf-8")
+        self.assertEqual(checks.paragraphs(first), [(0, RAW.splitlines()[0][8:]), (41, RAW.splitlines()[1][8:]),
+                                                    (73, RAW.splitlines()[2][8:])])  # times by word position
         (self.dir / "transcript.txt").write_text(RAW + "\n[01:50] more", encoding="utf-8")
         flow.check(self.job, self.dir)
-        self.assertEqual(raw.read_text(encoding="utf-8"), RAW)  # never edited after
+        self.assertEqual(raw.read_text(encoding="utf-8"), first)  # never edited after
         self.assertEqual(flow.then(self.job, self.dir), [("lecture_links", [{"key": "pain1", "payload": {"lecture": "pain1"}}])])
 
 

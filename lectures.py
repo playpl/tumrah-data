@@ -48,6 +48,17 @@ def compress(src, dst, kbps):
                     "-b:a", f"{kbps}k", str(dst)], check=True)
 
 
+def chunks(src, out_dir, seconds):
+    """Cuts src into seconds-long pieces out_dir/c00.ogg, c01.ogg, ... with exact offsets (the timing pass).
+    Returns how many. Already cut: counts them."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if not any(out_dir.glob("c*.ogg")):
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-f", "segment", "-segment_time", str(seconds),
+                        "-reset_timestamps", "1", "-ac", "1", "-c:a", "libopus", "-b:a", "16k",
+                        str(out_dir / "c%02d.ogg")], check=True)
+    return len(list(out_dir.glob("c*.ogg")))
+
+
 def vtt_to_raw(vtt_text):
     """YouTube captions to raw.txt: rolling auto-caption repeats dropped, a [mm:ss] paragraph every ~30 s."""
     paras, last_line, start = [], None, None
