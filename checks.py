@@ -279,8 +279,15 @@ def word_time(text, index):
     return stamp
 
 
-def applied(fixes):
-    return [f for f in fixes if isinstance(f, dict) and f.get("confidence", 0) >= APPLY_AT]
+def applied(fixes, decisions=None):
+    """Fixes in clean.txt: 0.9 or more, unless the owner kept the heard word; under 0.9 only when the owner took it.
+    decisions: {"<fix index>": "take" | "keep"} from the admin page."""
+    decisions = decisions or {}
+
+    def on(i, f):
+        d = decisions.get(str(i))
+        return d == "take" or (d != "keep" and f.get("confidence", 0) >= APPLY_AT)
+    return [f for i, f in enumerate(fixes) if isinstance(f, dict) and on(i, f)]
 
 
 def check_fixes(fixes):
@@ -297,10 +304,10 @@ def check_fixes(fixes):
     return errors
 
 
-def expected_tokens(raw, fixes):
+def expected_tokens(raw, fixes, decisions=None):
     """The raw words with every applied fix put in, each at its next occurrence after the previous fix."""
     words, pos = tokens(raw), 0
-    for f in applied(fixes):
+    for f in applied(fixes, decisions):
         heard, meant = tokens(f["heard"]), tokens(f["meant"])
         for i in range(pos, len(words) - len(heard) + 1):
             if words[i:i + len(heard)] == heard:
@@ -312,13 +319,13 @@ def expected_tokens(raw, fixes):
     return words, None
 
 
-def check_clean(raw, clean, fixes):
+def check_clean(raw, clean, fixes, decisions=None):
     """clean.txt is raw.txt laid out again: the same words in the same order, except the applied fixes.
     Errors give positions, never the words, so a reader of the log never needs the transcript."""
     errors = check_fixes(fixes)
     if errors:
         return errors
-    want, problem = expected_tokens(raw, fixes)
+    want, problem = expected_tokens(raw, fixes, decisions)
     if problem:
         return [problem]
     got = tokens(clean)

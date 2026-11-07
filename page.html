@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tumrah data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --base: #eef0f4; --raised: #ffffff; --inset: #e4e7ee; --edge: #cfd5e1; --ledge: #b9c1d1;
+  --ink: #1d2433; --ink2: #5b6478; --accent: #3b6fe0; --accent-ink: #ffffff;
+  --ok: #1f8a5b; --warn: #b7791f; --bad: #c2413b;
+  --r-control: .75rem; --r-card: 1.25rem; --fast: 120ms;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--base); color: var(--ink); font: 400 .9375rem/1.45 Outfit, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums; }
+header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.5rem; flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 1.125rem; font-weight: 700; letter-spacing: .02em; }
+nav { display: flex; gap: .375rem; flex-wrap: wrap; flex: 1; min-width: 0; }
+main { padding: 0 1.5rem 2rem; }
+.card { background: var(--raised); border: 2px solid var(--edge); border-bottom-width: 5px; border-bottom-color: var(--ledge);
+  border-radius: var(--r-card); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.card h2 { margin: 0 0 .75rem; font-size: 1rem; font-weight: 600; }
+button, .btn { font: inherit; font-weight: 600; color: var(--ink); background: var(--raised); border: 2px solid var(--edge);
+  border-bottom-width: 4px; border-bottom-color: var(--ledge); border-radius: var(--r-control); padding: .4rem .85rem;
+  cursor: pointer; transition: transform var(--fast), border-width var(--fast); }
+button:hover { border-color: var(--ledge); }
+button:active { transform: translateY(2px); border-bottom-width: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: #2c58bb; }
+button[aria-pressed="true"] { background: var(--inset); color: var(--accent); border-bottom-width: 2px; transform: translateY(2px); }
+button:disabled { opacity: .5; cursor: default; }
+input, select { font: inherit; color: var(--ink); background: var(--inset); border: 2px solid var(--edge); border-radius: var(--r-control);
+  padding: .35rem .6rem; min-width: 0; }
+.row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: .75rem; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: .4rem .5rem; vertical-align: top; }
+th { font-size: .75rem; color: var(--ink2); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+tr + tr td { border-top: 1px solid var(--inset); }
+.muted { color: var(--ink2); }
+.num { text-align: right; }
+.chip { display: inline-block; padding: .05rem .5rem; border-radius: 999px; background: var(--inset); font-size: .75rem; font-weight: 600; }
+.ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+.bar { height: .5rem; background: var(--inset); border-radius: 999px; overflow: hidden; min-width: 6rem; }
+.bar > i { display: block; height: 100%; background: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.75rem, 1fr)); gap: .25rem; }
+.cell { border-radius: .375rem; padding: .25rem 0; text-align: center; font-size: .6875rem; background: var(--inset); color: var(--ink2); }
+.cell.q { box-shadow: inset 0 -4px 0 #3b6fe0; } .cell.b { outline: 2px solid #1f8a5b; } .cell.l { background: #fde8c8; color: var(--ink); }
+.legend span { margin-right: 1rem; font-size: .8125rem; }
+.out { white-space: pre-wrap; font-size: .8125rem; background: var(--inset); border-radius: var(--r-control); padding: .5rem .75rem; }
+.hide { display: none; }
+td.text { max-width: 42rem; }
+@media (max-width: 40rem) { header, main { padding-left: 1rem; padding-right: 1rem; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tumrah data</h1>
+  <nav id="tabs"></nav>
+</header>
+<main>
+  <section data-tab="Progress">
+    <div class="card"><h2>Jobs</h2><div id="flows"></div></div>
+    <div class="card"><h2>Accounts</h2><div id="accounts"></div></div>
+  </section>
+
+  <section data-tab="Questions">
+    <div class="card">
+      <div class="row">
+        <select id="qModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select>
+        <input id="qDoctor" placeholder="Doctor">
+        <input id="qSet" placeholder="Set">
+        <select id="qPointer"><option value="">All</option><option value="without">No pointer</option><option value="with">Pointer</option></select>
+        <button id="qLoad">Show</button>
+        <span class="muted" id="qCount"></span>
+        <span style="flex:1"></span>
+        <button class="primary" id="qHand" disabled>Hand over</button>
+      </div>
+      <table><thead><tr><th><input type="checkbox" id="qAll"></th><th>Question</th><th>Doctor</th><th>Set</th><th>Pointer</th></tr></thead>
+        <tbody id="qRows"></tbody></table>
+      <div class="row" style="margin-top:.75rem"><button id="qMore" class="hide">More</button></div>
+      <div class="out hide" id="qOut"></div>
+    </div>
+  </section>
+
+  <section data-tab="Lectures">
+    <div class="card"><h2>Add</h2>
+      <div class="row">
+        <input id="lId" placeholder="Id">
+        <select id="lModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select>
+        <input id="lTitle" placeholder="Title">
+        <input id="lSrc" placeholder="File path or YouTube link" style="flex:1;min-width:14rem">
+        <input id="lPages" placeholder="Pages 154-160" style="width:9rem">
+        <input id="lLesson" placeholder="Site lesson id" style="width:13rem">
+        <label><input type="checkbox" id="lTx" checked> Transcribe</label>
+        <button class="primary" id="lAdd">Add</button>
+      </div>
+      <div class="out hide" id="lOut"></div>
+    </div>
+    <div class="card"><h2>Lectures</h2>
+      <table><thead><tr><th>Lecture</th><th>Stage</th><th class="num">Minutes</th><th>Lines covered</th><th>Recording linked</th><th>Fixes for you</th><th>Transcribe</th></tr></thead>
+        <tbody id="lRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Word fixes">
+    <div class="card">
+      <div class="row"><select id="fLecture"></select></div>
+      <table><thead><tr><th>At</th><th>Heard</th><th>Suggested</th><th class="num">Sure</th><th>Reason</th><th></th></tr></thead>
+        <tbody id="fRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Books">
+    <div class="card">
+      <table><thead><tr><th>Module</th><th>Book</th><th class="num">Pages</th><th>Aligned</th><th class="num">Held</th></tr></thead>
+        <tbody id="bRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Coverage">
+    <div class="card"><h2>Check a file</h2>
+      <div class="row"><input type="file" id="cFile" accept=".jsonl,.json"><button class="primary" id="cGo">Check</button></div>
+      <div class="out hide" id="cOut"></div>
+    </div>
+    <div class="card"><h2>Covered</h2>
+      <table><thead><tr><th>File</th><th class="num">Questions</th><th class="num">Matched</th><th>Covered</th><th>When</th></tr></thead>
+        <tbody id="cRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Voters">
+    <div class="card"><h2>Update voters</h2>
+      <div class="row"><button id="vDry">Dry run</button><button class="primary" id="vApply">Update the site</button><span class="muted" id="vState"></span></div>
+      <div class="out hide" id="vOut"></div>
+    </div>
+  </section>
+
+  <section data-tab="Lecture questions">
+    <div class="card">
+      <div class="row"><input id="rLesson" placeholder="Site lesson id" style="width:15rem"><button id="rLoad">Show</button></div>
+      <div class="row"><input id="rIds" placeholder="Question ids, comma separated" style="flex:1"><button class="primary" id="rAdd">Add required</button><button id="rDel">Remove</button></div>
+      <div class="out hide" id="rOut"></div>
+      <table><thead><tr><th>Kind</th><th>Question</th><th>Parts</th></tr></thead><tbody id="rRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Gap map">
+    <div class="card">
+      <div class="row"><select id="gModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select><button id="gLoad">Show</button></div>
+      <div class="legend row"><span><b style="color:#3b6fe0">&#9644;</b> Questions</span><span><b class="ok">&#9633;</b> Book</span><span><b style="color:#d69b3d">&#9632;</b> Lecture</span></div>
+      <div class="grid" id="gGrid"></div>
+    </div>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const get = (u) => fetch(u).then((r) => r.json());
+const post = (u, b) => fetch(u, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(b)}).then((r) => r.json());
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const pct = (x) => x == null ? "" : `<div class="bar"><i style="width:${Math.round(x * 100)}%"></i></div> ${Math.round(x * 100)}%`;
+const show = (el, text) => { el.classList.remove("hide"); el.textContent = typeof text === "string" ? text : JSON.stringify(text, null, 1); };
+
+const tabs = [...document.querySelectorAll("section[data-tab]")];
+const loaders = {};
+function open(name) {
+  tabs.forEach((s) => s.classList.toggle("hide", s.dataset.tab !== name));
+  document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-pressed", b.textContent === name));
+  try { localStorage.setItem("tab", name); } catch (e) {}
+  loaders[name] && loaders[name]();
+}
+tabs.forEach((s) => { const b = document.createElement("button"); b.textContent = s.dataset.tab; b.onclick = () => open(s.dataset.tab); $("tabs").append(b); });
+
+loaders.Progress = async () => {
+  const p = await get("/api/progress");
+  const flows = Object.entries(p.flows);
+  $("flows").innerHTML = flows.length ? `<table><tr><th>Flow</th><th class="num">Queued</th><th class="num">Running</th><th class="num">Passed</th><th class="num">Held</th></tr>${
+    flows.map(([f, c]) => `<tr><td>${esc(f)}</td><td class="num">${c.queued || 0}</td><td class="num">${c.running || 0}</td><td class="num ok">${c.passed || 0}</td><td class="num ${c.held ? "bad" : ""}">${c.held || 0}</td></tr>`).join("")
+  }</table><p class="muted">${p.hours_left != null ? `About ${p.hours_left} h left` : ""}</p>` : `<p class="muted">Nothing queued</p>`;
+  $("accounts").innerHTML = `<table><tr><th>Account</th><th>Lane</th><th class="num">Slots</th><th class="num">Running</th><th>State</th></tr>${
+    p.accounts.map((a) => `<tr><td>${esc(a.account)}</td><td>${esc(a.lane)}</td><td class="num">${a.slots}</td><td class="num">${a.running}</td><td class="${a.cooling ? "warn" : "ok"}">${a.cooling ? "Resting" : "Ready"}</td></tr>`).join("")}</table>`;
+};
+
+let qNext = null;
+async function loadQuestions(more) {
+  const params = new URLSearchParams({module: $("qModule").value, doctor: $("qDoctor").value, set: $("qSet").value, pointer: $("qPointer").value});
+  if (more && qNext) params.set("after", qNext);
+  const d = await get("/api/questions?" + params);
+  if (!more) $("qRows").innerHTML = "";
+  $("qRows").insertAdjacentHTML("beforeend", d.rows.map((r) => `<tr><td><input type="checkbox" value="${r.id}" ${r.pointer ? "disabled" : ""}></td><td class="text">${esc(r.text)}</td><td>${esc(r.doctor)}</td><td>${esc(r.set)}</td><td>${r.pointer ? '<span class="chip ok">Yes</span>' : ""}</td></tr>`).join(""));
+  qNext = d.next;
+  $("qMore").classList.toggle("hide", !qNext);
+  $("qCount").textContent = `${$("qRows").children.length} shown`;
+  ticked();
+}
+function ticked() {
+  const n = document.querySelectorAll("#qRows input:checked").length;
+  $("qHand").disabled = !n;
+  $("qHand").textContent = n ? `Hand over ${n}` : "Hand over";
+}
+$("qLoad").onclick = () => loadQuestions(false);
+$("qMore").onclick = () => loadQuestions(true);
+$("qRows").onchange = ticked;
+$("qAll").onchange = (e) => { document.querySelectorAll("#qRows input:not(:disabled)").forEach((c) => c.checked = e.target.checked); ticked(); };
+$("qHand").onclick = async () => {
+  const ids = [...document.querySelectorAll("#qRows input:checked")].map((c) => c.value);
+  show($("qOut"), await post("/api/handover", {module: $("qModule").value, ids}));
+};
+
+loaders.Lectures = async () => {
+  const rows = await get("/api/lectures");
+  $("lRows").innerHTML = rows.map((l) => `<tr><td>${esc(l.title)}<div class="muted">${esc(l.id)}</div></td><td><span class="chip">${esc(l.stage)}</span></td><td class="num">${l.duration_s ? Math.round(l.duration_s / 60) : ""}</td><td>${pct(l.report?.lines_covered)}</td><td>${pct(l.report?.recording_linked)}</td><td class="num">${l.fixes?.for_owner ?? ""}</td><td><input type="checkbox" data-tx="${esc(l.id)}" ${l.transcribe ? "checked" : ""}></td></tr>`).join("") || `<tr><td class="muted">No lectures yet</td></tr>`;
+  $("fLecture").innerHTML = rows.filter((l) => l.fixes?.for_owner).map((l) => `<option value="${esc(l.id)}">${esc(l.title)}</option>`).join("");
+};
+$("lRows").onchange = (e) => e.target.dataset.tx && post("/api/transcribe", {id: e.target.dataset.tx, on: e.target.checked});
+$("lAdd").onclick = async () => {
+  const src = $("lSrc").value.trim();
+  const body = {id: $("lId").value.trim(), module: $("lModule").value, title: $("lTitle").value.trim(), pages: $("lPages").value.trim(),
+    lesson: $("lLesson").value.trim(), transcribe: $("lTx").checked, [/^https?:/.test(src) ? "youtube" : "file"]: src};
+  if (!body.id || !src) return show($("lOut"), "Id and source first");
+  show($("lOut"), await post("/api/lecture", body));
+  poll(`lecture ${body.id}`, $("lOut"), loaders.Lectures);
+};
+
+loaders["Word fixes"] = async () => {
+  await loaders.Lectures();
+  const id = $("fLecture").value;
+  if (!id) { $("fRows").innerHTML = `<tr><td class="muted">Nothing waits for you</td></tr>`; return; }
+  const rows = await get("/api/fixes?lecture=" + encodeURIComponent(id));
+  $("fRows").innerHTML = rows.map((f) => `<tr><td>${esc(f.at)}</td><td>${esc(f.heard)}</td><td><b>${esc(f.meant)}</b></td><td class="num">${Math.round(f.confidence * 100)}%</td><td class="muted">${esc(f.reason)}</td><td><button data-i="${f.index}" data-take="0" aria-pressed="${f.decision === "keep"}">Keep</button> <button data-i="${f.index}" data-take="1" aria-pressed="${f.decision === "take"}">Take</button></td></tr>`).join("");
+};
+$("fLecture").onchange = () => loaders["Word fixes"]();
+$("fRows").onclick = async (e) => {
+  const b = e.target.closest("button[data-i]");
+  if (!b) return;
+  const r = await post("/api/fix", {lecture: $("fLecture").value, index: +b.dataset.i, take: b.dataset.take === "1"});
+  if (!r.saved) alert(r.errors.join("\n"));
+  loaders["Word fixes"]();
+};
+
+loaders.Books = async () => {
+  const rows = await get("/api/books");
+  $("bRows").innerHTML = rows.map((b) => `<tr><td>${esc(b.module)}</td><td>${esc(b.book)}</td><td class="num">${b.pages}</td><td>${pct(b.percent / 100)}</td><td class="num ${b.held ? "bad" : ""}">${b.held}</td></tr>`).join("") || `<tr><td class="muted">No books queued</td></tr>`;
+};
+
+loaders.Coverage = async () => {
+  const rows = await get("/api/covered");
+  $("cRows").innerHTML = rows.map((c) => `<tr><td>${esc(c.file.split(/[\\/]/).pop())}</td><td class="num">${c.questions}</td><td class="num">${c.matched}</td><td>${pct(c.percent / 100)}</td><td class="muted">${esc(c.at)}</td></tr>`).join("") || `<tr><td class="muted">No files yet</td></tr>`;
+};
+$("cGo").onclick = async () => {
+  const f = $("cFile").files[0];
+  if (!f) return;
+  show($("cOut"), await post("/api/cover", {name: f.name, content: await f.text()}));
+  poll("coverage", $("cOut"), loaders.Coverage);
+};
+
+async function voters(apply) {
+  show($("vOut"), await post("/api/voters", {apply}));
+  poll("voters", $("vOut"));
+}
+$("vDry").onclick = () => voters(false);
+$("vApply").onclick = () => confirm("Write the new vote counts to the site?") && voters(true);
+
+async function loadRequired() {
+  const d = await get("/api/lecture-questions?lesson=" + encodeURIComponent($("rLesson").value.trim()));
+  $("rRows").innerHTML = [...d.required.map((r) => ["Required", r]), ...d.extra.map((r) => ["Extra", r])]
+    .map(([k, r]) => `<tr><td><span class="chip ${k === "Required" ? "ok" : ""}">${k}</span></td><td>${esc(r.question)}</td><td class="muted">${esc(r.parts.join(", "))}</td></tr>`).join("") || `<tr><td class="muted">None</td></tr>`;
+}
+$("rLoad").onclick = loadRequired;
+const ids = () => $("rIds").value.split(/[\s,]+/).filter(Boolean);
+$("rAdd").onclick = async () => { show($("rOut"), await post("/api/required", {lesson: $("rLesson").value.trim(), ids: ids()})); loadRequired(); };
+$("rDel").onclick = async () => { show($("rOut"), await post("/api/required", {lesson: $("rLesson").value.trim(), ids: ids(), remove: true})); loadRequired(); };
+
+loaders["Gap map"] = async () => {
+  const d = await get("/api/gap?module=" + $("gModule").value);
+  $("gGrid").innerHTML = d.error ? `<p class="muted">${esc(d.error)}</p>` : d.pages.map((p) =>
+    `<div class="cell ${p.questions ? "q" : ""} ${p.book ? "b" : ""} ${p.lecture ? "l" : ""}" title="p${p.page}: ${p.questions} questions, ${p.book} book lines, ${p.lecture} lecture parts">${p.page}</div>`).join("");
+};
+$("gLoad").onclick = loaders["Gap map"];
+
+function poll(name, el, then) {
+  const t = setInterval(async () => {
+    const j = (await get("/api/jobs"))[name];
+    if (!j) return;
+    $("vState") && name === "voters" && ($("vState").textContent = j.state === "running" ? `Running since ${j.at}` : "");
+    if (j.state !== "running") { clearInterval(t); show(el, j.result ?? j.state); then && then(); }
+  }, 2000);
+}
+
+let first = "Progress";
+try { first = localStorage.getItem("tab") || first; } catch (e) {}
+open(tabs.some((s) => s.dataset.tab === first) ? first : "Progress");
+setInterval(() => !document.hidden && !$("flows").closest("section").classList.contains("hide") && loaders.Progress(), 10000);
+</script>
+</body>
+</html>

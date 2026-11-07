@@ -160,6 +160,11 @@ def cmd_voters(args):
     print(json.dumps(voters.run(apply=args.apply), indent=1))
 
 
+def cmd_page(_):
+    import page
+    page.serve()
+
+
 def cmd_run(args):
     import dispatch
     import flows
@@ -198,6 +203,7 @@ def main():
     p.add_argument("--pages", help="first-last handout pdf pages of the lecture")
     p.add_argument("--no-transcribe", action="store_true", help="register only (an old recording kept as a taste)")
     p.set_defaults(fn=cmd_lecture)
+    sub.add_parser("page", help="the admin page on http://127.0.0.1:8770").set_defaults(fn=cmd_page)
     sub.add_parser("bank", help="merge polls, QuizBot and forms into bank/questions.jsonl").set_defaults(fn=cmd_bank)
     p = sub.add_parser("cover", help="is this question file already in our data? records it as covered")
     p.add_argument("file")
