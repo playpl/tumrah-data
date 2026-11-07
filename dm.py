@@ -117,6 +117,44 @@ def cmd_lecture(args):
         print("not queued: Transcribe is off for this lecture")
 
 
+def cmd_bank(_):
+    import merge
+    print(json.dumps(merge.build()))
+
+
+def cmd_cover(args):
+    import cover
+    import db
+    import queue_db
+    done = cover.covered(args.file)
+    if done and not args.again:
+        sys.exit(f"already covered on {done['at']}: {done['matched']} of {done['questions']} ({done['percent']}%)")
+    rows = cover.read_jsonl(args.file)
+    reader = db.Reader.live()
+    index = {**cover.bank_index(), **cover.site_index(reader, refresh=args.refresh)}
+    matches = cover.script_match(rows, index)
+    entry = cover.record(args.file, rows, matches)
+    print(f"script: {entry['matched']} of {entry['questions']} matched ({entry['percent']}%)")
+    left = [i for i, m in enumerate(matches) if m is None]
+    if not left:
+        return
+    pool, df = cover.pool_of([{"id": r["id"], "text": r["t"]} for r in cover.read_jsonl(cover.SITE_KEYS)])
+    text = {p["id"]: p["text"] for p in pool}
+    items = []
+    for i in left:
+        ids = cover.candidates(rows[i], pool, df)
+        if ids:
+            items.append({"i": i, "question": rows[i]["question"], "options": rows[i].get("options") or [],
+                          "candidates": [{"id": c, "text": text[c]} for c in ids]})
+    jobs = [{"key": f"{entry['sha']}-{n:03d}", "payload": {"file": str(args.file), "sha": entry["sha"],
+                                                         "items": items[n:n + POINTER_BATCH]}}
+            for n in range(0, len(items), POINTER_BATCH)]
+    q = queue_db.Queue()
+    q.add_jobs("cover", jobs)
+    q.close()
+    print(f"fleet: {len(items)} questions with candidates in {len(jobs)} jobs; {len(left) - len(items)} have none (new)")
+
+
 def cmd_run(args):
     import dispatch
     import flows
@@ -155,6 +193,12 @@ def main():
     p.add_argument("--pages", help="first-last handout pdf pages of the lecture")
     p.add_argument("--no-transcribe", action="store_true", help="register only (an old recording kept as a taste)")
     p.set_defaults(fn=cmd_lecture)
+    sub.add_parser("bank", help="merge polls, QuizBot and forms into bank/questions.jsonl").set_defaults(fn=cmd_bank)
+    p = sub.add_parser("cover", help="is this question file already in our data? records it as covered")
+    p.add_argument("file")
+    p.add_argument("--again", action="store_true", help="check a file that was already covered")
+    p.add_argument("--refresh", action="store_true", help="re-read the site's questions")
+    p.set_defaults(fn=cmd_cover)
     import sources
     sources.add_parser(sub)
     p = sub.add_parser("run", help="run queued jobs across the fleet accounts")

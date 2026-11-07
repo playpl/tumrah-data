@@ -389,3 +389,22 @@ def check_lecture_dir(job_dir, lines, duration_s, lecture_pages=None):
     raw = (d / "raw.txt").read_text(encoding="utf-8")
     return check_clean(raw, (d / "clean.txt").read_text(encoding="utf-8"), fixes) + \
         check_links(parts, duration_s, lines, lecture_pages)
+
+
+def check_cover(rows, batch, lines=None, reference=None):
+    """Worker rows {i, match}: every item answered once, each match null or one of its listed candidates."""
+    allowed = {b["i"]: set(b["candidates"]) for b in batch}
+    errors, seen = [], set()
+    for r in rows:
+        if not isinstance(r, dict) or set(r) != {"i", "match"}:
+            errors.append("each row must be exactly {i, match}")
+            continue
+        if r["i"] not in allowed:
+            errors.append(f"item {r['i']} is not in the batch")
+        elif r["match"] is not None and r["match"] not in allowed[r["i"]]:
+            errors.append(f"item {r['i']}: match must be null or one of its listed candidates")
+        seen.add(r["i"])
+    missing = set(allowed) - seen
+    if missing:
+        errors.append(f"{len(missing)} items have no row")
+    return errors

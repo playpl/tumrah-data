@@ -36,8 +36,8 @@ def build(job_dir, module, batch, checker, output, brief, extra_inputs=(), extra
     inputs.mkdir(exist_ok=True)
     for f in [*KIT.glob("*.py"), ROOT / "hub.py", ROOT / "checks.py"]:
         shutil.copy2(f, tools / f.name)
-    src = module_dir(module)
-    for name in ("lines.jsonl", "reference.json", *extra_inputs):
+    src = module_dir(module) if module else None  # cover jobs need no handout
+    for name in ("lines.jsonl", "reference.json", *extra_inputs) if src else ():
         if (src / name).exists() and not (inputs / name).exists():
             shutil.copy2(src / name, inputs / name)
     write_jsonl(job_dir / "batch.jsonl", batch)

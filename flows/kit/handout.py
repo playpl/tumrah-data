@@ -11,7 +11,8 @@ def read_jsonl(path):
 
 
 def lines():
-    return read_jsonl(JOB / "inputs" / "lines.jsonl")
+    p = JOB / "inputs" / "lines.jsonl"
+    return read_jsonl(p) if p.exists() else []
 
 
 def reference():
