@@ -18,6 +18,12 @@ def cmd_status(_):
         lines = d / "lines.jsonl"
         n = sum(1 for _ in lines.open(encoding="utf-8")) if lines.exists() else 0
         print(f"  {d.name}: handout {'yes' if (d / 'handout.pdf').exists() else 'MISSING'}, lines {n or 'not split'}")
+    if (ROOT / "queue.db").exists():
+        import queue_db
+        q = queue_db.Queue()
+        for flow, counts in sorted(q.progress().items()):
+            print(f"queue {flow}: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())))
+        q.close()
     try:
         with urllib.request.urlopen(POLLS_PAGE, timeout=3) as r:
             s = json.load(r)
