@@ -173,6 +173,21 @@ def cmd_run(args):
     q = queue_db.Queue()
     d = dispatch.Dispatcher(q, slots=cfg["slots"], lanes=cfg["lanes"], flows=flows.REGISTRY, jobs_root=ROOT / "jobs")
     (ROOT / "jobs" / "stop.flag").unlink(missing_ok=True)
+    if (ROOT / "handover").exists():
+        import threading
+        import db
+        import intake
+
+        def take_handovers():  # new hand-over files from the admin page become pointer jobs, once
+            while not d.stopping():
+                hq = queue_db.Queue()
+                try:
+                    for name, n in intake.intake(db.Reader.live(), hq, cfg["pointer_order"]).items():
+                        print(f"hand-over {name}: {n} pointer jobs", flush=True)
+                finally:
+                    hq.close()
+                d.stop.wait(60)
+        threading.Thread(target=take_handovers, daemon=True).start()
     print(f"dispatcher: {sum(cfg['slots'].values())} slots, flows: {', '.join(flows.REGISTRY) or 'none yet'}"
           f"{' (until the queue is empty)' if args.once else ' (create jobs/stop.flag or Ctrl+C to stop)'}", flush=True)
     print(json.dumps(d.run(once=args.once)))
