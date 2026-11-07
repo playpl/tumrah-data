@@ -101,3 +101,113 @@ def pointer_import_rows(rows, lines):
                     "lecture_id": r["lecture_id"], "reason": r["reason"], "other_module": r["other_module"],
                     "spans": spans})
     return out
+
+
+ALIGN_KEYS = {"book_id", "page", "page_kind", "lecture_id", "blocks", "note"}
+BLOCK_KEYS = {"n", "text", "figure", "match", "handout"}
+ALIGN_SPAN_KEYS = {"pdf_page", "printed_page", "text", "figure"}
+MATCHES = {"same", "reworded", "partial", "extra", "not_content"}
+LINKED = {"same", "reworded", "partial"}
+MIN_COVERAGE = 0.9        # share of a text page's characters its blocks must cover (old alignment rule)
+IMAGE_PAGE_CHARS = 20     # less text than this: an image-only page, blocks are not checked against it
+MAX_BLOCK_WORDS, MAX_SPAN_WORDS = 60, 80
+
+
+def squash(text):
+    return " ".join(str(text or "").split())
+
+
+def coverage(page_text, blocks):
+    """Share of the page's non-space characters covered by the blocks' texts (first free occurrence of each)."""
+    covered = [False] * len(page_text)
+    for text in blocks:
+        start, i = 0, -1
+        while True:
+            i = page_text.find(text, start)
+            if i < 0 or not any(covered[i:i + len(text)]):
+                break
+            start = i + 1
+        if i >= 0 and text:
+            covered[i:i + len(text)] = [True] * len(text)
+    chars = [k for k, c in enumerate(page_text) if not c.isspace()]
+    return sum(covered[k] for k in chars) / len(chars) if chars else 1.0
+
+
+def check_alignment(rows, batch, lines, reference=None):
+    """rows: align rows; batch: the book pages {"book_id", "page", "text"}; lines: the module's handout lines."""
+    lines = as_lines(lines)
+    printed = {ln.page: ln.printed for ln in lines}
+    lectures = {lec["lecture_id"] for lec in (reference or {}).get("lectures", [])}
+    pages = {(b["book_id"], b["page"]): squash(b["text"]) for b in batch}
+    errors, seen = [], []
+    for r in rows:
+        where = f"{r.get('book_id')} p{r.get('page')}" if isinstance(r, dict) else "row"
+        if not isinstance(r, dict) or set(r) != ALIGN_KEYS:
+            errors.append(f"{where}: keys must be exactly {sorted(ALIGN_KEYS)}")
+            continue
+        seen.append((r["book_id"], r["page"]))
+        text = pages.get((r["book_id"], r["page"]))
+        if text is None:
+            errors.append(f"{where}: not a page of this batch")
+            continue
+        if r["page_kind"] not in ("content", "not_content"):
+            errors.append(f"{where}: page_kind must be content or not_content")
+        if r["lecture_id"] is not None and lectures and r["lecture_id"] not in lectures:
+            errors.append(f"{where}: unknown lecture_id {r['lecture_id']}")
+        blocks = r["blocks"] if isinstance(r["blocks"], list) else []
+        ns = [b.get("n") for b in blocks if isinstance(b, dict)]
+        if ns != list(range(1, len(blocks) + 1)):
+            errors.append(f"{where}: blocks must be numbered 1, 2, 3... with no gap or repeat")
+        for b in blocks:
+            if not isinstance(b, dict) or set(b) != BLOCK_KEYS:
+                errors.append(f"{where}: block keys must be exactly {sorted(BLOCK_KEYS)}")
+                continue
+            at = f"{where} block {b['n']}"
+            if b["match"] not in MATCHES:
+                errors.append(f"{at}: match must be one of {sorted(MATCHES)}")
+            if r["page_kind"] == "not_content" and b["match"] != "not_content":
+                errors.append(f"{at}: a not_content page has only not_content blocks")
+            if len(squash(b["text"]).split()) > MAX_BLOCK_WORDS:
+                errors.append(f"{at}: over {MAX_BLOCK_WORDS} words; split it")
+            if len(text) >= IMAGE_PAGE_CHARS and squash(b["text"]) not in text:
+                errors.append(f"{at}: not verbatim on the book page: {squash(b['text'])[:60]!r}")
+            spans = b["handout"] if isinstance(b["handout"], list) else []
+            if (b["match"] in LINKED) != bool(spans):
+                errors.append(f"{at}: {b['match']} needs {'handout spans' if b['match'] in LINKED else 'no spans'}")
+            for i, s in enumerate(spans):
+                if not isinstance(s, dict) or set(s) != ALIGN_SPAN_KEYS:
+                    errors.append(f"{at} span {i}: keys must be exactly {sorted(ALIGN_SPAN_KEYS)}")
+                    continue
+                if s["pdf_page"] not in printed:
+                    errors.append(f"{at} span {i}: handout pdf_page {s['pdf_page']} does not exist")
+                    continue
+                if s["printed_page"] != printed[s["pdf_page"]]:
+                    errors.append(f"{at} span {i}: printed_page for pdf {s['pdf_page']} must be {printed[s['pdf_page']]}")
+                if len(squash(s["text"]).split()) > MAX_SPAN_WORDS:
+                    errors.append(f"{at} span {i}: over {MAX_SPAN_WORDS} words")
+                if not resolve_span(lines, s["pdf_page"], s["text"], s["figure"]):
+                    errors.append(f"{at} span {i}: not verbatim on handout pdf page {s['pdf_page']}: {squash(s['text'])[:60]!r}")
+        if len(text) >= IMAGE_PAGE_CHARS and r["page_kind"] == "content":
+            cov = coverage(text, [squash(b.get("text")) for b in blocks if isinstance(b, dict)])
+            if cov < MIN_COVERAGE:
+                errors.append(f"{where}: blocks cover {cov:.0%} of the page; at least {MIN_COVERAGE:.0%}")
+    missing = [p for p in pages if p not in seen]
+    if missing:
+        errors.append(f"missing {len(missing)} pages: {missing[:3]}")
+    if len(seen) != len(set(seen)):
+        errors.append("a page appears twice")
+    return errors
+
+
+def alignment_import_rows(rows, lines):
+    """Checked align rows as importSiteBook page rows, with each block's handout line IDs."""
+    lines = as_lines(lines)
+    out = []
+    for r in rows:
+        blocks = []
+        for b in r["blocks"]:
+            ids = [i for s in b["handout"] for i in resolve_span(lines, s["pdf_page"], s["text"], s["figure"])]
+            blocks.append({**b, "line_ids": list(dict.fromkeys(ids))})
+        out.append({"book_id": r["book_id"], "page": r["page"], "page_kind": r["page_kind"],
+                    "lecture_id": r["lecture_id"], "blocks": blocks})
+    return out

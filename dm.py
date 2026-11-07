@@ -46,6 +46,57 @@ def cmd_lines(args):
           f"{kinds['page']} pages with no text, {sum(v is None for v in printed.values())} pages without a printed number")
 
 
+POINTER_BATCH, BOOK_BATCH = 25, 5
+
+
+def pointer_jobs(module, questions, order):
+    """Batches of 25 in the owner's set order (doctor, quiz, past exam, ai; unknown sets last)."""
+    import hashlib
+    rank = {s: i for i, s in enumerate(order)}
+    qs = sorted(questions, key=lambda q: (rank.get(q.get("set"), len(rank)), q.get("lesson") or "", q["qid"]))
+    jobs = []
+    for i in range(0, len(qs), POINTER_BATCH):
+        batch = qs[i:i + POINTER_BATCH]
+        key = f"{module}-" + hashlib.sha1(",".join(q["qid"] for q in batch).encode()).hexdigest()[:12]
+        jobs.append({"key": key, "payload": {"module": module, "batch": batch}})
+    return jobs
+
+
+def book_jobs(module, book_id, pages):
+    return [{"key": f"{module}-{book_id}-p{pages[i]['page']:04d}",
+             "payload": {"module": module, "book_id": book_id, "pages": pages[i:i + BOOK_BATCH]}}
+            for i in range(0, len(pages), BOOK_BATCH)]
+
+
+def book_pages(pdf, book_id, first=None, last=None):
+    import fitz
+    with fitz.open(pdf) as doc:
+        a, b = first or 1, min(last or doc.page_count, doc.page_count)
+        return [{"book_id": book_id, "page": n, "text": doc[n - 1].get_text("text")} for n in range(a, b + 1)]
+
+
+def cmd_add(args):
+    import queue_db
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    if not (MODULES / args.module / "lines.jsonl").exists():
+        sys.exit(f"run `py dm.py lines {args.module}` first")
+    if args.flow == "pointers":
+        from flows.common import read_jsonl
+        jobs = pointer_jobs(args.module, read_jsonl(args.file), cfg["pointer_order"])
+    else:
+        import shutil
+        first, last = (int(x) for x in args.pages.split("-")) if args.pages else (None, None)
+        keep = MODULES / args.module / "books" / f"{args.book}.pdf"
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        if Path(args.file).resolve() != keep.resolve():
+            shutil.copy2(args.file, keep)
+        jobs = book_jobs(args.module, args.book, book_pages(keep, args.book, first, last))
+    q = queue_db.Queue()
+    added = q.add_jobs(args.flow, jobs)
+    q.close()
+    print(f"{args.flow}: {len(jobs)} jobs, {added} new")
+
+
 def cmd_run(args):
     import dispatch
     import flows
@@ -67,6 +118,13 @@ def main():
     p = sub.add_parser("lines", help="split modules/<code>/handout.pdf into modules/<code>/lines.jsonl")
     p.add_argument("module")
     p.set_defaults(fn=cmd_lines)
+    p = sub.add_parser("add", help="queue work: pointers <module> --file questions.jsonl | books <module> --book <id> --file book.pdf")
+    p.add_argument("flow", choices=["pointers", "books"])
+    p.add_argument("module")
+    p.add_argument("--file", required=True)
+    p.add_argument("--book", help="book id (books)")
+    p.add_argument("--pages", help="first-last book pages (books); default all")
+    p.set_defaults(fn=cmd_add)
     p = sub.add_parser("run", help="run queued jobs across the fleet accounts")
     p.add_argument("--once", action="store_true", help="stop when nothing is queued or running")
     p.set_defaults(fn=cmd_run)
