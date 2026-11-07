@@ -1,0 +1,52 @@
+"""Builds a job folder: tools (the kit plus hub.py and checks.py), the module's handout lines and reference,
+the batch and job.json. Workers see only this folder."""
+import json
+import shutil
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+KIT = Path(__file__).resolve().parent / "kit"
+MODULES = ROOT / "modules"
+
+SUBAGENTS = ("You may split the work across subagents (for example 5 items each, or one per lecture part) to go faster. "
+             "You own the merged output file: run the check on the whole file yourself before you finish.")
+
+
+def read_jsonl(path):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def write_jsonl(path, rows):
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def module_dir(code):
+    d = MODULES / code
+    if not (d / "lines.jsonl").exists():
+        raise FileNotFoundError(f"run `py dm.py lines {code}` first")
+    return d
+
+
+def build(job_dir, module, batch, checker, output, brief, extra_inputs=()):
+    tools, inputs = job_dir / "tools", job_dir / "inputs"
+    tools.mkdir(parents=True, exist_ok=True)
+    inputs.mkdir(exist_ok=True)
+    for f in [*KIT.glob("*.py"), ROOT / "hub.py", ROOT / "checks.py"]:
+        shutil.copy2(f, tools / f.name)
+    src = module_dir(module)
+    for name in ("lines.jsonl", "reference.json", *extra_inputs):
+        if (src / name).exists() and not (inputs / name).exists():
+            shutil.copy2(src / name, inputs / name)
+    write_jsonl(job_dir / "batch.jsonl", batch)
+    (job_dir / "job.json").write_text(json.dumps({"module": module, "batch": "batch.jsonl", "checker": checker,
+                                                  "output": output}), encoding="utf-8")
+    (job_dir / "BRIEF.md").write_text(brief, encoding="utf-8")
+
+
+def output_rows(job_dir):
+    job = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+    out = job_dir / job["output"]
+    return read_jsonl(out) if out.exists() else None

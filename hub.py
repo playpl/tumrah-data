@@ -11,7 +11,6 @@ import unicodedata
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-import fitz
 
 MIN_FIGURE_AREA = 2000      # pt^2; smaller images are icons and bullets
 CAPTION_GAP = 30            # pt between a figure and the text row that names it
@@ -95,6 +94,7 @@ def _caption(fig, rows):
 
 
 def split_handout(pdf, module):
+    import fitz  # only here: fleet workers import this file for word_key and resolve_span without PyMuPDF
     h = file_hash(pdf)
     out = []
     with fitz.open(pdf) as doc:
