@@ -1,4 +1,16 @@
 {
+  "book_root": "C:/Users/Ahmed/Desktop/tumrah-book",
+  "highlights": {
+    "weights": {"said_mcq": 6, "said_important": 3, "doctor_mcq": 3, "other_mcq": 1, "stressed": 1,
+                "repeat_bonus": 1, "extra_doctor": 2},
+    "red_at": 6,
+    "blue_at": 3,
+    "min_repeats": 2,
+    "min_importance": 2,
+    "max_words_per_page": 18,
+    "max_sentences_per_page": 4,
+    "audit_every": 10
+  },
   "lanes": {
     "zero": "transcribe",
     "work": "pointers",

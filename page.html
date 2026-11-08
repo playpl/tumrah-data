@@ -51,6 +51,13 @@ tr + tr td { border-top: 1px solid var(--inset); }
 .out { white-space: pre-wrap; font-size: .8125rem; background: var(--inset); border-radius: var(--r-control); padding: .5rem .75rem; }
 .hide { display: none; }
 td.text { max-width: 42rem; }
+.lesson { white-space: pre-line; line-height: 1.9; max-width: 48rem; }
+.lesson .pg { display: block; margin: .75rem 0 .25rem; color: var(--ink2); font-size: .75rem; font-weight: 600; }
+.h1 { background: #ffd0cc; } .h2 { background: #cfe0ff; } .h3 { background: #cdeed8; }
+.u1, .u2, .u3 { text-decoration: underline 2px; text-underline-offset: 3px; }
+.u1 { text-decoration-color: #c2413b; } .u2 { text-decoration-color: #3b6fe0; } .u3 { text-decoration-color: #1f8a5b; }
+.mcq { outline: 2px solid #c2413b; border-radius: 999px; padding: 0 .2rem; }
+.mcqtag { font-size: .625rem; font-weight: 700; color: #fff; background: #c2413b; border-radius: 999px; padding: 0 .35rem; margin-left: .25rem; }
 @media (max-width: 40rem) { header, main { padding-left: 1rem; padding-right: 1rem; } }
 </style>
 </head>
@@ -90,6 +97,7 @@ td.text { max-width: 42rem; }
         <input id="lId" placeholder="Id">
         <select id="lModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select>
         <input id="lTitle" placeholder="Title">
+        <input id="lDoctor" placeholder="Doctor" style="width:9rem">
         <input id="lSrc" placeholder="File path or YouTube link" style="flex:1;min-width:14rem">
         <input id="lPages" placeholder="Pages 154-160" style="width:9rem">
         <input id="lLesson" placeholder="Site lesson id" style="width:13rem">
@@ -143,6 +151,19 @@ td.text { max-width: 42rem; }
       <div class="row"><input id="rIds" placeholder="Question ids, comma separated" style="flex:1"><button class="primary" id="rAdd">Add required</button><button id="rDel">Remove</button></div>
       <div class="out hide" id="rOut"></div>
       <table><thead><tr><th>Kind</th><th>Question</th><th>Parts</th></tr></thead><tbody id="rRows"></tbody></table>
+    </div>
+  </section>
+
+  <section data-tab="Highlights">
+    <div class="card">
+      <div class="row"><select id="hModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select><button id="hLoad">Show</button><button class="primary" id="hGo" disabled>Highlight</button></div>
+      <div class="out hide" id="hOut"></div>
+      <table><thead><tr><th><input type="checkbox" id="hAll"></th><th>Lesson</th><th class="num">Pages</th><th class="num">Lectures</th><th>State</th><th class="num">Red</th><th class="num">Blue</th><th class="num">Green</th><th class="num">MCQ</th><th></th></tr></thead>
+        <tbody id="hRows"></tbody></table>
+    </div>
+    <div class="card hide" id="hView"><h2 id="hTitle"></h2>
+      <div class="legend row"><span class="h1">Must know</span><span class="h2">Important</span><span class="h3">Good to know</span><span class="u1">Sentence</span><span class="h1 mcq">MCQ</span></div>
+      <div class="lesson" id="hText"></div>
     </div>
   </section>
 
@@ -217,7 +238,7 @@ $("lRows").onchange = (e) => e.target.dataset.tx && post("/api/transcribe", {id:
 $("lAdd").onclick = async () => {
   const src = $("lSrc").value.trim();
   const body = {id: $("lId").value.trim(), module: $("lModule").value, title: $("lTitle").value.trim(), pages: $("lPages").value.trim(),
-    lesson: $("lLesson").value.trim(), transcribe: $("lTx").checked, [/^https?:/.test(src) ? "youtube" : "file"]: src};
+    lesson: $("lLesson").value.trim(), doctor: $("lDoctor").value.trim(), transcribe: $("lTx").checked, [/^https?:/.test(src) ? "youtube" : "file"]: src};
   if (!body.id || !src) return show($("lOut"), "Id and source first");
   show($("lOut"), await post("/api/lecture", body));
   poll(`lecture ${body.id}`, $("lOut"), loaders.Lectures);
@@ -278,6 +299,60 @@ loaders["Gap map"] = async () => {
     `<div class="cell ${p.questions ? "q" : ""} ${p.book ? "b" : ""} ${p.lecture ? "l" : ""}" title="p${p.page}: ${p.questions} questions, ${p.book} book lines, ${p.lecture} lecture parts">${p.page}</div>`).join("");
 };
 $("gLoad").onclick = loaders["Gap map"];
+
+loaders.Highlights = async () => {
+  const rows = await get("/api/highlights?module=" + $("hModule").value);
+  const state = (s) => !s ? "" : `<span class="chip ${s.status === "passed" ? "ok" : s.status === "held" ? "bad" : ""}" title="${esc(s.note)}">${s.flow === "hl_audit" ? "Audit" : "Marks"}: ${esc(s.status)}</span>`;
+  $("hRows").innerHTML = rows.map((L) => `<tr><td><input type="checkbox" value="${esc(L.key)}"></td><td>${esc(L.name)}<div class="muted">${esc(L.subject)}</div></td><td class="num">${L.pages[0]}-${L.pages[1]}</td><td class="num">${L.lectures}</td><td>${state(L.state)}</td><td class="num">${L.summary?.red ?? ""}</td><td class="num">${L.summary?.blue ?? ""}</td><td class="num">${L.summary?.green ?? ""}</td><td class="num">${L.summary?.mcq ?? ""}</td><td>${L.summary ? `<button data-view="${esc(L.key)}">View</button>` : ""}</td></tr>`).join("") || `<tr><td class="muted" colspan="10">No book lessons for this module</td></tr>`;
+  hTicked();
+};
+function hTicked() {
+  const n = document.querySelectorAll("#hRows input:checked").length;
+  $("hGo").disabled = !n;
+  $("hGo").textContent = n ? `Highlight ${n}` : "Highlight";
+}
+$("hLoad").onclick = loaders.Highlights;
+$("hRows").onchange = hTicked;
+$("hAll").onchange = (e) => { document.querySelectorAll("#hRows input").forEach((c) => c.checked = e.target.checked); hTicked(); };
+$("hGo").onclick = async () => {
+  const keys = [...document.querySelectorAll("#hRows input:checked")].map((c) => c.value);
+  show($("hOut"), await post("/api/highlight", {module: $("hModule").value, keys}));
+  poll("highlight", $("hOut"), loaders.Highlights);
+};
+// The marked handout: cut the text at every mark edge, so overlapping word and sentence marks never nest badly.
+function markedText(lines, marks) {
+  const parts = [], at = {};
+  let pos = 0, page = null;
+  for (const l of lines) {
+    if (l.page !== page) { page = l.page; parts.push(`\u0000p ${page}\u0000`); pos += parts.at(-1).length + 1; }
+    at[l.id] = pos; parts.push(l.text); pos += l.text.length + 1;
+  }
+  const text = parts.join("\n"), ranges = [];
+  for (const m of marks) {
+    if (at[m.line_ids[0]] == null) continue;
+    const re = new RegExp(m.text.trim().split(/\s+/).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"));
+    const hit = re.exec(text.slice(at[m.line_ids[0]]));
+    if (hit) ranges.push({a: at[m.line_ids[0]] + hit.index, b: at[m.line_ids[0]] + hit.index + hit[0].length, m});
+  }
+  const cuts = [...new Set([0, text.length, ...ranges.flatMap((r) => [r.a, r.b])])].sort((x, y) => x - y);
+  return cuts.slice(0, -1).map((c, i) => {
+    const d = cuts[i + 1], on = ranges.filter((r) => r.a <= c && r.b >= d);
+    let t = esc(text.slice(c, d)).replace(/\u0000(p \d+)\u0000/g, '<span class="pg">$1</span>');
+    if (!on.length) return t;
+    const cls = on.map((r) => (r.m.kind === "sentence" ? "u" : "h") + r.m.level).concat(on.some((r) => r.m.mcq && r.m.kind === "word") ? ["mcq"] : []);
+    const tag = on.some((r) => r.m.mcq && r.b === d) ? '<span class="mcqtag">MCQ</span>' : "";
+    return `<span class="${cls.join(" ")}" title="${esc(on.map((r) => `${r.m.why} (${r.m.doctors.join(", ") || "MCQs"})`).join(" | "))}">${t}</span>${tag}`;
+  }).join("");
+}
+$("hRows").onclick = async (e) => {
+  const b = e.target.closest("button[data-view]");
+  if (!b) return;
+  const d = await get(`/api/highlight-view?module=${$("hModule").value}&key=${encodeURIComponent(b.dataset.view)}`);
+  $("hView").classList.remove("hide");
+  $("hTitle").textContent = b.closest("tr").children[1].firstChild.textContent;
+  $("hText").innerHTML = markedText(d.lines, d.marks);
+  $("hView").scrollIntoView({behavior: "smooth"});
+};
 
 function poll(name, el, then) {
   const t = setInterval(async () => {

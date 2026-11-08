@@ -2,7 +2,7 @@
 writes it only through the tumrah repo's importers.
 
 Screens: Questions (filter, tick, Hand over), Lectures (add, Transcribe), Word fixes, Books (% aligned), Coverage,
-Voters, Lecture questions, Gap map, Progress.
+Voters, Lecture questions, Highlights, Gap map, Progress.
 """
 import json
 import re
@@ -15,6 +15,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import checks
+import highlights
 import lectures
 import queue_db
 from flows.common import read_jsonl, write_jsonl
@@ -262,6 +263,23 @@ def importer(kind, *args):
         return {"error": (res.stderr or res.stdout).strip()[-300:]}
 
 
+# ---- importance highlights ------------------------------------------------------------------------------------------
+def highlight_lessons(module, q):
+    lines = highlights.module_lines(module) if (ROOT / "modules" / module / "lines.jsonl").exists() else []
+    return [{**L, "lectures": len(highlights.lesson_lectures(module, L["pages"], lines)),
+             "state": highlights.state(q, L["key"]), "summary": highlights.summary(module, L["key"])}
+            for L in highlights.lessons(module)]
+
+
+def queue_highlights(reader, module, keys):
+    q = queue_db.Queue()
+    try:
+        queued = [highlights.queue(q, reader, L) for L in highlights.lessons(module) if L["key"] in keys]
+    finally:
+        q.close()
+    return f"{sum(bool(k) for k in queued)} queued, {sum(not k for k in queued)} already waiting. Run py dm.py run."
+
+
 # ---- HTTP ------------------------------------------------------------------------------------------------------------
 class Handler(BaseHTTPRequestHandler):
     reader = None
@@ -302,6 +320,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/covered": covered_list,
                 "/api/lecture-questions": lambda: lecture_questions(self.get_reader(), a.get("lesson")),
                 "/api/jobs": lambda: JOBS,
+                "/api/highlights": lambda: highlight_lessons(a.get("module", "year2-cns"), q),
+                "/api/highlight-view": lambda: highlights.preview(a["module"], a["key"]),
             }
             if u.path in routes:
                 return self.reply(routes[u.path]())
@@ -321,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(handover(self.get_reader(), b["module"], b.get("ids", [])))
             if self.path == "/api/lecture":
                 cmd = ["py", str(ROOT / "dm.py"), "lecture", b["id"], "--module", b["module"], "--title", b.get("title") or b["id"]]
-                for k in ("file", "youtube", "lesson", "pages"):
+                for k in ("file", "youtube", "lesson", "pages", "doctor"):
                     if b.get(k):
                         cmd += [f"--{k}", str(b[k])]
                 if not b.get("transcribe", True):
@@ -338,6 +358,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/voters":
                 import voters
                 return self.reply(background("voters", voters.run, bool(b.get("apply"))))
+            if self.path == "/api/highlight":
+                return self.reply(background("highlight", queue_highlights, self.get_reader(), b["module"], b.get("keys", [])))
             if self.path == "/api/required":
                 return self.reply(set_required(b.get("lesson"), b.get("ids", []), bool(b.get("remove"))))
             return self.reply({"error": "not found"}, code=404)

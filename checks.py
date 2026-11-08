@@ -601,3 +601,175 @@ def check_labels(rows, batch, lines=None, reference=None):
     if missing:
         errors.append(f"{len(missing)} items have no row")
     return errors
+
+
+# ---- importance highlights (owner 2026-11-08) ----------------------------------------------------------------------
+MARK_KEYS = {"line_ids", "text", "kind", "evidence", "why"}
+MARK_WORDS = {"word": (1, 3), "sentence": (4, 40)}   # owner: a highlight is 1-3 words; a stressed sentence is underlined
+LECTURE_EVIDENCE = {"said_mcq", "said_important", "stressed"}
+MCQ_EVIDENCE = {"doctor_mcq", "other_mcq"}
+MAX_QUOTE_WORDS, MAX_WHY_WORDS = 30, 15
+AUDIT_KEYS = {"n", "keep", "reason"}
+
+
+def words(text):
+    return TOKEN.findall(str(text or ""))
+
+
+def norm(text):
+    """Words only, lower case: a quote matches the transcript whatever its punctuation or spacing."""
+    return " ".join(words(text)).lower()
+
+
+def on_lines(text, joined):
+    """text sits on the lines as whole words (spacing may differ)."""
+    return bool(text) and re.search(r"(?<!\w)" + re.escape(text) + r"(?!\w)", joined) is not None
+
+
+def check_evidence(e, ids, lns, qs, lectures):
+    t = e.get("type") if isinstance(e, dict) else None
+    if t in MCQ_EVIDENCE:
+        if set(e) != {"type", "qid"}:
+            return [f"{t} evidence is exactly {{type, qid}}"]
+        q = qs.get(e["qid"])
+        if q is None:
+            return [f"question {e['qid']} is not in batch.jsonl"]
+        if (t == "doctor_mcq") != (q["kind"] == "doctor"):
+            right = "doctor_mcq" if q["kind"] == "doctor" else "other_mcq"
+            return [f"question {e['qid']} is a {q['kind']} MCQ: its evidence type is {right}"]
+        if not set(q.get("line_ids") or []) & set(ids):
+            return [f"question {e['qid']} is not pointed at these lines"]
+        return []
+    if t not in LECTURE_EVIDENCE:
+        return [f"evidence type must be one of {sorted(LECTURE_EVIDENCE | MCQ_EVIDENCE)}"]
+    need = {"type", "lecture", "at"} | ({"quote"} if t != "stressed" else set())
+    if set(e) != need:
+        return [f"{t} evidence is exactly {{{', '.join(sorted(need))}}}"]
+    lec = lectures.get(e["lecture"])
+    if lec is None:
+        return [f"lecture {e['lecture']} is not in lectures/"]
+    stamps = e["at"] if t == "stressed" else [e["at"]]
+    if t == "stressed" and (not isinstance(stamps, list) or len({str(s) for s in stamps}) < 2):
+        return ["stressed needs 2 or more different times in at (a list of mm:ss)"]
+    errors = []
+    for s in stamps:
+        sec = stamp_seconds(f"[{s}]") if isinstance(s, str) else None
+        if sec is None or sec > (lec["duration_s"] or 0) + 5:
+            errors.append(f"at {s!r} is not a mm:ss time inside lecture {e['lecture']}")
+    if not {ln["page"] for ln in lns} & lec["pages"]:
+        errors.append(f"lecture {e['lecture']} has no part on pdf page {lns[0]['page']}")
+    if t != "stressed":
+        quote = norm(e["quote"])
+        if not quote or len(quote.split()) > MAX_QUOTE_WORDS:
+            errors.append(f"quote has 1 to {MAX_QUOTE_WORDS} words")
+        elif f" {quote} " not in f" {lec['norm']} ":
+            errors.append(f"quote is not word for word in lectures/{e['lecture']}/clean.txt")
+    return errors
+
+
+def check_marks(rows, batch, lines, lectures, pages):
+    """rows: marks.jsonl; batch: the lesson's MCQs; lectures: {id: {norm, duration_s, pages}}; pages: [first, last]."""
+    idx = {ln["id"]: i for i, ln in enumerate(lines)}
+    qs = {q["qid"]: q for q in batch}
+    first, last = pages
+    errors, seen = [], set()
+    for n, r in enumerate(rows, 1):
+        at = f"row {n}"
+        if not isinstance(r, dict) or set(r) != MARK_KEYS:
+            errors.append(f"{at}: keys must be exactly {sorted(MARK_KEYS)}")
+            continue
+        ids = r["line_ids"]
+        if not isinstance(ids, list) or not ids or any(i not in idx for i in ids):
+            errors.append(f"{at}: line_ids must be a list of IDs from inputs/lines.jsonl")
+            continue
+        pos = [idx[i] for i in ids]
+        if pos != list(range(pos[0], pos[0] + len(pos))):
+            errors.append(f"{at}: line_ids must be neighbouring lines in reading order")
+            continue
+        lns = [lines[p] for p in pos]
+        if any(ln.get("figure") is not None for ln in lns):
+            errors.append(f"{at}: a figure cannot be highlighted")
+            continue
+        if any(not first <= ln["page"] <= last for ln in lns):
+            errors.append(f"{at}: a line is outside this lesson's pdf pages {first}-{last}")
+        if r["kind"] not in MARK_WORDS:
+            errors.append(f"{at}: kind is word or sentence")
+            continue
+        text = squash(r["text"])
+        if not on_lines(text, squash(" ".join(ln["text"] for ln in lns))):
+            errors.append(f"{at}: text is not word for word on its lines")
+        elif len(lns) > 1 and (on_lines(text, squash(" ".join(ln["text"] for ln in lns[1:])))
+                               or on_lines(text, squash(" ".join(ln["text"] for ln in lns[:-1])))):
+            errors.append(f"{at}: line_ids hold more lines than the text needs")
+        low, high = MARK_WORDS[r["kind"]]
+        if not low <= len(words(text)) <= high:
+            errors.append(f"{at}: a {r['kind']} mark has {low} to {high} words, this one has {len(words(text))}")
+        key = (tuple(ids), text, r["kind"])
+        if key in seen:
+            errors.append(f"{at}: the same mark twice (put all its evidence in one row)")
+        seen.add(key)
+        if not isinstance(r["why"], str) or not r["why"].strip() or len(words(r["why"])) > MAX_WHY_WORDS:
+            errors.append(f"{at}: why is a reason of 1 to {MAX_WHY_WORDS} words")
+        if not isinstance(r["evidence"], list) or not r["evidence"]:
+            errors.append(f"{at}: evidence must list at least one item")
+            continue
+        for e in r["evidence"]:
+            errors += [f"{at}: {m}" for m in check_evidence(e, ids, lns, qs, lectures)]
+    return errors
+
+
+def _jsonl(path):
+    import json
+    return [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines() if x.strip()]
+
+
+def job_lectures(job_dir, lines):
+    """{id: {norm, duration_s, doctor, pages}} from the lectures/ folder of a highlights job."""
+    from pathlib import Path
+    import json
+    page_of = {ln["id"]: ln["page"] for ln in lines}
+    out = {}
+    for d in sorted(p for p in (Path(job_dir) / "lectures").glob("*") if p.is_dir()):
+        meta = json.loads((d / "lecture.json").read_text(encoding="utf-8"))
+        out[d.name] = {"norm": norm((d / "clean.txt").read_text(encoding="utf-8")),
+                       "duration_s": meta.get("duration_s"), "doctor": meta.get("doctor"),
+                       "pages": {page_of[i] for p in _jsonl(d / "parts.jsonl") for i in p["line_ids"] if i in page_of}}
+    return out
+
+
+def check_job_marks(job_dir):
+    """The highlights job: marks.jsonl against its lines, MCQs and lectures (same code on the worker and here)."""
+    from pathlib import Path
+    import json
+    d = Path(job_dir)
+    if not (d / "marks.jsonl").exists():
+        return ["marks.jsonl does not exist"]
+    try:
+        rows = _jsonl(d / "marks.jsonl")
+    except ValueError as e:
+        return [f"a line of marks.jsonl is not JSON ({e})"]
+    lines = _jsonl(d / "inputs" / "lines.jsonl")
+    job = json.loads((d / "job.json").read_text(encoding="utf-8"))
+    return check_marks(rows, _jsonl(d / "batch.jsonl"), lines, job_lectures(d, lines), job["pages"])
+
+
+def check_audit(rows, batch, lines=None, reference=None):
+    """Audit rows {n, keep, reason}: every item answered once."""
+    want = {b["n"] for b in batch}
+    errors, seen = [], set()
+    for r in rows:
+        if not isinstance(r, dict) or set(r) != AUDIT_KEYS:
+            errors.append(f"each row must be exactly {sorted(AUDIT_KEYS)}")
+            continue
+        if r["n"] not in want:
+            errors.append(f"n {r['n']!r} is not an item of batch.jsonl")
+        if r["n"] in seen:
+            errors.append(f"n {r['n']} has more than one row")
+        seen.add(r["n"])
+        if not isinstance(r["keep"], bool):
+            errors.append(f"n {r['n']}: keep is true or false")
+        if not isinstance(r["reason"], str) or not r["reason"].strip() or len(words(r["reason"])) > MAX_WHY_WORDS:
+            errors.append(f"n {r['n']}: reason is 1 to {MAX_WHY_WORDS} words")
+    if want - seen:
+        errors.append(f"{len(want - seen)} items have no row")
+    return errors

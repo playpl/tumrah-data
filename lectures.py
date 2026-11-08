@@ -1,6 +1,6 @@
 """Lectures: one folder each under lectures/<id>/ (gitignored; transcripts are internal, never for students).
 
-    lecture.json   id, module, title, lesson (site id or null), pdf_pages [a, b] or null, transcribe, source, duration_s
+    lecture.json   id, module, title, doctor, lesson (site id or null), pdf_pages [a, b] or null, transcribe, source, duration_s
     audio.ogg      the recording compressed so one worker hears all of it (config.json lecture_audio)
     raw.txt        what was heard, word for word with [mm:ss]; never edited after it is written
     clean.txt      the same words laid out in paragraphs with punctuation, plus fixes at 0.9 confidence or more
@@ -96,11 +96,11 @@ def youtube(url, workdir):
     return None, next(workdir.glob("yt_audio.*"))
 
 
-def add(lecture_id, module, title, kbps, file=None, url=None, lesson=None, pdf_pages=None, transcribe=True):
+def add(lecture_id, module, title, kbps, file=None, url=None, lesson=None, pdf_pages=None, transcribe=True, doctor=None):
     """Registers a lecture and prepares its audio or transcript. Returns the next flow to queue, or None."""
     d = folder(lecture_id)
     d.mkdir(parents=True, exist_ok=True)
-    meta = {"id": lecture_id, "module": module, "title": title, "lesson": lesson, "pdf_pages": pdf_pages,
+    meta = {"id": lecture_id, "module": module, "title": title, "doctor": doctor, "lesson": lesson, "pdf_pages": pdf_pages,
             "transcribe": transcribe, "source": {"file": str(file)} if file else {"youtube": url}, "duration_s": None}
     audio = Path(file) if file else None
     if url:

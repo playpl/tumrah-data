@@ -27,6 +27,9 @@ elif job["checker"] == "check_reference":
 elif job["checker"] == "check_lecture_dir":
     errors = checks.check_lecture_dir(JOB, lines(), job["duration_s"], job.get("pdf_pages"))
     rows = []
+elif job["checker"] == "check_job_marks":
+    errors = checks.check_job_marks(JOB)
+    rows = []
 else:
     out = JOB / job["output"]
     if not out.exists():

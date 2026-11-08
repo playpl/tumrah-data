@@ -168,3 +168,21 @@ class LectureLinkFlow:
         meta["fixes"] = {"applied": len(checks.applied(fixes)), "for_owner": len(fixes) - len(checks.applied(fixes))}
         lectures.save(meta)
         return []
+
+    def then(self, job, job_dir):
+        """A linked lecture re-highlights every book lesson it explains (owner 2026-11-08). The MCQs come from the
+        live site; when it cannot be reached the owner queues the lessons from the admin page."""
+        import db
+        import highlights
+        import queue_db
+        try:
+            reader = db.Reader.live()
+        except Exception:  # noqa: BLE001 - the lecture itself passed; highlighting waits for the button
+            return []
+        q = queue_db.Queue()
+        try:
+            for lesson in highlights.lessons_for_lecture(job["payload"]["lecture"]):
+                highlights.queue(q, reader, lesson)
+        finally:
+            q.close()
+        return []

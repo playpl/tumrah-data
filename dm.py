@@ -109,7 +109,8 @@ def cmd_lecture(args):
         sys.exit("give --file <audio or video> or --youtube <url>")
     pages = [int(x) for x in args.pages.split("-")] if args.pages else None
     nxt = lectures.add(args.id, args.module, args.title or args.id, cfg["lecture_audio_kbps"], file=args.file,
-                       url=args.youtube, lesson=args.lesson, pdf_pages=pages, transcribe=not args.no_transcribe)
+                       url=args.youtube, lesson=args.lesson, pdf_pages=pages, transcribe=not args.no_transcribe,
+                       doctor=args.doctor)
     meta = lectures.load(args.id)
     print(f"{args.id}: {meta['duration_s']} s, transcript from {meta['source'].get('transcript', 'the fleet')}")
     if nxt:
@@ -119,6 +120,26 @@ def cmd_lecture(args):
         print(f"queued {nxt}")
     else:
         print("not queued: Transcribe is off for this lecture")
+
+
+def cmd_highlight(args):
+    """Lists a module's book lessons with their highlight state, or queues lessons for the highlights flow."""
+    import db
+    import highlights
+    import queue_db
+    q = queue_db.Queue()
+    lessons = highlights.lessons(args.module)
+    pick = [L for L in lessons if args.all or L["key"] in args.lessons or L["name"] in args.lessons]
+    if not pick:
+        for L in lessons:
+            print(f"{L['key']} | {L['name']} | pdf {L['pages'][0]}-{L['pages'][1]} | "
+                  f"{highlights.state(q, L['key']) or 'never run'} | {highlights.summary(args.module, L['key']) or ''}")
+        q.close()
+        return
+    reader = db.Reader.live()
+    for L in pick:
+        print(L["name"], "->", highlights.queue(q, reader, L) or "already waiting")
+    q.close()
 
 
 def cmd_bank(_):
@@ -227,7 +248,13 @@ def main():
     p.add_argument("--lesson", help="site lesson id")
     p.add_argument("--pages", help="first-last handout pdf pages of the lecture")
     p.add_argument("--no-transcribe", action="store_true", help="register only (an old recording kept as a taste)")
+    p.add_argument("--doctor", help="the doctor who gives the lecture (highlights record it)")
     p.set_defaults(fn=cmd_lecture)
+    p = sub.add_parser("highlight", help="list a module's book lessons, or queue the highlights flow for some")
+    p.add_argument("module")
+    p.add_argument("lessons", nargs="*", help="lesson keys or names; none lists them")
+    p.add_argument("--all", action="store_true", help="every lesson of the module")
+    p.set_defaults(fn=cmd_highlight)
     sub.add_parser("page", help="the admin page on http://127.0.0.1:8770").set_defaults(fn=cmd_page)
     sub.add_parser("bank", help="merge polls, QuizBot and forms into bank/questions.jsonl").set_defaults(fn=cmd_bank)
     p = sub.add_parser("cover", help="is this question file already in our data? records it as covered")
