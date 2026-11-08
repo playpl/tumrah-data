@@ -68,7 +68,7 @@ td.text { max-width: 42rem; }
 </header>
 <main>
   <section data-tab="Progress">
-    <div class="card"><h2>Jobs</h2><div id="flows"></div></div>
+    <div class="card"><div class="row"><h2 style="margin:0;flex:1">Jobs</h2><span class="chip" id="fState">Stopped</span><button class="primary" id="fStart">Run</button><button id="fStop">Stop</button></div><div id="flows"></div></div>
     <div class="card"><h2>Accounts</h2><div id="accounts"></div></div>
   </section>
 
@@ -199,9 +199,18 @@ loaders.Progress = async () => {
   $("flows").innerHTML = flows.length ? `<table><tr><th>Flow</th><th class="num">Queued</th><th class="num">Running</th><th class="num">Passed</th><th class="num">Held</th></tr>${
     flows.map(([f, c]) => `<tr><td>${esc(f)}</td><td class="num">${c.queued || 0}</td><td class="num">${c.running || 0}</td><td class="num ok">${c.passed || 0}</td><td class="num ${c.held ? "bad" : ""}">${c.held || 0}</td></tr>`).join("")
   }</table><p class="muted">${p.hours_left != null ? `About ${p.hours_left} h left` : ""}</p>` : `<p class="muted">Nothing queued</p>`;
+  const f = p.fleet || {};
+  $("fState").textContent = f.stopping ? "Stopping after current jobs" : f.running ? "Running" : "Stopped";
+  $("fState").className = "chip " + (f.running ? "ok" : "");
+  $("fStart").disabled = !!f.running;
+  $("fStop").disabled = !f.running || !!f.stopping;
   $("accounts").innerHTML = `<table><tr><th>Account</th><th>Lane</th><th class="num">Slots</th><th class="num">Running</th><th>State</th></tr>${
     p.accounts.map((a) => `<tr><td>${esc(a.account)}</td><td>${esc(a.lane)}</td><td class="num">${a.slots}</td><td class="num">${a.running}</td><td class="${a.cooling ? "warn" : "ok"}">${a.cooling ? "Resting" : "Ready"}</td></tr>`).join("")}</table>`;
 };
+
+$("fStart").onclick = async () => { await post("/api/fleet", {action: "start"}); loaders.Progress(); };
+$("fStop").onclick = async () => { await post("/api/fleet", {action: "stop"}); loaders.Progress(); };
+setInterval(() => !document.querySelector('section[data-tab="Progress"]').classList.contains("hide") && loaders.Progress(), 10000);
 
 let qNext = null;
 async function loadQuestions(more) {

@@ -166,6 +166,27 @@ def books(q):
     return sorted(out.values(), key=lambda b: (b["module"], b["book"]))
 
 
+FLEET = {"proc": None}  # the dispatcher this page started (py dm.py run)
+
+
+def fleet_running():
+    p = FLEET["proc"]
+    return bool(p and p.poll() is None)
+
+
+def fleet(action):
+    """Start: runs `py dm.py run` in the background (log jobs/run.out). Stop: jobs/stop.flag; running jobs finish first."""
+    jobs = ROOT / "jobs"
+    jobs.mkdir(exist_ok=True)
+    if action == "start" and not fleet_running():
+        log = open(jobs / "run.out", "a", encoding="utf-8")
+        FLEET["proc"] = subprocess.Popen(["py", str(ROOT / "dm.py"), "run"], cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    elif action == "stop" and fleet_running():
+        (jobs / "stop.flag").touch()
+    return {"running": fleet_running(), "stopping": (jobs / "stop.flag").exists() and fleet_running()}
+
+
 def progress(q):
     import dispatch
     cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
@@ -177,7 +198,8 @@ def progress(q):
     flows = q.progress()
     slots = sum(cfg["slots"].values())
     left = sum(per.get(f, 0) * (c.get("queued", 0) + c.get("running", 0)) for f, c in flows.items())
-    return {"flows": flows, "accounts": accounts, "hours_left": round(left / slots / 3600, 1) if per else None}
+    return {"flows": flows, "accounts": accounts, "hours_left": round(left / slots / 3600, 1) if per else None,
+            "fleet": {"running": fleet_running(), "stopping": (ROOT / "jobs" / "stop.flag").exists() and fleet_running()}}
 
 
 def gap_map(reader, module):
@@ -358,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/api/voters":
                 import voters
                 return self.reply(background("voters", voters.run, bool(b.get("apply"))))
+            if self.path == "/api/fleet":
+                return self.reply(fleet(b.get("action")))
             if self.path == "/api/highlight":
                 return self.reply(background("highlight", queue_highlights, self.get_reader(), b["module"], b.get("keys", [])))
             if self.path == "/api/required":
