@@ -18,10 +18,10 @@ class TestAdd(unittest.TestCase):
         self.assertEqual(jobs[1]["payload"]["batch"][-1]["set"], None)
         self.assertEqual([j["key"] for j in jobs], [j["key"] for j in dm.pointer_jobs("year2-cns", list(reversed(qs)), ORDER)])
 
-    def test_book_jobs_hold_five_pages(self):
+    def test_book_jobs_hold_ten_pages(self):
         pages = [{"book_id": "b1", "page": n, "text": "x"} for n in range(3, 15)]
         jobs = dm.book_jobs("year2-cns", "b1", pages)
-        self.assertEqual([len(j["payload"]["pages"]) for j in jobs], [5, 5, 2])
+        self.assertEqual([len(j["payload"]["pages"]) for j in jobs], [10, 2])
         self.assertEqual(jobs[0]["key"], "year2-cns-b1-p0003")
 
 

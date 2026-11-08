@@ -130,6 +130,9 @@ class TranscribeFlow:
         return errors
 
     def then(self, job, job_dir):
+        """Linking needs the lecture's handout pages: without them the place flow queues it when it passes."""
+        if not lectures.load(job["payload"]["lecture"]).get("ranges"):
+            return []
         return [("lecture_links", [{"key": job["payload"]["lecture"], "payload": job["payload"]}])]
 
 

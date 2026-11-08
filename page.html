@@ -124,11 +124,13 @@ td.text { max-width: 42rem; }
     <div class="card"><h2>Name a lecture</h2>
       <div class="row">
         <select id="nModule"></select>
+        <select id="nKind"><option value="lecture">Lecture</option><option value="summary">Mini lecture</option><option value="revision">Revision</option></select>
         <input id="nTitle" placeholder="Title" style="flex:1;min-width:14rem">
         <input id="nDoctor" placeholder="Doctor" list="nDoctors" style="width:16rem"><datalist id="nDoctors"></datalist>
+        <input id="nCovers" class="hide" placeholder="Covers: cns-001, cns-004" style="width:14rem">
         <button class="primary" id="nAdd">Add</button>
       </div>
-      <p class="muted" style="margin:0">An agent then finds the lecture's handout pages. You pick the doctor's questions; the agents do the rest.</p>
+      <p class="muted" style="margin:0">An agent then finds the lecture's handout pages. A mini lecture covers one lecture and a revision several: they take those lectures' pages. You pick the doctor's questions; the agents do the rest.</p>
       <div class="out hide" id="nOut" style="margin-top:.75rem"></div>
     </div>
     <div class="card"><h2>Lectures</h2>
@@ -330,7 +332,7 @@ loaders.Lectures = async () => {
     : l.place ? `<span class="chip ${l.place.status === "held" || l.place.status === "failed" ? "bad" : ""}" title="${esc(l.place.note)}">Agent: ${esc(l.place.status)}</span>` : "";
   const agents = (l) => !l.sent ? (l.shortlist ? `Shortlist ${l.shortlist.kept}` : "") :
     `${l.answered}/${l.sent} read<div class="muted">${l.pointed} on its pages, ${l.other_lecture} elsewhere</div>`;
-  $("lRows").innerHTML = lecRows.map((l) => `<tr><td>${esc(l.title)}<div class="muted">${esc(l.id)}</div></td><td>${esc(l.doctor)}</td><td>${place(l)}</td>
+  $("lRows").innerHTML = lecRows.map((l) => `<tr><td>${esc(l.title)}<div class="muted">${esc(l.id)}${l.kind && l.kind !== "lecture" ? ` &middot; ${l.kind === "summary" ? "mini lecture" : "revision"} of ${esc((l.covers || []).join(", "))}` : ""}</div></td><td>${esc(l.doctor)}</td><td>${place(l)}</td>
     <td class="num">${l.required || ""}</td><td class="num">${l.doctor_questions || ""}</td><td>${agents(l)}</td>
     <td><span class="chip">${esc(l.stage)}</span>${l.duration_s ? ` ${Math.round(l.duration_s / 60)} min` : ""}${l.fixes?.for_owner ? `<div class="warn">${l.fixes.for_owner} word fixes for you</div>` : ""}
       ${l.source && Object.keys(l.source).length ? `<label class="muted"><input type="checkbox" data-tx="${esc(l.id)}" ${l.transcribe ? "checked" : ""}> Transcribe</label>` : ""}</td>
@@ -341,11 +343,13 @@ loaders.Lectures = async () => {
 };
 $("lRows").onchange = (e) => e.target.dataset.tx && post("/api/transcribe", {id: e.target.dataset.tx, on: e.target.checked});
 $("lRows").onclick = (e) => { const b = e.target.closest("button[data-open]"); if (b) { lec = b.dataset.open; bankPage = 0; showLecture(lec, true); } };
+$("nKind").onchange = () => $("nCovers").classList.toggle("hide", $("nKind").value === "lecture");
 $("nAdd").onclick = async () => {
-  const body = {module: $("nModule").value, title: $("nTitle").value.trim(), doctor: $("nDoctor").value.trim()};
+  const body = {module: $("nModule").value, kind: $("nKind").value, title: $("nTitle").value.trim(), doctor: $("nDoctor").value.trim(), covers: $("nCovers").value};
   if (!body.title || !body.doctor) return show($("nOut"), "Title and doctor first");
   const r = await post("/api/lecture-new", body);
-  show($("nOut"), r.error || `${r.id} added. An agent is finding its handout pages (press Run on Progress if the fleet is stopped).`);
+  show($("nOut"), r.error || (r.queued ? `${r.id} added. An agent is finding its handout pages (press Run on Progress if the fleet is stopped).`
+    : `${r.id} added with the pages of what it covers: ${pagesText(r.pages) || "none yet"}.`));
   if (!r.error) { $("nTitle").value = ""; loaders.Lectures(); }
 };
 $("lAdd").onclick = async () => {

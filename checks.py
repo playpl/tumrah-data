@@ -500,8 +500,34 @@ def check_lecture_dir(job_dir, lines, duration_s, lecture_pages=None):
     except ValueError as e:
         return [f"a line of fixes.jsonl or parts.jsonl is not JSON ({e})"]
     raw = (d / "raw.txt").read_text(encoding="utf-8")
-    return check_clean(raw, (d / "clean.txt").read_text(encoding="utf-8"), fixes) + \
+    errors = check_clean(raw, (d / "clean.txt").read_text(encoding="utf-8"), fixes) + \
         check_links(parts, duration_s, lines, lecture_pages)
+    return errors or check_link_depth(parts, duration_s)
+
+
+LINK_MINUTES_PER_PART = 12   # at least one top-level part per 12 minutes of recording
+LINK_MIN_LINKED = 0.75       # share of the recording whose top-level parts carry handout lines
+LINK_MIN_LINES = 3.0         # average distinct handout lines per linked part
+
+
+def check_link_depth(parts, duration_s):
+    """A passing but lazy link (2 parts for 72 minutes, one line in all, measured 2026-11-08) is not a link."""
+    top = [p for p in parts if p.get("sub") == 0]
+    need = max(1, int(duration_s // (LINK_MINUTES_PER_PART * 60))) if duration_s else 1
+    errors = []
+    if len(top) < need:
+        errors.append(f"{len(top)} parts for {round(duration_s / 60)} minutes: split the lecture into at least {need} "
+                      f"parts by topic, as the doctor moves on")
+    linked = sum(p["end"] - p["start"] for p in top if p.get("line_ids")) / duration_s if duration_s else 0
+    if linked < LINK_MIN_LINKED:
+        errors.append(f"only {round(linked * 100)}% of the recording is linked to handout lines: link every part the "
+                      f"doctor teaches from the handout (at least {round(LINK_MIN_LINKED * 100)}%)")
+    with_lines = [p for p in parts if p.get("line_ids")]
+    avg = sum(len(set(p["line_ids"])) for p in with_lines) / len(with_lines) if with_lines else 0
+    if avg < LINK_MIN_LINES:
+        errors.append(f"a linked part holds {avg:.1f} handout lines on average: give every line the part explains "
+                      f"(at least {LINK_MIN_LINES:.0f} on average), not one line per part")
+    return errors
 
 
 def check_cover(rows, batch, lines=None, reference=None):
@@ -529,6 +555,7 @@ REFERENCE_GAP = 0.05      # share of the handout's text pages (inside the lectur
 
 
 PLACE_KEYS = {"ranges", "note"}
+DUMMY = re.compile(r"\b(test|testing|dummy|placeholder|lorem|todo|tbd|xxx)\b", re.I)
 MAX_LECTURE_PAGES = 120
 
 
@@ -555,8 +582,9 @@ def check_place(place, lines):
         prev, total = b, total + b - a + 1
     if not errors and total > MAX_LECTURE_PAGES:
         errors.append(f"{total} pages is more than one lecture ({MAX_LECTURE_PAGES} at most): read again where it starts and ends")
-    if not isinstance(place["note"], str) or not place["note"].strip() or len(place["note"].split()) > 40:
-        errors.append("note: how you found the pages, 1 to 40 words")
+    note = place["note"] if isinstance(place["note"], str) else ""
+    if not 6 <= len(note.split()) <= 40 or DUMMY.search(note):
+        errors.append("note: how you found the pages (which contents entry, which headings start and end it), 6 to 40 words")
     return errors
 
 

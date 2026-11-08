@@ -90,6 +90,10 @@ class TestTranscribe(Base):
         (self.dir / "transcript.txt").write_text(RAW + "\n[01:50] more", encoding="utf-8")
         flow.check(self.job, self.dir)
         self.assertEqual(raw.read_text(encoding="utf-8"), first)  # never edited after
+        self.assertEqual(flow.then(self.job, self.dir), [])  # no handout pages yet: the place flow queues linking
+        meta = lectures.load("pain1")
+        meta["ranges"] = [{"from": "a", "to": "b", "pages": [1, 2]}]
+        lectures.save(meta)
         self.assertEqual(flow.then(self.job, self.dir), [("lecture_links", [{"key": "pain1", "payload": {"lecture": "pain1"}}])])
 
 
@@ -104,7 +108,7 @@ class TestLectureLinks(Base):
         (self.dir / "clean.txt").write_text(TestClean.CLEAN, encoding="utf-8")
         (self.dir / "fixes.jsonl").write_text(json.dumps({"at": "00:40", "heard": "fibers", "meant": "fibres", "confidence": 0.5, "reason": "spelling"}) + "\n", encoding="utf-8")
         common.write_jsonl(self.dir / "parts.jsonl", [
-            {"part": 1, "sub": 0, "title": "Analgesia", "start": 0, "end": 120, "line_ids": ["year2-cns:h:p12:l1", "year2-cns:h:p12:l2"]}])
+            {"part": 1, "sub": 0, "title": "Analgesia", "start": 0, "end": 120, "line_ids": ["year2-cns:h:p12:l1", "year2-cns:h:p12:l2", "year2-cns:h:p12:l3"]}])
         self.assertIn("PASS", self.kit_check().stdout)
         self.assertEqual(flow.check(self.job, self.dir), [])
         meta = lectures.load("pain1")

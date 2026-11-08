@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent
 BANK = ROOT / "bank"
 WORD = re.compile(r"[^\W\d_]{4,}")
 CONFIG = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
-DEFAULTS = {"cap": 400, "max": 1500, "floor": 2.0, "share": 0.5, "max_df": 0.2}
+DEFAULTS = {"cap": 800, "max": 2000, "floor": 0.0, "share": 0.3, "max_df": 0.3}
 POINTER_BATCH = 25
 
 
@@ -72,14 +72,18 @@ def fit(q, module, label):
 
 
 def rank(bank, terms, module, label_rows=None):
-    """[(score, word_key)] best first, every bank question that shares at least one lecture term."""
+    """[(score, word_key)] best first, every bank question that shares at least one lecture term. A shared term also
+    counts by its rarity in the bank, so a word every question uses adds little (measured on the owner's picks)."""
     label_rows = label_rows or {}
+    qw = {q["word_key"]: words(" ".join([q.get("question") or "", *(o or "" for o in q.get("options") or [])])) for q in bank}
+    qdf = Counter(w for ws in qw.values() for w in ws if w in terms)
+    n = max(1, len(bank))
     out = []
     for q in bank:
-        shared = words(" ".join([q.get("question") or "", *(o or "" for o in q.get("options") or [])])) & terms.keys()
+        shared = qw[q["word_key"]] & terms.keys()
         if not shared:
             continue
-        s = sum(terms[w] for w in shared) * fit(q, module, label_rows.get(q["word_key"]))
+        s = sum(terms[w] * math.log(1 + n / qdf[w]) for w in shared) * fit(q, module, label_rows.get(q["word_key"]))
         s *= 1.2 if q.get("repetition_count", 1) > 1 else 1.0
         out.append((round(s, 3), q["word_key"]))
     out.sort(key=lambda x: (-x[0], x[1]))

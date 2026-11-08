@@ -8,8 +8,32 @@ ROOT = Path(__file__).resolve().parent.parent
 KIT = Path(__file__).resolve().parent / "kit"
 MODULES = ROOT / "modules"
 
-SUBAGENTS = ("You may split the work across subagents (for example 5 items each, or one per lecture part) to go faster. "
-             "You own the merged output file: run the check on the whole file yourself before you finish.")
+SUBAGENTS = ("You are the lead worker. Start at least 10 subagents in parallel and split the work between them (for example "
+             "one per page, 2-3 questions each, or one per lecture part); with fewer than 10 items, one subagent per item, "
+             "and a job of one item you do yourself. Monitor them, check each part they return, and give "
+             "a part that is wrong or missing to a new subagent. You own the merged output file: run the check on the whole "
+             "file yourself before you finish.")
+
+
+WORKING_RULES = """
+
+## Working rules (every job)
+- Stay inside this folder. Never list, open or read anything outside it (no `..`, no other jobs' folders, no
+  other workers' output): every input you need is here, and copying someone else's answer is a failure.
+- The tools are for running, not for reading: never open or print their source (`tools/*.py`, `inspect`,
+  `getsource`). `python tools/check.py` tells you exactly what is wrong; fix that by reading the pages again.
+- Never write test, dummy or placeholder content into the output file, not even to see what the checker says: the
+  output file holds only your real answer. The checker's messages already tell you the rules.
+- Commands: use `python ...` (and the tools) for everything, counting lines included. `powershell -Command`, `cmd /c`
+  and anything that deletes, downloads or uses git is blocked. When a command is denied, never stop: do the same
+  thing another way (a python one-liner) and carry on.
+- Work fast: you are the lead. Start at least 10 subagents in parallel (for example one per page, 2-3 questions each,
+  or one per lecture part), each writing its own part file in this folder. With fewer than 10 items, one subagent per
+  item; a job of one item you do yourself, with no subagents. Split by item, never one item across subagents. Give each subagent these same rules.
+  Monitor them: check each part as it comes back, and give a wrong or missing part to a new subagent. When all are
+  done, merge the parts into the output file named in BRIEF.md yourself (part files alone count as nothing), then run
+  `python tools/check.py` on the whole file.
+"""
 
 
 def read_jsonl(path):
@@ -43,7 +67,7 @@ def build(job_dir, module, batch, checker, output, brief, extra_inputs=(), extra
     write_jsonl(job_dir / "batch.jsonl", batch)
     (job_dir / "job.json").write_text(json.dumps({"module": module, "batch": "batch.jsonl", "checker": checker,
                                                   "output": output, **(extra or {})}), encoding="utf-8")
-    (job_dir / "BRIEF.md").write_text(brief, encoding="utf-8")
+    (job_dir / "BRIEF.md").write_text(brief + WORKING_RULES, encoding="utf-8")
 
 
 def output_rows(job_dir):

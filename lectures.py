@@ -100,7 +100,9 @@ def youtube(url, workdir):
     return None, next(workdir.glob("yt_audio.*"))
 
 
-KINDS = ("lecture",)
+# The website's Lesson kinds (website session, 2026-11-08): a summary (mini lecture) is the short form of one lesson; a
+# revision reviews several lessons of its chapter. Both name what they cover in `covers` and take its handout pages.
+KINDS = ("lecture", "summary", "revision")
 
 
 def new_id(module):
@@ -111,17 +113,42 @@ def new_id(module):
     return f"{short}-{max(used, default=0) + 1:03d}"
 
 
-def create(module, title, doctor, kind="lecture"):
+def create(module, title, doctor, kind="lecture", **context):
     """The owner names a lecture (owner 2026-11-08: there are no lectures until the owner names one). The agents then
-    place it in the handout (flows/place.py) and fill the rest."""
+    place it in the handout (flows/place.py) and fill the rest. `context` (subject, chapter, chapter_lessons) comes
+    from the owner's doctors/ folder and helps the place agent."""
     if kind not in KINDS:
         raise ValueError(f"kind must be one of {KINDS}")
     if not (title or "").strip() or not (doctor or "").strip():
         raise ValueError("a lecture needs a title and a doctor")
+    covers = [c for c in context.get("covers") or [] if c]
+    if kind == "summary" and len(covers) != 1:
+        raise ValueError("a mini lecture (summary) covers exactly one lecture")
+    if kind == "revision" and not covers:
+        raise ValueError("a revision names the lectures it reviews")
+    for c in covers:
+        if load(c)["module"] != module:
+            raise ValueError(f"{c} is not in {module}")
     meta = {"id": new_id(module), "module": module, "title": title.strip(), "doctor": doctor.strip(), "kind": kind,
-            "lesson": None, "ranges": [], "placed_by": None, "required": [], "doctor_questions": [],
+            "covers": covers, "lesson": None, "ranges": [], "placed_by": None, "required": [], "doctor_questions": [],
             "transcribe": False, "source": {}, "duration_s": None, "pdf_pages": None,
-            "created": time.strftime("%Y-%m-%d %H:%M")}
+            "created": time.strftime("%Y-%m-%d %H:%M"),
+            **{k: v for k, v in context.items() if k in ("subject", "chapter", "chapter_lessons") and v}}
+    save(meta)
+    if covers:
+        cover_ranges(meta)
+    return meta
+
+
+def cover_ranges(meta):
+    """A summary or revision takes the handout ranges of the lectures it covers (joined, handout order). Run again when a
+    covered lecture's pages change."""
+    rs = []
+    for c in meta.get("covers") or []:
+        rs += [r for r in load(c).get("ranges") or [] if r not in rs]
+    rs.sort(key=lambda r: tuple(r["pages"]))
+    meta.update(ranges=rs, placed_by="covers" if rs else None,
+                pdf_pages=[rs[0]["pages"][0], max(r["pages"][1] for r in rs)] if rs else None)
     save(meta)
     return meta
 
@@ -143,6 +170,9 @@ def set_ranges(meta, module_lines, pages, by):
         out.append({"from": first["id"], "to": last["id"], "pages": [a, b]})
     meta.update(ranges=out, placed_by=by, pdf_pages=[out[0]["pages"][0], out[-1]["pages"][1]] if out else None)
     save(meta)
+    for other in all_lectures(meta["module"]):  # mini lectures and revisions follow the pages of what they cover
+        if meta["id"] in (other.get("covers") or []):
+            cover_ranges(other)
     return meta
 
 

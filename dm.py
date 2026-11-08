@@ -46,7 +46,7 @@ def cmd_lines(args):
           f"{kinds['page']} pages with no text, {sum(v is None for v in printed.values())} pages without a printed number")
 
 
-POINTER_BATCH, BOOK_BATCH = 25, 5
+POINTER_BATCH, BOOK_BATCH = 25, 10  # 10 book pages: one per subagent (owner 2026-11-08)
 
 
 def pointer_jobs(module, questions, order):
@@ -124,6 +124,23 @@ def cmd_lecture(args):
         print(f"queued {nxt}")
     else:
         print("not queued: Transcribe is off for this lecture")
+
+
+def cmd_site(args):
+    """Writes lectures/<id>/site/ranges.jsonl (importHubData ranges) for each lecture, and prints the import command
+    for those that know their site lesson. Nothing is written to the site here."""
+    import lectures
+    from flows.common import write_jsonl
+    ids = args.lectures or [m["id"] for m in lectures.all_lectures()]
+    for lid in ids:
+        meta = lectures.load(lid)
+        d = lectures.folder(lid) / "site"
+        d.mkdir(exist_ok=True)
+        rows = [{"from": r["from"], "to": r["to"]} for r in meta.get("ranges") or []]
+        write_jsonl(d / "ranges.jsonl", rows)
+        cmd = (f"node ../node_modules/tsx/dist/cli.mjs src/scripts/importHubData.ts ranges --lesson {meta['lesson']} "
+               f"--file \"{d / 'ranges.jsonl'}\"") if meta.get("lesson") else "no site lesson yet: the site has no lesson for it to load into"
+        print(f"{lid} {meta.get('kind', 'lecture')} {meta['title']}: {len(rows)} range(s) {lectures.page_ranges(meta)}; {cmd}")
 
 
 def cmd_highlight(args):
@@ -256,6 +273,9 @@ def main():
     p.add_argument("--no-transcribe", action="store_true", help="register only (an old recording kept as a taste)")
     p.add_argument("--doctor", help="the doctor who gives the lecture (highlights record it)")
     p.set_defaults(fn=cmd_lecture)
+    p = sub.add_parser("site", help="write each lecture's site files (handout ranges) and print the import commands")
+    p.add_argument("lectures", nargs="*", help="lecture ids; none: every lecture")
+    p.set_defaults(fn=cmd_site)
     p = sub.add_parser("highlight", help="list a module's book lessons, or queue the highlights flow for some")
     p.add_argument("module")
     p.add_argument("lessons", nargs="*", help="lesson keys or names; none lists them")

@@ -29,7 +29,10 @@ if step == "quota" or (isinstance(step, dict) and account in step.get("quota_on"
     sys.exit("no account available (all tried or cooling down)")
 text = step if isinstance(step, str) else step["text"]
 (cwd / "out.txt").write_text(text)
-Path(out).write_text(json.dumps({"status": "SUCCESS", "response": "PASS"}))
+if isinstance(step, dict) and step.get("drop"):  # the connection drops after the worker wrote its file
+    Path(out).write_text(json.dumps({"status": "ERROR", "failure": "other", "error": "connection force closed"}))
+else:
+    Path(out).write_text(json.dumps({"status": "SUCCESS", "response": "PASS"}))
 '''
 
 
@@ -69,6 +72,13 @@ class TestDispatcher(unittest.TestCase):
 
     def runs(self, flow, key):
         return (Path(self.dir.name) / "jobs" / flow / key / "runs.txt").read_text().split()
+
+    def test_a_dropped_connection_keeps_output_the_checker_accepts(self):
+        self.add("pointers", 1, [{"text": "good", "drop": True}])
+        self.add("books", 1, [{"text": "half", "drop": True}, "good"])
+        self.assertEqual(self.d.run(once=True), {"passed": 2, "failed": 1})
+        self.assertEqual(self.runs("pointers", "j0"), ["work"])  # no rerun: its output passed
+        self.assertEqual(len(self.runs("books", "j0")), 2)      # nothing usable: run again
 
     def test_jobs_spread_over_every_slot_and_pass(self):
         self.add("pointers", 6, ["good"])

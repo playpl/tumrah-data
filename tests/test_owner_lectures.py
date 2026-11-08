@@ -81,19 +81,21 @@ class TestNaming(Base):
 
 class TestPlace(Base):
     def test_place_checker(self):
-        ok = {"ranges": [{"first_page": 2, "last_page": 3}], "note": "contents page"}
+        ok = {"ranges": [{"first_page": 2, "last_page": 3}], "note": "contents page entry, then the corticospinal heading on page 2"}
         self.assertEqual(checks.check_place(ok, LINES), [])
         self.assertTrue(checks.check_place({"ranges": []}, LINES))
         self.assertTrue(checks.check_place({**ok, "ranges": [{"first_page": 3, "last_page": 9}]}, LINES))
         self.assertTrue(checks.check_place({**ok, "ranges": [{"first_page": 2, "last_page": 3}, {"first_page": 3, "last_page": 4}]}, LINES))
         self.assertTrue(checks.check_place({**ok, "note": ""}, LINES))
+        self.assertTrue(checks.check_place({**ok, "note": "test"}, LINES))  # a worker probing the checker
+        self.assertTrue(checks.check_place({**ok, "note": "a dummy range to test what the checker says"}, LINES))
 
     def test_the_agent_places_but_never_over_the_owner(self):
         m = lectures.create("year2-cns", "T", "d")
         job_dir = self.root / "job"
         (job_dir / "inputs").mkdir(parents=True)
         write_jsonl(job_dir / "inputs" / "lines.jsonl", LINES)
-        (job_dir / "place.json").write_text(json.dumps({"ranges": [{"first_page": 2, "last_page": 3}], "note": "n"}))
+        (job_dir / "place.json").write_text(json.dumps({"ranges": [{"first_page": 2, "last_page": 3}], "note": "the contents page lists it on pages two and three"}))
         job = {"payload": {"lecture": m["id"]}}
         self.assertEqual(PlaceFlow().check(job, job_dir), [])
         self.assertEqual((lectures.load(m["id"])["placed_by"], lectures.page_ranges(lectures.load(m["id"]))), ("agent", [[2, 3]]))
@@ -178,3 +180,32 @@ class TestOwnerPicks(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestMiniLecturesAndRevisions(Base):
+    def test_they_take_the_pages_of_what_they_cover_and_follow_changes(self):
+        a = lectures.set_ranges(lectures.create("year2-cns", "Neuron 1", "d"), LINES, [[2, 3]], "agent")
+        b = lectures.set_ranges(lectures.create("year2-cns", "Neuron 2", "d"), LINES, [[4, 5]], "agent")
+        with self.assertRaises(ValueError):
+            lectures.create("year2-cns", "Mini", "d", kind="summary", covers=[a["id"], b["id"]])
+        with self.assertRaises(ValueError):
+            lectures.create("year2-cns", "Revision", "d", kind="revision")
+        mini = lectures.create("year2-cns", "Neuron 1 (mini lecture)", "d", kind="summary", covers=[a["id"]])
+        rev = lectures.create("year2-cns", "Chapter revision", "d", kind="revision", covers=[b["id"], a["id"]])
+        self.assertEqual((lectures.page_ranges(mini), mini["placed_by"]), ([[2, 3]], "covers"))
+        self.assertEqual(lectures.page_ranges(rev), [[2, 3], [4, 5]])
+        lectures.set_ranges(lectures.load(a["id"]), LINES, [[2, 2]], "owner")
+        self.assertEqual(lectures.page_ranges(lectures.load(mini["id"])), [[2, 2]])
+        self.assertEqual(lectures.page_ranges(lectures.load(rev["id"])), [[2, 2], [4, 5]])
+
+    def test_naming_a_mini_lecture_queues_no_place_agent(self):
+        a = lectures.set_ranges(lectures.create("year2-cns", "Neuron 1", "d"), LINES, [[2, 3]], "agent")
+        with mock.patch.object(page, "ROOT", self.root), mock.patch.object(page, "module_codes", return_value=["year2-cns"]):
+            (self.root / "modules" / "year2-cns").mkdir(parents=True)
+            write_jsonl(self.root / "modules" / "year2-cns" / "lines.jsonl", LINES)
+            out = page.new_lecture({"module": "year2-cns", "kind": "summary", "title": "Mini", "doctor": "d",
+                                    "covers": a["id"]}, self.q)
+            self.assertEqual((out["queued"], out["pages"]), (None, [[2, 3]]))
+            self.assertIn("error", page.new_lecture({"module": "year2-cns", "kind": "summary", "title": "M", "doctor": "d",
+                                                     "covers": "cns-999"}, self.q))
+        self.assertEqual(self.q.progress(), {})

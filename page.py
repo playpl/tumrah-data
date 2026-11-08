@@ -103,7 +103,7 @@ def lecture_list(q=None):
             "waiting" if m.get("transcribe") else "no recording" if not m.get("source") else "not transcribed"
         sl = json.loads((d / "shortlist.json").read_text(encoding="utf-8")) if (d / "shortlist.json").exists() else None
         row = {**{k: m.get(k) for k in ("id", "module", "title", "doctor", "kind", "lesson", "pdf_pages", "transcribe",
-                                        "duration_s", "report", "fixes", "placed_by", "place_note", "source")},
+                                        "duration_s", "report", "fixes", "placed_by", "place_note", "source", "covers")},
                "stage": stage, "pages": lectures.page_ranges(m), "required": len(m.get("required") or []),
                "doctor_questions": len(m.get("doctor_questions") or []), "shortlist": sl}
         if q is not None:
@@ -123,10 +123,15 @@ def new_lecture(b, q):
         return {"error": f"unknown module {module}"}
     if not (ROOT / "modules" / module / "lines.jsonl").exists():
         return {"error": f"add the {module} handout first (Handout tab)"}
+    covers = [c.strip() for c in (b.get("covers") or []) if c.strip()] if isinstance(b.get("covers"), list) else \
+        [c for c in re.split(r"[\s,]+", b.get("covers") or "") if c]
     try:
-        meta = lectures.create(module, b.get("title", ""), b.get("doctor", ""))
-    except ValueError as e:
-        return {"error": str(e)}
+        meta = lectures.create(module, b.get("title", ""), b.get("doctor", ""), kind=b.get("kind") or "lecture",
+                               covers=covers)
+    except (ValueError, FileNotFoundError) as e:
+        return {"error": str(e) if isinstance(e, ValueError) else f"no lecture {e.filename}"}
+    if meta["kind"] != "lecture":  # a mini lecture or revision takes its pages from what it covers
+        return {"id": meta["id"], "queued": None, "pages": lectures.page_ranges(meta)}
     q.add_jobs("place", [{"key": meta["id"], "payload": {"lecture": meta["id"]}}])
     return {"id": meta["id"], "queued": "place"}
 
@@ -137,7 +142,7 @@ def set_pages(lecture_id, text):
     pages = sorted([int(a), int(b)] if a else [int(c), int(c)] for a, b, c in spans)
     meta = lectures.load(lecture_id)
     lines = read_jsonl(ROOT / "modules" / meta["module"] / "lines.jsonl")
-    errors = checks.check_place({"ranges": [{"first_page": a, "last_page": b} for a, b in pages], "note": "owner"}, lines)
+    errors = checks.check_place({"ranges": [{"first_page": a, "last_page": b} for a, b in pages], "note": "set by the owner by hand on the admin page"}, lines)
     if errors:
         return {"error": "; ".join(errors)}
     lectures.set_ranges(meta, lines, pages, "owner")
@@ -225,11 +230,12 @@ def file_into_lecture(lecture_id, into, path):
     prefix = {k[:16]: k for k in by}
     meta = lectures.load(lecture_id)
     have = {r.get("word_key") for n in ("required", "doctor_questions") for r in meta.get(n) or []}
+    rows_in = {(r.get("file"), r.get("n")) for n in ("required", "doctor_questions") for r in meta.get(n) or [] if r.get("file")}
     added = Counter()
     for i, r in enumerate(rows):
         m = r.get("match")
         wk = prefix.get(m[5:]) if isinstance(m, str) and m.startswith("bank:") else None
-        if wk and wk in have:
+        if (wk and wk in have) or (entry["sha"], i) in rows_in:
             added["already listed"] += 1
             continue
         item = {"by": "owner", "file": entry["sha"], "n": i, "at": time.strftime("%Y-%m-%d %H:%M")}

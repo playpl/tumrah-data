@@ -62,8 +62,15 @@ class Dispatcher:
             if r.get("failure") == "quota" or cooling(self.fleet_state, account):
                 q.release(job["id"])
                 return "released"
-            q.finish(job["id"], "failed", f"fleet: {r.get('failure') or r.get('error') or r.get('status')}"[:500])
-            return "failed"
+            # A dropped connection often comes after the worker already wrote its output: the checker decides.
+            try:
+                saved = not flow.check(job, job_dir)
+            except Exception:  # noqa: BLE001 - no usable output: an ordinary failure
+                saved = False
+            if not saved:
+                q.finish(job["id"], "failed", f"fleet: {r.get('failure') or r.get('error') or r.get('status')}"[:500])
+                return "failed"
+            r["status"] = "SUCCESS"
         errors = flow.check(job, job_dir)
         if errors:
             q.finish(job["id"], "failed", "; ".join(errors)[:500])
@@ -90,7 +97,11 @@ class Dispatcher:
                         return
                     self.stop.wait(0.2 if once else 30)
                     continue
-                outcome = self.work(q, job, account)
+                try:
+                    outcome = self.work(q, job, account)
+                except Exception as e:  # noqa: BLE001 - a broken job never kills its slot (2026-11-08)
+                    q.finish(job["id"], "failed", f"dispatcher: {type(e).__name__}: {e}"[:500])
+                    outcome = "failed"
                 with self._lock:
                     self.stats[outcome] += 1
         finally:
