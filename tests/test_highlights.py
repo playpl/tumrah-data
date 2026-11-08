@@ -81,6 +81,12 @@ class TestLevel(unittest.TestCase):
     def lv(self, *evidence):
         return highlights.level(highlights.enrich(mark(evidence=list(evidence)), QS, {"pain1": "Dr B"}, LINES))
 
+    def test_question_kinds_from_import_labels(self):
+        q = {"_id": "a", "appearance_sources": [{"source_type": "doctor,student", "doctor": "Dr A"}], "options": {}}
+        self.assertEqual(highlights.question_row(q)["kind"], "doctor")
+        self.assertEqual(highlights.question_row({"_id": "b", "appearance_sources": [{"source_type": "past_exam"}]})["kind"], "other")
+        self.assertIsNone(highlights.question_row({"_id": "c", "appearance_sources": [{"source_type": "student"}]}))
+
     def test_levels(self):
         self.assertEqual((self.lv(SAID)["level"], self.lv(SAID)["mcq"]), (1, True))
         self.assertEqual(self.lv({"type": "doctor_mcq", "qid": "q1"})["level"], 2)

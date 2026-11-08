@@ -64,13 +64,15 @@ def lesson_lectures(module, pages, lines):
 
 def question_row(q):
     """A site question as the worker sees it, or None when it is not important enough (owner: only the important
-    pointed MCQs). A doctor-collection MCQ always counts; another one when it repeats or carries importance."""
+    pointed MCQs). A doctor-collection MCQ always counts; another one when it repeats, carries importance or came
+    from a past exam. importfile.py writes source_type as the comma-joined label kinds ("doctor,student")."""
     c = cfg()
     srcs = q.get("appearance_sources") or []
-    doctor_set = q.get("test_type") == "doctor" or any(s.get("source_type") == "doctor" for s in srcs)
+    kinds = {k.strip() for s in srcs for k in (s.get("source_type") or "").split(",")}
+    doctor_set = q.get("test_type") == "doctor" or bool(kinds & {"doctor", "doctor_collection"})
     repeats = q.get("repetition_count") or 1
     if not (doctor_set or repeats >= c["min_repeats"] or (q.get("importance_score") or 1) >= c["min_importance"]
-            or q.get("is_high_yield")):
+            or q.get("is_high_yield") or "past_exam" in kinds):
         return None
     opts = q.get("options") or {}
     pairs = opts.items() if isinstance(opts, dict) else zip("ABCDE", opts)
