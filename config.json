@@ -39,6 +39,7 @@
     "ai"
   ],
   "audit_sample": 0.05,
+  "shortlist": {"cap": 400, "max": 1500, "floor": 3.0, "share": 0.5, "max_df": 0.2},
   "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
   "db_name": "tumrah",
   "lecture_audio_kbps": 16,

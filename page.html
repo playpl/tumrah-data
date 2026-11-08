@@ -72,6 +72,22 @@ td.text { max-width: 42rem; }
     <div class="card"><h2>Accounts</h2><div id="accounts"></div></div>
   </section>
 
+  <section data-tab="Handout">
+    <div class="card"><h2>Add a handout</h2>
+      <div class="row">
+        <select id="hoModule"></select>
+        <input type="file" id="hoFile" accept=".pdf,application/pdf">
+        <button class="primary" id="hoGo">Upload</button>
+      </div>
+      <p class="muted" style="margin:0">Every question, book line and lecture links to the handout's line IDs. Uploading saves it and splits it into lines.</p>
+      <div class="out hide" id="hoOut" style="margin-top:.75rem"></div>
+    </div>
+    <div class="card"><h2>Modules</h2>
+      <table><thead><tr><th>Module</th><th>Handout</th><th class="num">Lines</th><th class="num">Books</th></tr></thead>
+        <tbody id="hoRows"></tbody></table>
+    </div>
+  </section>
+
   <section data-tab="Questions">
     <div class="card">
       <div class="row">
@@ -91,24 +107,70 @@ td.text { max-width: 42rem; }
     </div>
   </section>
 
+  <section data-tab="Polls">
+    <div class="card"><div class="row"><h2 style="margin:0;flex:1">Polls and the question bank</h2><button id="pBank">Rebuild bank</button></div>
+      <div id="pSummary"></div>
+      <div class="out hide" id="pOut"></div>
+    </div>
+    <div class="card"><h2>Key conflicts</h2>
+      <p class="muted" style="margin-top:0">Reposts or sources marked different correct options. Pick the right one; Rebuild bank applies your picks. Undecided ones stay off the site.</p>
+      <div class="row"><select id="pShow"><option value="open">Undecided</option><option value="all">All</option></select><span class="muted" id="pCount"></span></div>
+      <table><thead><tr><th>Question</th><th>Options (votes)</th><th>Telegram</th></tr></thead>
+        <tbody id="pRows"></tbody></table>
+    </div>
+  </section>
+
   <section data-tab="Lectures">
-    <div class="card"><h2>Add</h2>
+    <div class="card"><h2>Name a lecture</h2>
       <div class="row">
-        <input id="lId" placeholder="Id">
-        <select id="lModule"><option value="year2-cns">CNS</option><option value="year1-musculoskeletal">MSK</option></select>
-        <input id="lTitle" placeholder="Title">
-        <input id="lDoctor" placeholder="Doctor" style="width:9rem">
+        <select id="nModule"></select>
+        <input id="nTitle" placeholder="Title" style="flex:1;min-width:14rem">
+        <input id="nDoctor" placeholder="Doctor" list="nDoctors" style="width:16rem"><datalist id="nDoctors"></datalist>
+        <button class="primary" id="nAdd">Add</button>
+      </div>
+      <p class="muted" style="margin:0">An agent then finds the lecture's handout pages. You pick the doctor's questions; the agents do the rest.</p>
+      <div class="out hide" id="nOut" style="margin-top:.75rem"></div>
+    </div>
+    <div class="card"><h2>Lectures</h2>
+      <table><thead><tr><th>Lecture</th><th>Doctor</th><th>Handout pages</th><th class="num">Required</th><th class="num">Doctor's other</th><th>Agents</th><th>Recording</th><th></th></tr></thead>
+        <tbody id="lRows"></tbody></table>
+    </div>
+
+    <div class="card hide" id="lcCard">
+      <div class="row"><h2 style="margin:0;flex:1" id="lcTitle"></h2><button id="lcClose">Close</button></div>
+      <div class="row">
+        <b>Handout pages</b><input id="lcPages" placeholder="49-57, 80-82" style="width:12rem"><button id="lcPagesSave">Save pages</button>
+        <span class="muted" id="lcPlaced"></span>
+      </div>
+      <h3>Your questions</h3>
+      <div class="row">
+        <span class="muted">Add the doctor's sheet (JSONL with question and options) to</span>
+        <select id="lcInto"><option value="required">Required</option><option value="doctor_questions">Doctor's other</option></select>
+        <input type="file" id="lcFile" accept=".jsonl,.json"><button id="lcFileGo">Add file</button>
+      </div>
+      <div class="out hide" id="lcOut"></div>
+      <table><thead><tr><th>List</th><th>Question</th><th>Found as</th><th></th></tr></thead><tbody id="lcPicks"></tbody></table>
+      <h3>Pick from the bank</h3>
+      <div class="row">
+        <input id="lcSearch" placeholder="Words from the question" style="flex:1;min-width:14rem"><button id="lcFind">Search</button>
+        <button id="lcShort">Build shortlist</button><span class="muted" id="lcFrom"></span>
+      </div>
+      <table><thead><tr><th>Question</th><th>Options</th><th class="num">Votes</th><th></th></tr></thead><tbody id="lcBank"></tbody></table>
+      <div class="row" style="margin-top:.75rem"><button id="lcPrev">Previous</button><button id="lcNext">Next</button></div>
+      <h3>Agents</h3>
+      <div id="lcShortInfo" class="muted"></div>
+      <div class="row" style="margin-top:.5rem"><button class="primary" id="lcSend">Send to agents</button><span class="muted">Your questions go first, then the shortlist; each is pointed on this lecture's pages only.</span></div>
+    </div>
+
+    <div class="card"><h2>Add a recording</h2>
+      <div class="row">
+        <select id="lId" style="min-width:14rem"></select>
         <input id="lSrc" placeholder="File path or YouTube link" style="flex:1;min-width:14rem">
-        <input id="lPages" placeholder="Pages 154-160" style="width:9rem">
         <input id="lLesson" placeholder="Site lesson id" style="width:13rem">
         <label><input type="checkbox" id="lTx" checked> Transcribe</label>
         <button class="primary" id="lAdd">Add</button>
       </div>
       <div class="out hide" id="lOut"></div>
-    </div>
-    <div class="card"><h2>Lectures</h2>
-      <table><thead><tr><th>Lecture</th><th>Stage</th><th class="num">Minutes</th><th>Lines covered</th><th>Recording linked</th><th>Fixes for you</th><th>Transcribe</th></tr></thead>
-        <tbody id="lRows"></tbody></table>
     </div>
   </section>
 
@@ -121,8 +183,22 @@ td.text { max-width: 42rem; }
   </section>
 
   <section data-tab="Books">
-    <div class="card">
-      <table><thead><tr><th>Module</th><th>Book</th><th class="num">Pages</th><th>Aligned</th><th class="num">Held</th></tr></thead>
+    <div class="card"><h2>Add a doctor's book</h2>
+      <div class="row">
+        <select id="bModule"></select>
+        <input id="bId" placeholder="Book id, e.g. b101" style="width:10rem">
+        <input id="bTitle" placeholder="Title" style="flex:1;min-width:12rem">
+        <input id="bDoctor" placeholder="Doctor" list="bDoctors" style="width:16rem">
+        <datalist id="bDoctors"></datalist>
+        <input id="bPages" placeholder="Pages 1-200 (all if empty)" style="width:12rem">
+        <input type="file" id="bFile" accept=".pdf,application/pdf">
+        <button class="primary" id="bAdd">Add</button>
+      </div>
+      <p class="muted" style="margin:0">Workers line every page up with the handout. The doctor is the site's doctor id; it goes on the site with the book.</p>
+      <div class="out hide" id="bOut" style="margin-top:.75rem"></div>
+    </div>
+    <div class="card"><h2>Books</h2>
+      <table><thead><tr><th>Module</th><th>Book</th><th>Doctor</th><th class="num">Pages</th><th>Aligned</th><th class="num">Held</th></tr></thead>
         <tbody id="bRows"></tbody></table>
     </div>
   </section>
@@ -238,19 +314,112 @@ $("qHand").onclick = async () => {
   show($("qOut"), await post("/api/handover", {module: $("qModule").value, ids}));
 };
 
+let lecRows = [];
+const pagesText = (ps) => (ps || []).map(([a, b]) => a === b ? `${a}` : `${a}-${b}`).join(", ");
+async function loadDoctors() {
+  if ($("nDoctors").children.length) return;
+  const ds = await get("/api/doctors");
+  const html = ds.map((d) => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join("");
+  $("nDoctors").innerHTML = html; $("bDoctors").innerHTML = html;
+}
 loaders.Lectures = async () => {
-  const rows = await get("/api/lectures");
-  $("lRows").innerHTML = rows.map((l) => `<tr><td>${esc(l.title)}<div class="muted">${esc(l.id)}</div></td><td><span class="chip">${esc(l.stage)}</span></td><td class="num">${l.duration_s ? Math.round(l.duration_s / 60) : ""}</td><td>${pct(l.report?.lines_covered)}</td><td>${pct(l.report?.recording_linked)}</td><td class="num">${l.fixes?.for_owner ?? ""}</td><td><input type="checkbox" data-tx="${esc(l.id)}" ${l.transcribe ? "checked" : ""}></td></tr>`).join("") || `<tr><td class="muted">No lectures yet</td></tr>`;
-  $("fLecture").innerHTML = rows.filter((l) => l.fixes?.for_owner).map((l) => `<option value="${esc(l.id)}">${esc(l.title)}</option>`).join("");
+  if (!modules.length) await loadModules();
+  loadDoctors();
+  lecRows = await get("/api/lectures");
+  const place = (l) => l.pages.length ? `${pagesText(l.pages)}<div class="muted">${l.placed_by === "owner" ? "by you" : "by the agent"}</div>`
+    : l.place ? `<span class="chip ${l.place.status === "held" || l.place.status === "failed" ? "bad" : ""}" title="${esc(l.place.note)}">Agent: ${esc(l.place.status)}</span>` : "";
+  const agents = (l) => !l.sent ? (l.shortlist ? `Shortlist ${l.shortlist.kept}` : "") :
+    `${l.answered}/${l.sent} read<div class="muted">${l.pointed} on its pages, ${l.other_lecture} elsewhere</div>`;
+  $("lRows").innerHTML = lecRows.map((l) => `<tr><td>${esc(l.title)}<div class="muted">${esc(l.id)}</div></td><td>${esc(l.doctor)}</td><td>${place(l)}</td>
+    <td class="num">${l.required || ""}</td><td class="num">${l.doctor_questions || ""}</td><td>${agents(l)}</td>
+    <td><span class="chip">${esc(l.stage)}</span>${l.duration_s ? ` ${Math.round(l.duration_s / 60)} min` : ""}${l.fixes?.for_owner ? `<div class="warn">${l.fixes.for_owner} word fixes for you</div>` : ""}
+      ${l.source && Object.keys(l.source).length ? `<label class="muted"><input type="checkbox" data-tx="${esc(l.id)}" ${l.transcribe ? "checked" : ""}> Transcribe</label>` : ""}</td>
+    <td><button data-open="${esc(l.id)}">Open</button></td></tr>`).join("") || `<tr><td class="muted" colspan="8">No lectures yet: name the first one above</td></tr>`;
+  $("lId").innerHTML = lecRows.map((l) => `<option value="${esc(l.id)}">${esc(l.title)} (${esc(l.id)})</option>`).join("");
+  $("fLecture").innerHTML = lecRows.filter((l) => l.fixes?.for_owner).map((l) => `<option value="${esc(l.id)}">${esc(l.title)}</option>`).join("");
+  if (lec) showLecture(lec);
 };
 $("lRows").onchange = (e) => e.target.dataset.tx && post("/api/transcribe", {id: e.target.dataset.tx, on: e.target.checked});
+$("lRows").onclick = (e) => { const b = e.target.closest("button[data-open]"); if (b) { lec = b.dataset.open; bankPage = 0; showLecture(lec, true); } };
+$("nAdd").onclick = async () => {
+  const body = {module: $("nModule").value, title: $("nTitle").value.trim(), doctor: $("nDoctor").value.trim()};
+  if (!body.title || !body.doctor) return show($("nOut"), "Title and doctor first");
+  const r = await post("/api/lecture-new", body);
+  show($("nOut"), r.error || `${r.id} added. An agent is finding its handout pages (press Run on Progress if the fleet is stopped).`);
+  if (!r.error) { $("nTitle").value = ""; loaders.Lectures(); }
+};
 $("lAdd").onclick = async () => {
-  const src = $("lSrc").value.trim();
-  const body = {id: $("lId").value.trim(), module: $("lModule").value, title: $("lTitle").value.trim(), pages: $("lPages").value.trim(),
-    lesson: $("lLesson").value.trim(), doctor: $("lDoctor").value.trim(), transcribe: $("lTx").checked, [/^https?:/.test(src) ? "youtube" : "file"]: src};
-  if (!body.id || !src) return show($("lOut"), "Id and source first");
+  const src = $("lSrc").value.trim(), l = lecRows.find((x) => x.id === $("lId").value);
+  if (!l || !src) return show($("lOut"), "Pick the lecture and give the file path or YouTube link");
+  const body = {id: l.id, module: l.module, title: l.title, doctor: l.doctor, lesson: $("lLesson").value.trim(),
+    transcribe: $("lTx").checked, [/^https?:/.test(src) ? "youtube" : "file"]: src};
   show($("lOut"), await post("/api/lecture", body));
   poll(`lecture ${body.id}`, $("lOut"), loaders.Lectures);
+};
+
+// ---- one lecture: pages, the owner's questions, the bank, the agents ----
+let lec = null, bankPage = 0;
+const LISTS = {required: "Required", doctor_questions: "Doctor's other"};
+const opts = (os, key) => (os || []).map((o, i) => `<div dir="auto" class="${i === key ? "ok" : ""}">${String.fromCharCode(65 + i)}. ${esc(o)}</div>`).join("");
+async function showLecture(id, scroll) {
+  const l = lecRows.find((x) => x.id === id);
+  if (!l) return;
+  $("lcCard").classList.remove("hide");
+  $("lcTitle").textContent = `${l.title} (${l.id})`;
+  if (document.activeElement !== $("lcPages")) $("lcPages").value = pagesText(l.pages);
+  $("lcPlaced").textContent = l.pages.length ? (l.placed_by === "owner" ? "Set by you" : `Found by the agent${l.place_note ? ": " + l.place_note : ""}`) : "The agent has not placed it yet";
+  const s = l.shortlist;
+  $("lcShortInfo").innerHTML = s ? `Shortlist: ${s.kept} questions kept of ${s.ranked} that share the lecture's words (cap ${s.cap}${s.grew ? ", grown to cover your questions" : ""}).
+    Your questions in the bank: ${s.owner_in_bank}; ${s.owner_within_default_cap} of ${s.owner_ranked} found by the shortlist inside the first 400. Built ${esc(s.at)}.` + (l.sent ? `<br>Sent ${l.sent}: ${l.answered} read, ${l.pointed} pointed on this lecture's pages, ${l.other_lecture} taught elsewhere.` : "")
+    : "No shortlist yet. Build it after the pages are set and you picked your questions.";
+  const p = await get("/api/lecture-picks?id=" + encodeURIComponent(id));
+  const found = (r) => r.word_key ? "In the bank" : r.site_id ? "On the site" : r.row ? '<span class="warn">New, no match yet</span>' : "";
+  $("lcPicks").innerHTML = Object.entries(LISTS).flatMap(([k, name]) => p[k].map((r) => `<tr><td><span class="chip ${k === "required" ? "ok" : ""}">${name}</span></td>
+    <td class="text" dir="auto">${esc(r.question)}</td><td>${found(r)}</td><td>${r.word_key ? `<button data-pick="${esc(r.word_key)}" data-into="">Remove</button>` : ""}</td></tr>`)).join("")
+    || `<tr><td class="muted" colspan="4">None yet: search the bank below, or add the doctor's sheet</td></tr>`;
+  await loadBank();
+  if (scroll) $("lcCard").scrollIntoView({behavior: "smooth"});
+}
+async function loadBank() {
+  const d = await get(`/api/lecture-bank?id=${encodeURIComponent(lec)}&text=${encodeURIComponent($("lcSearch").value.trim())}&page=${bankPage}`);
+  $("lcFrom").textContent = `${d.total.toLocaleString()} ${d.from === "shortlist" ? "in the shortlist, best first" : d.from === "search" ? "match" : "in the bank"}`;
+  $("lcBank").innerHTML = d.rows.map((r) => `<tr><td class="text" dir="auto">${esc(r.question)}</td><td>${opts(r.options, r.key)}</td><td class="num">${r.total || ""}</td>
+    <td style="white-space:nowrap">${Object.entries(LISTS).map(([k, name]) => `<button data-pick="${esc(r.word_key)}" data-into="${r.picked === k ? "" : k}" aria-pressed="${r.picked === k}">${name}</button>`).join(" ")}</td></tr>`).join("")
+    || `<tr><td class="muted" colspan="4">Nothing found</td></tr>`;
+  $("lcPrev").disabled = bankPage === 0;
+  $("lcNext").disabled = (bankPage + 1) * 50 >= d.total;
+}
+$("lcClose").onclick = () => { lec = null; $("lcCard").classList.add("hide"); };
+$("lcPagesSave").onclick = async () => {
+  const r = await post("/api/lecture-pages", {id: lec, pages: $("lcPages").value});
+  if (r.error) return show($("lcOut"), r.error);
+  $("lcOut").classList.add("hide");
+  loaders.Lectures();
+};
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("#lcPicks button[data-pick], #lcBank button[data-pick]");
+  if (!b) return;
+  await post("/api/pick", {id: lec, word_key: b.dataset.pick, into: b.dataset.into || null});
+  loaders.Lectures();
+});
+$("lcFind").onclick = () => { bankPage = 0; loadBank(); };
+$("lcSearch").onkeydown = (e) => { if (e.key === "Enter") { bankPage = 0; loadBank(); } };
+$("lcPrev").onclick = () => { bankPage = Math.max(0, bankPage - 1); loadBank(); };
+$("lcNext").onclick = () => { bankPage += 1; loadBank(); };
+$("lcFileGo").onclick = async () => {
+  const f = $("lcFile").files[0];
+  if (!f) return show($("lcOut"), "Pick the sheet first");
+  show($("lcOut"), await post("/api/lecture-file", {id: lec, into: $("lcInto").value, name: f.name, content: await f.text()}));
+  poll(`lecture-file ${lec}`, $("lcOut"), loaders.Lectures);
+};
+$("lcShort").onclick = async () => {
+  show($("lcOut"), await post("/api/lecture-shortlist", {id: lec}));
+  poll(`shortlist ${lec}`, $("lcOut"), () => { bankPage = 0; loaders.Lectures(); });
+};
+$("lcSend").onclick = async () => {
+  const r = await post("/api/lecture-send", {id: lec});
+  show($("lcOut"), r.error || `Sent ${r.questions} questions in ${r.jobs} jobs (${r.owner_first} of yours first). Press Run on Progress if the fleet is stopped.`);
+  loaders.Lectures();
 };
 
 loaders["Word fixes"] = async () => {
@@ -269,9 +438,78 @@ $("fRows").onclick = async (e) => {
   loaders["Word fixes"]();
 };
 
+let modules = [];
+async function loadModules() {
+  modules = await get("/api/modules");
+  for (const id of ["hoModule", "bModule", "nModule"]) {
+    const keep = $(id).value;
+    $(id).innerHTML = modules.map((m) => `<option value="${esc(m.code)}">${esc(m.name)}</option>`).join("");
+    if (keep) $(id).value = keep;
+  }
+}
+// The PDF is the request body; the form fields ride in the query string (local page only).
+const upload = (u, file) => fetch(u, {method: "POST", headers: {"Content-Type": "application/pdf"}, body: file}).then((r) => r.json());
+
+loaders.Handout = async () => {
+  await loadModules();
+  $("hoRows").innerHTML = modules.map((m) => `<tr><td>${esc(m.name)}<div class="muted">${esc(m.code)}</div></td><td>${m.handout ? `<span class="chip ok">Yes</span> <span class="muted">${esc(m.hash || "")}</span>` : '<span class="chip">Missing</span>'}</td><td class="num">${m.lines || ""}</td><td class="num">${m.books || ""}</td></tr>`).join("");
+};
+$("hoGo").onclick = async () => {
+  const f = $("hoFile").files[0], m = modules.find((x) => x.code === $("hoModule").value);
+  if (!f) return show($("hoOut"), "Pick the handout PDF first");
+  if (m?.handout && !confirm(`${m.name} already has a handout. Replace it? Its line IDs change, so links made on the old one need redoing. The old one is kept under modules/${m.code}/old/.`)) return;
+  show($("hoOut"), `Uploading ${f.name} (${Math.round(f.size / 1048576)} MB)...`);
+  const r = await upload(`/api/handout?module=${encodeURIComponent($("hoModule").value)}`, f);
+  if (r.error) return show($("hoOut"), r.error);
+  show($("hoOut"), "Saved. Splitting into lines...");
+  poll(`handout ${$("hoModule").value}`, $("hoOut"), loaders.Handout);
+};
+
 loaders.Books = async () => {
+  if (!modules.length) await loadModules();
+  loadDoctors();
   const rows = await get("/api/books");
-  $("bRows").innerHTML = rows.map((b) => `<tr><td>${esc(b.module)}</td><td>${esc(b.book)}</td><td class="num">${b.pages}</td><td>${pct(b.percent / 100)}</td><td class="num ${b.held ? "bad" : ""}">${b.held}</td></tr>`).join("") || `<tr><td class="muted">No books queued</td></tr>`;
+  $("bRows").innerHTML = rows.map((b) => `<tr><td>${esc(b.module)}</td><td>${esc(b.title || b.book)}<div class="muted">${esc(b.book)}</div></td><td>${esc(b.doctor)}</td><td class="num">${b.pages}</td><td>${pct(b.percent / 100)}</td><td class="num ${b.held ? "bad" : ""}">${b.held}</td></tr>`).join("") || `<tr><td class="muted" colspan="6">No books queued</td></tr>`;
+};
+$("bAdd").onclick = async () => {
+  const f = $("bFile").files[0];
+  const p = {module: $("bModule").value, book: $("bId").value.trim(), title: $("bTitle").value.trim(), doctor: $("bDoctor").value.trim(), pages: $("bPages").value.trim()};
+  if (!p.book || !f) return show($("bOut"), "Book id and PDF first");
+  if (!p.doctor) return show($("bOut"), "Pick the doctor");
+  show($("bOut"), `Uploading ${f.name} (${Math.round(f.size / 1048576)} MB)...`);
+  const r = await upload("/api/book?" + new URLSearchParams(p), f);
+  if (r.error || r.started === false) return show($("bOut"), r.error || r.reason);
+  show($("bOut"), "Saved. Reading the pages and queueing them...");
+  poll(`book ${p.book.toLowerCase()}`, $("bOut"), loaders.Books);
+};
+
+loaders.Polls = async () => {
+  const s = await get("/api/polls"), p = s.polls, b = s.bank;
+  const n = (x) => (x ?? 0).toLocaleString();
+  $("pSummary").innerHTML = `<table>
+    <tr><th>Polls job</th><th class="num">Questions</th><th class="num">With key</th><th class="num">Key conflicts</th><th class="num">Held</th><th>Finished</th></tr>
+    <tr><td>polls/ready</td><td class="num">${n(p.questions)}</td><td class="num">${n(p.keyed)}</td><td class="num ${p.key_conflicts ? "warn" : ""}">${n(p.key_conflicts)}</td><td class="num">${n(p.held)}</td><td class="muted">${esc(p.updated)}</td></tr></table>
+    <p class="muted">${Object.entries(p.channels).map(([c, k]) => `${esc(c)}: ${n(k)}`).join(" &middot; ")}</p>
+    <table><tr><th>Bank (polls + QuizBot + forms)</th><th class="num">Questions</th><th class="num">With key</th><th class="num">Key conflicts</th><th class="num">Seen twice or more</th><th class="num">Repeated by doctors</th><th class="num">You decided</th></tr>
+    <tr><td>bank/questions.jsonl</td><td class="num">${n(b.questions)}</td><td class="num">${n(b.keyed)}</td><td class="num ${b.key_conflicts ? "warn" : ""}">${n(b.key_conflicts)}</td><td class="num">${n(b.seen_more_than_once)}</td><td class="num">${n(b.repeated_across_doctors)}</td><td class="num">${n(s.decided)}</td></tr></table>`;
+  const rows = (await get("/api/conflicts")).filter((c) => $("pShow").value === "all" || c.decision == null);
+  $("pCount").textContent = `${rows.length} shown`;
+  const letter = (i) => String.fromCharCode(65 + i);
+  $("pRows").innerHTML = rows.map((c) => `<tr><td class="text" dir="auto">${esc(c.question)}${c.solution ? `<div class="muted" dir="auto">${esc(c.solution)}</div>` : ""}</td>
+    <td>${c.options.map((o, i) => `<div class="row" style="margin:.15rem 0;flex-wrap:nowrap"><button data-id="${esc(c.id)}" data-key="${i}" aria-pressed="${c.decision === i}" title="Make ${letter(i)} the key">${letter(i)}</button><span dir="auto" style="flex:1">${esc(o)}</span><span class="muted num">${c.votes[i] ?? 0}</span></div>`).join("")}
+      ${c.decision != null ? `<button data-id="${esc(c.id)}" data-key="">Undo</button>` : ""}</td>
+    <td>${c.links.map((l, i) => `<a href="${esc(l)}" target="_blank" rel="noopener">${i + 1}</a>`).join(" ")}</td></tr>`).join("") || `<tr><td class="muted" colspan="3">No conflicts left</td></tr>`;
+};
+$("pShow").onchange = () => loaders.Polls();
+$("pRows").onclick = async (e) => {
+  const b = e.target.closest("button[data-id]");
+  if (!b) return;
+  await post("/api/key", {id: b.dataset.id, key: b.dataset.key === "" ? null : +b.dataset.key});
+  loaders.Polls();
+};
+$("pBank").onclick = async () => {
+  show($("pOut"), await post("/api/bank", {}));
+  poll("bank", $("pOut"), loaders.Polls);
 };
 
 loaders.Coverage = async () => {

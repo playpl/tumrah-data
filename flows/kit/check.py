@@ -24,6 +24,14 @@ elif job["checker"] == "check_reference":
     errors = checks.check_reference(ref, job["module"], lines()) if ref is not None \
         else [f"{job['output']} does not exist"]
     rows = []
+elif job["checker"] == "check_place":
+    out = JOB / job["output"]
+    try:
+        place = json.loads(out.read_text(encoding="utf-8")) if out.exists() else None
+    except ValueError as e:
+        sys.exit(f"FAIL: {job['output']} is not JSON ({e})")
+    errors = checks.check_place(place, lines()) if place is not None else [f"{job['output']} does not exist"]
+    rows = []
 elif job["checker"] == "check_lecture_dir":
     errors = checks.check_lecture_dir(JOB, lines(), job["duration_s"], job.get("pdf_pages"))
     rows = []

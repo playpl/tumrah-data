@@ -61,13 +61,34 @@ Repeat until it prints PASS. Final reply: the PASS line, and how many questions 
 """
 
 
+LECTURE_SCOPE = """
+## This batch belongs to one lecture
+The owner named the lecture **{title}** (`lecture_id` `{lecture}`). It is taught on pdf pages {pages}. These questions
+were picked by code as maybe belonging to it: some do not.
+- Look for each question **only on those pages** (`python tools/page.py <first> <last>`). Use `"lecture_id": "{lecture}"`.
+- When a question is not taught on those pages: `"found": false, "reason": "other_lecture"`. Do not search the rest
+  of the handout for it. A wrong pointer is worse than "other_lecture".
+"""
+
+
 class PointerFlow:
     lane = "pointers"
     timeout = 60
 
     def prepare(self, job, job_dir: Path):
         p = job["payload"]
-        common.build(job_dir, p["module"], p["batch"], "check_pointers", "out.jsonl", BRIEF)
+        brief = BRIEF
+        if p.get("lecture"):  # owner-named lecture: only its pages, "other_lecture" when the question is not taught there
+            import lectures
+            meta = lectures.load(p["lecture"])
+            pages = lectures.page_ranges(meta)
+            brief = BRIEF + LECTURE_SCOPE.format(title=meta["title"], lecture=meta["id"],
+                                                 pages=", ".join(f"{a}-{b}" for a, b in pages))
+        common.build(job_dir, p["module"], p["batch"], "check_pointers", "out.jsonl", brief)
+        if p.get("lecture"):
+            (job_dir / "inputs" / "reference.json").write_text(json.dumps(
+                {"lecture_scope": True, "lectures": [{"lecture_id": meta["id"], "title": meta["title"], "pdf_pages": pages}]},
+                ensure_ascii=False), encoding="utf-8")
         prompt = job_dir / "prompt.md"
         prompt.write_text("Read BRIEF.md in this folder to the end and follow it exactly. "
                           f"Your batch has {len(p['batch'])} questions. {common.SUBAGENTS}\n", encoding="utf-8")

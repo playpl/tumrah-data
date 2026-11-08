@@ -1,14 +1,16 @@
 """The data admin page: http://127.0.0.1:8770 (py dm.py page). Local only; reads the live site through db.py and
 writes it only through the tumrah repo's importers.
 
-Screens: Questions (filter, tick, Hand over), Lectures (add, Transcribe), Word fixes, Books (% aligned), Coverage,
-Voters, Lecture questions, Highlights, Gap map, Progress.
+Screens: Progress, Handout (upload, split into lines), Questions (filter, tick, Hand over), Polls (counts, key
+conflicts for the owner), Lectures (add, Transcribe), Word fixes, Books (add with doctor, % aligned), Coverage, Voters,
+Lecture questions, Highlights, Gap map.
 """
 import json
 import re
 import subprocess
 import threading
 import time
+from collections import Counter
 from datetime import date
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -87,16 +89,174 @@ def handover(reader, module, ids):
 
 
 # ---- lectures and word fixes ---------------------------------------------------------------------------------------
-def lecture_list():
+def job_state(q, flow, key):
+    r = q.db.execute("SELECT status, note FROM jobs WHERE flow=? AND key=?", (flow, key)).fetchone()
+    return {"status": r["status"], "note": r["note"]} if r else None
+
+
+def lecture_list(q=None):
     out = []
     for f in sorted(lectures.LECTURES.glob("*/lecture.json")):
         m = json.loads(f.read_text(encoding="utf-8"))
         d = f.parent
         stage = "aligned" if (d / "links.jsonl").exists() else "transcribed" if (d / "raw.txt").exists() else \
-            "waiting" if m.get("transcribe") else "not transcribed"
-        out.append({**{k: m.get(k) for k in ("id", "module", "title", "lesson", "pdf_pages", "transcribe", "duration_s",
-                                              "report", "fixes")}, "stage": stage})
+            "waiting" if m.get("transcribe") else "no recording" if not m.get("source") else "not transcribed"
+        sl = json.loads((d / "shortlist.json").read_text(encoding="utf-8")) if (d / "shortlist.json").exists() else None
+        row = {**{k: m.get(k) for k in ("id", "module", "title", "doctor", "kind", "lesson", "pdf_pages", "transcribe",
+                                        "duration_s", "report", "fixes", "placed_by", "place_note", "source")},
+               "stage": stage, "pages": lectures.page_ranges(m), "required": len(m.get("required") or []),
+               "doctor_questions": len(m.get("doctor_questions") or []), "shortlist": sl}
+        if q is not None:
+            import shortlist
+            res = shortlist.results(m["id"], q)
+            sent = json.loads((d / "sent.json").read_text(encoding="utf-8")) if (d / "sent.json").exists() else []
+            row.update(place=job_state(q, "place", m["id"]), sent=len(sent), pointed=sum(r["found"] for r in res.values()),
+                       other_lecture=sum(r["reason"] == "other_lecture" for r in res.values()), answered=len(res))
+        out.append(row)
     return out
+
+
+def new_lecture(b, q):
+    """The owner names a lecture; the place agent is queued at once when the module has its handout lines."""
+    module = b.get("module", "")
+    if module not in module_codes():
+        return {"error": f"unknown module {module}"}
+    if not (ROOT / "modules" / module / "lines.jsonl").exists():
+        return {"error": f"add the {module} handout first (Handout tab)"}
+    try:
+        meta = lectures.create(module, b.get("title", ""), b.get("doctor", ""))
+    except ValueError as e:
+        return {"error": str(e)}
+    q.add_jobs("place", [{"key": meta["id"], "payload": {"lecture": meta["id"]}}])
+    return {"id": meta["id"], "queued": "place"}
+
+
+def set_pages(lecture_id, text):
+    """The owner's own handout pages for a lecture ("49-57, 80-82"); they replace the agent's and are never overwritten."""
+    spans = re.findall(r"(\d+)\s*-\s*(\d+)|(\d+)", text or "")
+    pages = sorted([int(a), int(b)] if a else [int(c), int(c)] for a, b, c in spans)
+    meta = lectures.load(lecture_id)
+    lines = read_jsonl(ROOT / "modules" / meta["module"] / "lines.jsonl")
+    errors = checks.check_place({"ranges": [{"first_page": a, "last_page": b} for a, b in pages], "note": "owner"}, lines)
+    if errors:
+        return {"error": "; ".join(errors)}
+    lectures.set_ranges(meta, lines, pages, "owner")
+    return {"pages": lectures.page_ranges(meta)}
+
+
+_BANK = {"mtime": None, "rows": [], "by": {}}
+
+
+def bank_rows():
+    """The bank, slim and cached until bank/questions.jsonl changes (the Lecture screen searches it)."""
+    qf = BANK / "questions.jsonl"
+    if not qf.exists():
+        return [], {}
+    m = qf.stat().st_mtime
+    if _BANK["mtime"] != m:
+        rows = []
+        with qf.open(encoding="utf-8") as f:
+            for line in f:
+                q = json.loads(line)
+                row = {k: q.get(k) for k in ("word_key", "question", "options", "key", "key_conflict", "doctors",
+                                             "repetition_count", "total")}
+                row["sightings"] = [{"chat": x.get("chat"), "date": x.get("date")} for x in q.get("sightings") or []]
+                rows.append(row)
+        _BANK.update(mtime=m, rows=rows, by={r["word_key"]: r for r in rows})
+    return _BANK["rows"], _BANK["by"]
+
+
+def lecture_bank(lecture_id, text="", page=0):
+    """Bank questions for the owner to pick from: the lecture's shortlist order when it is built, else the whole bank;
+    `text` narrows to questions holding every typed word. 50 per page."""
+    import shortlist
+    meta = lectures.load(lecture_id)
+    rows, by = bank_rows()
+    sl = lectures.folder(lecture_id) / "shortlist.jsonl"
+    order = [by[r["word_key"]] for r in read_jsonl(sl) if r["word_key"] in by] if sl.exists() and not text else rows
+    want = [w.lower() for w in (text or "").split()]
+    if want:
+        order = [r for r in order if all(w in (" ".join([r["question"] or "", *(o or "" for o in r["options"] or [])])).lower()
+                                         for w in want)]
+    picked = {r.get("word_key"): name for name in ("required", "doctor_questions") for r in meta.get(name) or []}
+    out = order[page * PAGE_SIZE:(page + 1) * PAGE_SIZE]
+    return {"rows": [{**{k: v for k, v in r.items() if k != "sightings"}, "qid": shortlist.qid_of(r["word_key"]),
+                      "picked": picked.get(r["word_key"])} for r in out],
+            "total": len(order), "from": "search" if want else "shortlist" if sl.exists() else "bank"}
+
+
+def lecture_picks(lecture_id):
+    """The owner's two lists with each question's text (bank) or file row, in order."""
+    meta = lectures.load(lecture_id)
+    _, by = bank_rows()
+    out = {}
+    for name in ("required", "doctor_questions"):
+        out[name] = [{**r, "question": (by.get(r.get("word_key")) or r.get("row") or {}).get("question"),
+                      "options": (by.get(r.get("word_key")) or r.get("row") or {}).get("options")} for r in meta.get(name) or []]
+    return out
+
+
+def pick(lecture_id, word_key, into):
+    """Puts one bank question in the owner's Required or Doctor's other list (or takes it out with into=None)."""
+    meta = lectures.load(lecture_id)
+    for name in ("required", "doctor_questions"):
+        meta[name] = [r for r in meta.get(name) or [] if r.get("word_key") != word_key]
+    if into in ("required", "doctor_questions"):
+        meta[into].append({"word_key": word_key, "by": "owner", "at": time.strftime("%Y-%m-%d %H:%M")})
+    lectures.save(meta)
+    return {"required": len(meta["required"]), "doctor_questions": len(meta["doctor_questions"])}
+
+
+def add_file(lecture_id, into, name, content):
+    """The doctor's own sheet: every row is looked up first (cover.py: exact in the bank and on the site, then the fleet
+    for near matches). Bank matches join the list now; site matches and unmatched rows wait in the list as such."""
+    if into not in ("required", "doctor_questions"):
+        return {"error": "list"}
+    path = save_cover_file(f"{lecture_id}-{into}-{name}", content)
+    return background(f"lecture-file {lecture_id}", file_into_lecture, lecture_id, into, path)
+
+
+def file_into_lecture(lecture_id, into, path):
+    import cover
+    done = run_cover(path)
+    entry = cover.covered(path)
+    rows = read_jsonl(BANK / f"cover_{entry['sha']}.jsonl") if entry else []
+    _, by = bank_rows()
+    prefix = {k[:16]: k for k in by}
+    meta = lectures.load(lecture_id)
+    have = {r.get("word_key") for n in ("required", "doctor_questions") for r in meta.get(n) or []}
+    added = Counter()
+    for i, r in enumerate(rows):
+        m = r.get("match")
+        wk = prefix.get(m[5:]) if isinstance(m, str) and m.startswith("bank:") else None
+        if wk and wk in have:
+            added["already listed"] += 1
+            continue
+        item = {"by": "owner", "file": entry["sha"], "n": i, "at": time.strftime("%Y-%m-%d %H:%M")}
+        if wk:
+            item["word_key"] = wk
+            added["in the bank"] += 1
+        elif m:
+            item["site_id"] = m
+            added["on the site"] += 1
+        else:
+            item["row"] = {"question": r.get("question"), "options": r.get("options"), "key": r.get("key")}
+            added["new (no match yet)"] += 1
+        meta[into].append(item)
+    lectures.save(meta)
+    return f"{done}\nAdded to {into}: " + ", ".join(f"{v} {k}" for k, v in added.items())
+
+
+def lecture_shortlist(lecture_id):
+    import shortlist
+    rows, _ = bank_rows()
+    return shortlist.build(lecture_id, rows)
+
+
+def lecture_send(lecture_id, q):
+    import shortlist
+    rows, _ = bank_rows()
+    return shortlist.send(lecture_id, q, rows)
 
 
 def set_transcribe(lecture_id, on, q):
@@ -150,9 +310,178 @@ def replace_near(text, at, old, new):
     return text if not m else text[:m.start()] + new + text[m.end():]
 
 
+# ---- modules, handouts and uploads ---------------------------------------------------------------------------------
+MODULE_CODE = re.compile(r"^year\d-[a-z0-9-]+$")
+BOOK_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
+CHUNK = 1 << 20
+
+
+def module_codes():
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    return [c for c in cfg["label_modules"] if not c.endswith("-other")]
+
+
+def module_list():
+    """Every module the site teaches with its handout state: the Handout tab and the module pickers."""
+    cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+    out = []
+    for code in module_codes():
+        d = ROOT / "modules" / code
+        lines = d / "lines.jsonl"
+        text = lines.read_text(encoding="utf-8").splitlines() if lines.exists() else []
+        first = json.loads(text[0]) if text else {}
+        out.append({"code": code, "name": cfg["label_modules"][code], "handout": (d / "handout.pdf").exists(),
+                    "lines": len(text),
+                    "hash": first.get("hash"), "books": len(list((d / "books").glob("*.pdf"))) if (d / "books").exists() else 0})
+    return out
+
+
+def save_upload(stream, size, dest):
+    """Streams an uploaded PDF to dest (through a .part file, so a broken upload never replaces a good file)."""
+    if size <= 0:
+        raise ValueError("empty upload")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    left, head = size, b""
+    with open(part, "wb") as f:
+        while left:
+            chunk = stream.read(min(CHUNK, left))
+            if not chunk:
+                break
+            head = head or chunk[:5]
+            f.write(chunk)
+            left -= len(chunk)
+    if left or head[:4] != b"%PDF":
+        part.unlink(missing_ok=True)
+        raise ValueError("not a whole PDF file" if left else "not a PDF file")
+    part.replace(dest)
+    return dest
+
+
+def put_handout(module, stream, size):
+    """Saves modules/<code>/handout.pdf, keeping a replaced handout and its lines under old/<time>/, and splits it."""
+    if module not in module_codes():
+        return {"error": f"unknown module {module}"}
+    d = ROOT / "modules" / module
+    new = save_upload(stream, size, d / "handout.new.pdf")
+    replaced = (d / "handout.pdf").exists()
+    if replaced:
+        old = d / "old" / time.strftime("%Y-%m-%d-%H%M%S")
+        old.mkdir(parents=True)
+        for name in ("handout.pdf", "lines.jsonl"):
+            if (d / name).exists():
+                (d / name).replace(old / name)
+    new.replace(d / "handout.pdf")
+    started = background(f"handout {module}", run_dm, "lines", module)
+    return {**started, "replaced": replaced}
+
+
+def put_book(a, stream, size):
+    """Saves modules/<code>/books/<id>.pdf and queues it for alignment with its title and doctor (dm.py add books)."""
+    module, book = a.get("module", ""), (a.get("book") or "").strip().lower()
+    if module not in module_codes():
+        return {"error": f"unknown module {module}"}
+    if not BOOK_ID.match(book):
+        return {"error": "book id: lowercase letters, digits and dashes, e.g. b101"}
+    if not (ROOT / "modules" / module / "lines.jsonl").exists():
+        return {"error": f"add the {module} handout first (Handout tab)"}
+    pages = (a.get("pages") or "").strip()
+    if pages and not re.fullmatch(r"\d+-\d+", pages):
+        return {"error": "pages: first-last, e.g. 1-200"}
+    pdf = save_upload(stream, size, ROOT / "modules" / module / "books" / f"{book}.pdf")
+    args = ["add", "books", module, "--book", book, "--file", str(pdf)]
+    for k in ("pages", "doctor", "title"):
+        if (a.get(k) or "").strip():
+            args += [f"--{k}", a[k].strip()]
+    return background(f"book {book}", run_dm, *args)
+
+
+def run_dm(*args):
+    res = subprocess.run(["py", str(ROOT / "dm.py"), *args], capture_output=True, text=True, cwd=ROOT,
+                         encoding="utf-8", errors="replace")
+    return (res.stdout + res.stderr).strip()
+
+
+def doctors(reader):
+    """The site's doctors for the book form: doctorId (what importSiteBook.ts --doctor takes) and English name."""
+    try:
+        return [{"id": r["doctorId"], "name": r.get("nameEn")} for r in
+                reader.find("doctorprofiles", {}, {"doctorId": 1, "nameEn": 1}, limit=500, sort=[("nameEn", 1)])]
+    except Exception:  # noqa: BLE001 - the form still takes a typed doctor id
+        return []
+
+
+# ---- polls and the question bank -----------------------------------------------------------------------------------
+POLLS_READY = ROOT / "polls" / "ready"
+BANK = ROOT / "bank"
+DECISIONS = BANK / "key_decisions.json"
+_CONFLICTS = {"mtime": None, "rows": []}
+
+
+def polls_summary():
+    """Counts only: the finished polls job, its channels, and the merged bank."""
+    rows = keyed = conflicts = 0
+    chans = {}
+    qf = POLLS_READY / "questions.jsonl"
+    if qf.exists():
+        with qf.open(encoding="utf-8") as f:
+            for line in f:
+                r = json.loads(line)
+                rows += 1
+                keyed += r.get("key") is not None
+                conflicts += bool(r.get("key_conflict"))
+                for c in {s.get("chat") for s in r.get("sightings", [])}:
+                    chans[c] = chans.get(c, 0) + 1
+    hf = POLLS_READY / "held.jsonl"
+    held = len(hf.read_text(encoding="utf-8").splitlines()) if hf.exists() else 0
+    bank = json.loads((BANK / "counts.json").read_text(encoding="utf-8")) if (BANK / "counts.json").exists() else {}
+    return {"polls": {"questions": rows, "keyed": keyed, "key_conflicts": conflicts, "held": held,
+                      "channels": dict(sorted(chans.items(), key=lambda x: -x[1])),
+                      "updated": time.strftime("%Y-%m-%d %H:%M", time.localtime(qf.stat().st_mtime)) if qf.exists() else None},
+            "bank": bank, "decided": len(key_decisions())}
+
+
+def key_decisions():
+    return json.loads(DECISIONS.read_text(encoding="utf-8")) if DECISIONS.exists() else {}
+
+
+def conflicts():
+    """The bank's key conflicts, each with its options, votes, sightings and the owner's decision so far."""
+    qf = BANK / "questions.jsonl"
+    if not qf.exists():
+        return []
+    m = qf.stat().st_mtime
+    if _CONFLICTS["mtime"] != m:
+        rows = []
+        with qf.open(encoding="utf-8") as f:
+            for line in f:
+                if '"key_conflict": true' not in line and '"key_source": "owner"' not in line:
+                    continue
+                q = json.loads(line)
+                if q.get("key_conflict") or q.get("key_source") == "owner":
+                    rows.append({"id": q["word_key"], "question": q["question"], "options": q["options"], "votes": q["votes"],
+                                 "total": q["total"], "key": q["key"], "solution": q.get("solution"),
+                                 "links": [s["link"] for s in q["sightings"] if s.get("link")][:5]})
+        _CONFLICTS.update(mtime=m, rows=rows)
+    dec = key_decisions()
+    return [{**r, "decision": dec.get(r["id"], {}).get("key")} for r in _CONFLICTS["rows"]]
+
+
+def decide_key(word_key, key):
+    """The owner's key for one conflict (an option index), or None to undo. merge.build applies it on the next bank."""
+    dec = key_decisions()
+    if key is None:
+        dec.pop(word_key, None)
+    else:
+        dec[word_key] = {"key": int(key), "at": time.strftime("%Y-%m-%d %H:%M")}
+    BANK.mkdir(exist_ok=True)
+    DECISIONS.write_text(json.dumps(dec, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"saved": True, "decided": len(dec)}
+
+
 # ---- books, progress, gap map --------------------------------------------------------------------------------------
 def books(q):
-    """Each queued book with its percent aligned (pages in passed jobs / pages queued)."""
+    """Each queued book with its title, doctor and percent aligned (pages in passed jobs / pages queued)."""
     out = {}
     for r in q.db.execute("SELECT key, payload, status FROM jobs WHERE flow='books'"):
         p = json.loads(r["payload"])
@@ -163,6 +492,9 @@ def books(q):
         b["held"] += len(p["pages"]) if r["status"] == "held" else 0
     for b in out.values():
         b["percent"] = round(100 * b["aligned"] / b["pages"], 1) if b["pages"] else 0.0
+        meta = ROOT / "modules" / b["module"] / "books" / f"{b['book']}.json"
+        m = json.loads(meta.read_text(encoding="utf-8")) if meta.exists() else {}
+        b["title"], b["doctor"] = m.get("title"), m.get("doctor")
     return sorted(out.values(), key=lambda b: (b["module"], b["book"]))
 
 
@@ -335,7 +667,9 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/progress": lambda: progress(q),
                 "/api/questions": lambda: questions(self.get_reader(), module=a.get("module"), doctor=a.get("doctor"),
                                                     test_type=a.get("set"), pointer=a.get("pointer"), after=a.get("after")),
-                "/api/lectures": lecture_list,
+                "/api/lectures": lambda: lecture_list(q),
+                "/api/lecture-bank": lambda: lecture_bank(a["id"], a.get("text", ""), int(a.get("page", 0))),
+                "/api/lecture-picks": lambda: lecture_picks(a["id"]),
                 "/api/fixes": lambda: pending_fixes(a["lecture"]),
                 "/api/books": lambda: books(q),
                 "/api/gap": lambda: gap_map(self.get_reader(), a.get("module", "year2-cns")),
@@ -344,6 +678,10 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/jobs": lambda: JOBS,
                 "/api/highlights": lambda: highlight_lessons(a.get("module", "year2-cns"), q),
                 "/api/highlight-view": lambda: highlights.preview(a["module"], a["key"]),
+                "/api/modules": module_list,
+                "/api/doctors": lambda: doctors(self.get_reader()),
+                "/api/polls": polls_summary,
+                "/api/conflicts": conflicts,
             }
             if u.path in routes:
                 return self.reply(routes[u.path]())
@@ -356,9 +694,22 @@ class Handler(BaseHTTPRequestHandler):
         if origin and origin != f"http://127.0.0.1:{self.server.server_port}":
             return self.reply({"error": "other site"}, code=403)  # a web page must not drive this
         size = int(self.headers.get("Content-Length") or 0)
+        u = urlparse(self.path)
+        if u.path in ("/api/handout", "/api/book"):  # the body is the PDF itself; the form fields ride in the query
+            a = {k: v[0] for k, v in parse_qs(u.query).items()}
+            try:
+                if u.path == "/api/handout":
+                    return self.reply(put_handout(a.get("module", ""), self.rfile, size))
+                return self.reply(put_book(a, self.rfile, size))
+            except ValueError as e:
+                return self.reply({"error": str(e)})
         b = json.loads(self.rfile.read(size) or "{}")
         q = queue_db.Queue()
         try:
+            if self.path == "/api/key":
+                return self.reply(decide_key(b["id"], b.get("key")))
+            if self.path == "/api/bank":
+                return self.reply(background("bank", run_dm, "bank"))
             if self.path == "/api/handover":
                 return self.reply(handover(self.get_reader(), b["module"], b.get("ids", [])))
             if self.path == "/api/lecture":
@@ -370,6 +721,21 @@ class Handler(BaseHTTPRequestHandler):
                     cmd.append("--no-transcribe")
                 return self.reply(background(f"lecture {b['id']}", lambda: subprocess.run(
                     cmd, capture_output=True, text=True, cwd=ROOT).stdout.strip()))
+            if self.path == "/api/lecture-new":
+                return self.reply(new_lecture(b, q))
+            if self.path == "/api/lecture-pages":
+                return self.reply(set_pages(b["id"], b.get("pages")))
+            if self.path == "/api/pick":
+                return self.reply(pick(b["id"], b["word_key"], b.get("into")))
+            if self.path == "/api/lecture-file":
+                return self.reply(add_file(b["id"], b.get("into"), b.get("name", "sheet.jsonl"), b.get("content", "")))
+            if self.path == "/api/lecture-shortlist":
+                return self.reply(background(f"shortlist {b['id']}", lecture_shortlist, b["id"]))
+            if self.path == "/api/lecture-send":
+                try:
+                    return self.reply(lecture_send(b["id"], q))
+                except ValueError as e:
+                    return self.reply({"error": str(e)})
             if self.path == "/api/transcribe":
                 return self.reply(set_transcribe(b["id"], b.get("on", True), q))
             if self.path == "/api/fix":

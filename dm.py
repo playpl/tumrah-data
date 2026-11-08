@@ -94,6 +94,10 @@ def cmd_add(args):
         keep.parent.mkdir(parents=True, exist_ok=True)
         if Path(args.file).resolve() != keep.resolve():
             shutil.copy2(args.file, keep)
+        meta = keep.with_suffix(".json")
+        old = json.loads(meta.read_text(encoding="utf-8")) if meta.exists() else {}
+        meta.write_text(json.dumps({"book_id": args.book, "title": args.title or old.get("title"),
+                                    "doctor": args.doctor or old.get("doctor")}, ensure_ascii=False), encoding="utf-8")
         jobs = book_jobs(args.module, args.book, book_pages(keep, args.book, first, last))
     q = queue_db.Queue()
     added = q.add_jobs(args.flow, jobs)
@@ -238,6 +242,8 @@ def main():
     p.add_argument("--file")
     p.add_argument("--book", help="book id (books)")
     p.add_argument("--pages", help="first-last book pages (books); default all")
+    p.add_argument("--doctor", help="the site doctorId whose book it is (books); importSiteBook.ts --doctor")
+    p.add_argument("--title", help="the book's title (books)")
     p.set_defaults(fn=cmd_add)
     p = sub.add_parser("lecture", help="add a lecture: --file <audio> or --youtube <url>; queues transcription")
     p.add_argument("id")

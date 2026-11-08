@@ -1,6 +1,9 @@
 """Lectures: one folder each under lectures/<id>/ (gitignored; transcripts are internal, never for students).
 
-    lecture.json   id, module, title, doctor, lesson (site id or null), pdf_pages [a, b] or null, transcribe, source, duration_s
+    lecture.json   id, module, title, doctor (site doctorId), kind, lesson (site id or null), ranges [{from, to, pages}]
+                   (handout line-ID ranges, placed by the agent or the owner), placed_by, required and doctor_questions
+                   (the owner's picks, [{ref, ...}]), pdf_pages [a, b] or null, transcribe, source, duration_s
+    shortlist.jsonl  the bank questions code ranks for this lecture (shortlist.py); only these go to the pointer agents
     audio.ogg      the recording compressed so one worker hears all of it (config.json lecture_audio)
     raw.txt        what was heard, word for word with [mm:ss]; never edited after it is written
     clean.txt      the same words laid out in paragraphs with punctuation, plus fixes at 0.9 confidence or more
@@ -13,6 +16,7 @@ Sources: a local file, or a YouTube link (YouTube's own transcript when there is
 import json
 import re
 import subprocess
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -96,12 +100,75 @@ def youtube(url, workdir):
     return None, next(workdir.glob("yt_audio.*"))
 
 
+KINDS = ("lecture",)
+
+
+def new_id(module):
+    """cns-001, cns-002, ...: the module's short name and the next free number."""
+    short = module.split("-", 1)[1] if "-" in module else module
+    used = {int(m.group(1)) for p in LECTURES.glob(f"{short}-*") if (m := re.fullmatch(rf"{re.escape(short)}-(\d+)", p.name))} \
+        if LECTURES.exists() else set()
+    return f"{short}-{max(used, default=0) + 1:03d}"
+
+
+def create(module, title, doctor, kind="lecture"):
+    """The owner names a lecture (owner 2026-11-08: there are no lectures until the owner names one). The agents then
+    place it in the handout (flows/place.py) and fill the rest."""
+    if kind not in KINDS:
+        raise ValueError(f"kind must be one of {KINDS}")
+    if not (title or "").strip() or not (doctor or "").strip():
+        raise ValueError("a lecture needs a title and a doctor")
+    meta = {"id": new_id(module), "module": module, "title": title.strip(), "doctor": doctor.strip(), "kind": kind,
+            "lesson": None, "ranges": [], "placed_by": None, "required": [], "doctor_questions": [],
+            "transcribe": False, "source": {}, "duration_s": None, "pdf_pages": None,
+            "created": time.strftime("%Y-%m-%d %H:%M")}
+    save(meta)
+    return meta
+
+
+def page_ranges(meta):
+    """[[first_pdf_page, last_pdf_page], ...] from the lecture's line-ID ranges."""
+    return [r["pages"] for r in meta.get("ranges") or []]
+
+
+def set_ranges(meta, module_lines, pages, by):
+    """Whole-page ranges [[a, b], ...] to line-ID ranges {from, to, pages}: the first line of page a to the last of b."""
+    by_page = {}
+    for ln in module_lines:
+        by_page.setdefault(ln["page"], []).append(ln)
+    out = []
+    for a, b in sorted(pages):
+        first = min(by_page[a], key=lambda ln: ln["n"])
+        last = max(by_page[b], key=lambda ln: ln["n"])
+        out.append({"from": first["id"], "to": last["id"], "pages": [a, b]})
+    meta.update(ranges=out, placed_by=by, pdf_pages=[out[0]["pages"][0], out[-1]["pages"][1]] if out else None)
+    save(meta)
+    return meta
+
+
+def lecture_lines(meta, module_lines):
+    """The handout lines inside the lecture's ranges, in handout order."""
+    spans = page_ranges(meta)
+    return [ln for ln in module_lines if any(a <= ln["page"] <= b for a, b in spans)]
+
+
+def all_lectures(module=None):
+    if not LECTURES.exists():
+        return []
+    out = [json.loads(f.read_text(encoding="utf-8")) for f in sorted(LECTURES.glob("*/lecture.json"))]
+    return [m for m in out if module is None or m["module"] == module]
+
+
 def add(lecture_id, module, title, kbps, file=None, url=None, lesson=None, pdf_pages=None, transcribe=True, doctor=None):
-    """Registers a lecture and prepares its audio or transcript. Returns the next flow to queue, or None."""
+    """Adds a recording (file or YouTube) to a lecture, registering the lecture first when the owner has not named it
+    yet, and prepares its audio or transcript. Returns the next flow to queue, or None."""
     d = folder(lecture_id)
     d.mkdir(parents=True, exist_ok=True)
-    meta = {"id": lecture_id, "module": module, "title": title, "doctor": doctor, "lesson": lesson, "pdf_pages": pdf_pages,
-            "transcribe": transcribe, "source": {"file": str(file)} if file else {"youtube": url}, "duration_s": None}
+    meta = load(lecture_id) if (d / "lecture.json").exists() else \
+        {"id": lecture_id, "module": module, "title": title, "doctor": doctor, "kind": "lecture", "lesson": lesson,
+         "ranges": [], "placed_by": None, "required": [], "doctor_questions": [], "pdf_pages": pdf_pages}
+    meta.update({k: v for k, v in (("lesson", lesson), ("pdf_pages", pdf_pages), ("doctor", doctor)) if v},
+                transcribe=transcribe, source={"file": str(file)} if file else {"youtube": url}, duration_s=None)
     audio = Path(file) if file else None
     if url:
         raw, audio = youtube(url, d / "download")

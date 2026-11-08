@@ -37,6 +37,12 @@ class TestMerge(unittest.TestCase):
         self.assertTrue(q["key_conflict"])
         self.assertEqual(q["key"], 0)
 
+    def test_only_the_owner_settles_a_conflict(self):
+        bank = merge.merge([row("Q?", ["a", "b"], 0), row("Q?", ["a", "b"], 1), row("R?", ["a", "b"], 0)])
+        merge.apply_decisions(bank, {bank[0]["word_key"]: {"key": 1}, bank[1]["word_key"]: {"key": 1}})
+        self.assertEqual((bank[0]["key"], bank[0]["key_conflict"], bank[0]["key_source"]), (1, False, "owner"))
+        self.assertEqual((bank[1]["key"], "key_source" in bank[1]), (0, False))  # no conflict: the source key stays
+
     def test_a_source_rows_own_conflict_survives(self):
         import json
         import tempfile

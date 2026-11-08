@@ -5,7 +5,8 @@ duplicate means depends on where it repeats (owner, 2026-11-07):
 - across channels or reposts: one question; net votes add up and the repeat is forgotten (no importance);
 - across doctors: a real signal; `repetition_count` counts the doctors and `importance_score` rises with it.
 Every sighting is kept with its Telegram link for a later "open on Telegram" button. Keys come only from the source;
-two sources that key different options give `key_conflict`, never a chosen key.
+two sources that key different options give `key_conflict`, never a chosen key; only the owner settles one
+(`apply_decisions`, from the admin page's Polls tab).
 
 Row shape (every loader returns it): {question, options, key (index or None), solution, votes (list), total,
 sightings: [{source, chat, msg_id, date, header, doctor, link}]}.
@@ -116,6 +117,16 @@ def merge(rows):
     return list(bank.values())
 
 
+def apply_decisions(bank, decisions):
+    """The owner's key for a conflict (admin page, bank/key_decisions.json): the conflict is settled by the owner,
+    never by code, and `key_source` says so."""
+    for q in bank:
+        d = decisions.get(q["word_key"])
+        if q["key_conflict"] and d and 0 <= d["key"] < len(q["options"]):
+            q.update(key=d["key"], key_conflict=False, key_source="owner")
+    return bank
+
+
 def counts(bank):
     return {"questions": len(bank), "keyed": sum(q["key"] is not None for q in bank),
             "key_conflicts": sum(q["key_conflict"] for q in bank),
@@ -130,7 +141,8 @@ def build(out_dir=ROOT / "bank"):
         load_quizbot(src / "quizbot" / "quizbot_questions.jsonl", src / "quizbot" / "quizbot_links.jsonl") + \
         load_forms(src / "forms" / "forms_questions.jsonl", src / "forms" / "keys" / "form_keys.jsonl",
                    src / "forms" / "forms_links.jsonl")
-    bank = merge(rows)
+    decisions = out_dir / "key_decisions.json"
+    bank = apply_decisions(merge(rows), json.loads(decisions.read_text(encoding="utf-8")) if decisions.exists() else {})
     out_dir.mkdir(exist_ok=True)
     with open(out_dir / "questions.jsonl", "w", encoding="utf-8") as f:
         for q in bank:

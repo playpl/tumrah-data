@@ -8,6 +8,7 @@ from hub import resolve_span, word_key
 POINTER_KEYS = {"qid", "found", "lecture_id", "spans", "partial", "tested_fact", "reason", "other_module"}
 SPAN_KEYS = {"pdf_page", "printed_page", "text", "figure", "for_option"}
 REASONS = {"not_in_book", "other_module", "question_unclear"}
+LECTURE_REASON = "other_lecture"  # a lecture-scoped job: the question is taught outside this lecture's pages
 BANNED = re.compile(r"\b(answer|correct|incorrect|keyed)\b", re.I)
 LETTERS = "ABCDE"
 
@@ -30,6 +31,7 @@ def check_pointers(rows, batch, lines, reference=None):
     lines = as_lines(lines)
     printed = {ln.page: ln.printed for ln in lines}
     lectures = {lec["lecture_id"]: lec for lec in (reference or {}).get("lectures", [])}
+    scoped = bool((reference or {}).get("lecture_scope"))
     options = {q["qid"]: len(q.get("options") or []) for q in batch}
     errors, seen = [], []
     for n, r in enumerate(rows, 1):
@@ -45,8 +47,9 @@ def check_pointers(rows, batch, lines, reference=None):
             if r[field] and BANNED.search(str(r[field])):
                 errors.append(f"{q}: {field} uses a banned word")
         if not r["found"]:
-            if r["reason"] not in REASONS:
-                errors.append(f"{q}: found=false needs reason in {sorted(REASONS)}")
+            reasons = REASONS | ({LECTURE_REASON} if scoped else set())
+            if r["reason"] not in reasons:
+                errors.append(f"{q}: found=false needs reason in {sorted(reasons)}")
             if r["spans"]:
                 errors.append(f"{q}: found=false must have no spans")
             continue
@@ -74,9 +77,10 @@ def check_pointers(rows, batch, lines, reference=None):
             elif not resolve_span(lines, p, s["text"], s["figure"]):
                 errors.append(f"{q} span {i}: not verbatim on pdf page {p}: {str(s['text'])[:60]!r}")
         if lec and lec.get("pdf_pages") and r["spans"] and isinstance(r["spans"][0], dict):
-            a, b = lec["pdf_pages"]
-            if not a <= r["spans"][0].get("pdf_page", 0) <= b:
-                errors.append(f"{q}: the first span lies outside lecture {lec['lecture_id']} (pdf {a}-{b})")
+            spans = lec["pdf_pages"] if isinstance(lec["pdf_pages"][0], list) else [lec["pdf_pages"]]  # one range or several
+            if not any(a <= r["spans"][0].get("pdf_page", 0) <= b for a, b in spans):
+                where = ", ".join(f"{a}-{b}" for a, b in spans)
+                errors.append(f"{q}: the first span lies outside lecture {lec['lecture_id']} (pdf {where})")
     want = [q["qid"] for q in batch]
     missing = [q for q in want if q not in seen]
     extra = [q for q in seen if q not in want]
@@ -522,6 +526,38 @@ def check_cover(rows, batch, lines=None, reference=None):
 # ---- module lecture list and labels (plan task 13) ------------------------------------------------------------
 LECTURE_KEYS = {"lecture_id", "title", "subject", "pdf_pages"}
 REFERENCE_GAP = 0.05      # share of the handout's text pages (inside the lectures' span) that may sit in no lecture
+
+
+PLACE_KEYS = {"ranges", "note"}
+MAX_LECTURE_PAGES = 120
+
+
+def check_place(place, lines):
+    """place.json: where one owner-named lecture is taught. `ranges` [{first_page, last_page}] in handout order, whole
+    pdf pages that exist, never overlapping; at least one; `note` says how it was found (under 40 words)."""
+    if not isinstance(place, dict) or set(place) != PLACE_KEYS:
+        return [f"place.json must have exactly the keys {sorted(PLACE_KEYS)}"]
+    top = max((ln["page"] for ln in lines), default=0)
+    rs = place["ranges"]
+    if not isinstance(rs, list) or not rs:
+        return ["ranges needs at least one {first_page, last_page}"]
+    errors, prev, total = [], 0, 0
+    for i, r in enumerate(rs, 1):
+        if not isinstance(r, dict) or set(r) != {"first_page", "last_page"}:
+            errors.append(f"range {i}: keys must be exactly first_page, last_page")
+            continue
+        a, b = r["first_page"], r["last_page"]
+        if not (all(isinstance(x, int) and not isinstance(x, bool) for x in (a, b)) and 1 <= a <= b <= top):
+            errors.append(f"range {i}: pages must be whole numbers with 1 <= first_page <= last_page <= {top}")
+            continue
+        if a <= prev:
+            errors.append(f"range {i}: starts on pdf page {a}, not after the previous range ends ({prev})")
+        prev, total = b, total + b - a + 1
+    if not errors and total > MAX_LECTURE_PAGES:
+        errors.append(f"{total} pages is more than one lecture ({MAX_LECTURE_PAGES} at most): read again where it starts and ends")
+    if not isinstance(place["note"], str) or not place["note"].strip() or len(place["note"].split()) > 40:
+        errors.append("note: how you found the pages, 1 to 40 words")
+    return errors
 
 
 def check_reference(ref, module, lines):
