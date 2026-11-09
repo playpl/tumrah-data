@@ -48,10 +48,16 @@ def numbered(name):
     return (int(m.group(1)), m.group(2)) if m else (None, name)
 
 
+# Folder names the name matcher cannot tie to a site doctor on its own (checked by hand, 2026-11-08).
+ALIASES = {"elsamahy": "dr-abdullah-el-samahi-phys"}
+
+
 def match_doctor(folder_name, site_doctors):
     """The site doctorId whose English name holds every word of the folder name (spelling may differ a little)."""
     def norm(s):
         return re.sub(r"[^a-z ]", " ", s.lower().replace("ss", "s").replace("ou", "o").replace("e", "a"))
+    if folder_name.lower() in ALIASES and any(d["id"] == ALIASES[folder_name.lower()] for d in site_doctors):
+        return ALIASES[folder_name.lower()]
     want = norm(folder_name).split()
     hits = [d["id"] for d in site_doctors if all(w in norm(d.get("name") or "") + " " + norm(d["id"]) for w in want)]
     return hits[0] if len(hits) == 1 else None
@@ -67,8 +73,10 @@ def scan(site_doctors=()):
             for doc in sorted(p for p in subj.iterdir() if p.is_dir()):
                 did = match_doctor(doc.name, site_doctors)
                 for pdf in sorted(doc.glob("*.pdf")):
+                    name = pdf.name.lower()
+                    kind = "mcq" if "mcq" in name else "partial" if name.startswith("partial") else "full"
                     books.append({"module": MODULES.get(mod.name, mod.name), "subject": subj.name, "doctor_folder": doc.name,
-                                  "doctor_id": did, "file": str(pdf), "partial": pdf.name.lower().startswith("partial")})
+                                  "doctor_id": did, "file": str(pdf), "kind": kind, "partial": kind == "partial"})
                 for f in sorted(doc.rglob("*.txt")):
                     chap = f.parent if f.parent != doc else None
                     cn, ctitle = numbered(chap.name) if chap else (None, None)
@@ -106,7 +114,9 @@ def nice(title):
 
 
 def book_id(b):
-    return f"{b['doctor_folder'].split()[-1].lower()}-{b['subject'][:4].lower()}-1"
+    """mossafer-anat-1 (a partial book, the first one added), zahran-hist-full, elsamahy-phys-mcq."""
+    suffix = {"partial": "1", "full": "full", "mcq": "mcq"}[b.get("kind", "partial")]
+    return f"{b['doctor_folder'].split()[-1].lower()}-{b['subject'][:4].lower()}-{suffix}"
 
 
 def read_form(url, out):
@@ -191,12 +201,17 @@ def import_all(q, site_doctors=(), kbps=16):
             elif link["kind"] == "telegram":
                 report.append(f"{lid}: telegram {link['url']} kept for later (needs a Telegram session)")
     for b in books:
+        if b["kind"] == "mcq":  # a doctor's MCQ book: its questions are copied out, never aligned as a book
+            import mcq
+            added = mcq.queue_book(q, b["module"], b["book"], b["file"], b["doctor_id"] or b["doctor_folder"], b["subject"])
+            report.append(f"mcq book {b['book']}: {added}")
+            continue
         jobs_file = ROOT / "modules" / b["module"] / "books" / f"{b['book']}.json"
         if jobs_file.exists():
             report.append(f"book {b['book']}: already queued")
             continue
         args = ["py", str(ROOT / "dm.py"), "add", "books", b["module"], "--book", b["book"], "--file", b["file"],
-                "--title", f"{b['doctor_folder'].title()} {b['subject']} ({'partial' if b['partial'] else 'full'})"]
+                "--title", f"{b['doctor_folder'].title()} {b['subject']} ({b['kind']})"]
         if b["doctor_id"]:
             args += ["--doctor", b["doctor_id"]]
         res = subprocess.run(args, capture_output=True, text=True, cwd=ROOT)

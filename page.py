@@ -611,9 +611,11 @@ def set_required(lesson, ids, remove=False):
 
 
 def importer(kind, *args):
-    dns = ROOT / "tools_dns.cjs"
-    dns.write_text('require("dns").setServers(["1.1.1.1"]);\n', encoding="utf-8")
     import os
+    import tempfile
+    # NODE_OPTIONS splits on spaces, and ROOT sits under "Tumrah projects": keep the preload in the temp folder.
+    dns = Path(tempfile.gettempdir()) / "tumrah_data_dns.cjs"
+    dns.write_text('require("dns").setServers(["1.1.1.1"]);\n', encoding="utf-8")
     res = subprocess.run(["node", "../node_modules/tsx/dist/cli.mjs", "src/scripts/importHubData.ts", kind, *args],
                          cwd=BACKEND, capture_output=True, text=True, env={**os.environ, "NODE_OPTIONS": f"--require {dns}"})
     last = (res.stdout.strip().splitlines() or [""])[-1]

@@ -167,6 +167,41 @@ def send(lecture_id, queue, bank=None):
             "owner_first": sum(k in set(owner_keys(meta)) for k in (r["word_key"] for r in rows))}
 
 
+def owner_qid(lecture_id, item):
+    """A question of the owner's lists that is not in the bank (a quiz row with no match): its id until it has one."""
+    return f"own:{lecture_id}:{item.get('file')}:{item.get('n')}"
+
+
+def send_owner(lecture_id, queue, bank=None):
+    """Queues lecture-scoped pointer jobs for the owner's own lists only (bank questions and quiz rows not in the bank):
+    no shortlist. A question already sent for this lecture is never sent again."""
+    meta = lectures.load(lecture_id)
+    d = lectures.folder(lecture_id)
+    sent_file = d / "sent.json"
+    sent = set(json.loads(sent_file.read_text(encoding="utf-8"))) if sent_file.exists() else set()
+    items = (meta.get("required") or []) + (meta.get("doctor_questions") or [])
+    keys = {i["word_key"] for i in items if i.get("word_key")}
+    by_key = {q["word_key"]: q for q in (bank if bank is not None else read_jsonl(BANK / "questions.jsonl"))
+              if q["word_key"] in keys}
+    rows = []
+    for i in items:
+        if i.get("word_key") and i["word_key"] in by_key and i["word_key"] not in sent:
+            rows.append(batch_row(by_key[i["word_key"]], meta["title"]))
+        elif i.get("row") and owner_qid(lecture_id, i) not in sent:
+            q = owner_qid(lecture_id, i)
+            rows.append({"qid": q, "word_key": q, "subject_hint": meta["title"], "stem": i["row"].get("question") or "",
+                         "case_text": None, "options": i["row"].get("options") or [], "correct_index": i["row"].get("key")})
+    rows = list({r["qid"]: r for r in rows}.values())
+    jobs = []
+    for k in range(0, len(rows), POINTER_BATCH):
+        b = rows[k:k + POINTER_BATCH]
+        key = f"{lecture_id}-" + hashlib.sha1(",".join(r["qid"] for r in b).encode()).hexdigest()[:12]
+        jobs.append({"key": key, "payload": {"module": meta["module"], "lecture": lecture_id, "batch": b}})
+    added = queue.add_jobs("pointers", jobs) if jobs else 0
+    sent_file.write_text(json.dumps(sorted(sent | {r["word_key"] for r in rows})), encoding="utf-8")
+    return {"questions": len(rows), "jobs": len(jobs), "new_jobs": added}
+
+
 def results(lecture_id, queue, jobs_root=ROOT / "jobs"):
     """What the pointer agents found for this lecture: {word_key: {found, reason, line_ids}} from passed jobs."""
     out = {}

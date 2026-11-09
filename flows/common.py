@@ -8,9 +8,9 @@ ROOT = Path(__file__).resolve().parent.parent
 KIT = Path(__file__).resolve().parent / "kit"
 MODULES = ROOT / "modules"
 
-SUBAGENTS = ("You are the lead worker. Start at least 10 subagents in parallel and split the work between them (for example "
-             "one per page, 2-3 questions each, or one per lecture part); with fewer than 10 items, one subagent per item, "
-             "and a job of one item you do yourself. Monitor them, check each part they return, and give "
+SUBAGENTS = ("You are the lead worker. Start 4 subagents in parallel (never more: 16 jobs share 4 accounts' quota) and split "
+             "the work between them (for example a few pages, questions or lecture parts each); with fewer than 4 items, "
+             "one subagent per item, and a job of one item you do yourself. Monitor them, check each part they return, and give "
              "a part that is wrong or missing to a new subagent. You own the merged output file: run the check on the whole "
              "file yourself before you finish.")
 
@@ -27,9 +27,9 @@ WORKING_RULES = """
 - Commands: use `python ...` (and the tools) for everything, counting lines included. `powershell -Command`, `cmd /c`
   and anything that deletes, downloads or uses git is blocked. When a command is denied, never stop: do the same
   thing another way (a python one-liner) and carry on.
-- Work fast: you are the lead. Start at least 10 subagents in parallel (for example one per page, 2-3 questions each,
-  or one per lecture part), each writing its own part file in this folder. With fewer than 10 items, one subagent per
-  item; a job of one item you do yourself, with no subagents. Split by item, never one item across subagents. Give each subagent these same rules.
+- Work fast: you are the lead. Start 4 subagents in parallel, never more (16 jobs share 4 accounts' quota), for
+  example a few pages, questions or lecture parts each, each writing its own part file in this folder. With fewer than
+  4 items, one subagent per item; a job of one item you do yourself, with no subagents. Split by item, never one item across subagents. Give each subagent these same rules.
   Monitor them: check each part as it comes back, and give a wrong or missing part to a new subagent. When all are
   done, merge the parts into the output file named in BRIEF.md yourself (part files alone count as nothing), then run
   `python tools/check.py` on the whole file.

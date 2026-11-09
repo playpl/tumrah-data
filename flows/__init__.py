@@ -6,11 +6,12 @@ from flows.cover import CoverFlow
 from flows.highlights import AuditFlow, HighlightFlow
 from flows.labels import LabelFlow
 from flows.lecture import LectureLinkFlow, TranscribeFlow
+from flows.mcq import MCQFlow
 from flows.place import PlaceFlow
 from flows.pointers import PointerFlow
 from flows.reference import ReferenceFlow
 
-REGISTRY = {"pointers": PointerFlow(), "books": BookFlow(), "transcribe": TranscribeFlow(), "place": PlaceFlow(),
+REGISTRY = {"pointers": PointerFlow(), "books": BookFlow(), "transcribe": TranscribeFlow(), "place": PlaceFlow(), "mcq": MCQFlow(),
             "lecture_links": LectureLinkFlow(), "cover": CoverFlow(),
             "reference": ReferenceFlow(), "labels": LabelFlow(),
             "highlights": HighlightFlow(), "hl_audit": AuditFlow()}

@@ -126,11 +126,48 @@ def cmd_lecture(args):
         print("not queued: Transcribe is off for this lecture")
 
 
+# The handout's own chapter names for the first chapter of each subject (the doctors' folders say "chapter 1").
+CHAPTERS = {"anatomy": "Spinal cord", "histology": "Nervous tissue", "physiology": "Sensations"}
+
+
+def lesson_rows(module):
+    """Every named lecture of a module as an importHubData `lessons` row (summaries and revisions after what they cover)."""
+    import re as _re
+    import lectures
+    import doctors_folder
+    out = []
+    metas = lectures.all_lectures(module)
+    by_id = {m["id"]: m for m in metas}
+    for m in metas:
+        base = by_id[m["covers"][0]] if m.get("covers") else m
+        subject = (base.get("subject") or "").lower()
+        lessons = base.get("chapter_lessons") or [base["title"]]
+        order = (lessons.index(base["title"]) + 1) if base["title"] in lessons else len(lessons) + 1
+        url = (m.get("source") or {}).get("youtube")
+        doctor = m.get("doctor")
+        doctor = doctors_folder.ALIASES.get((doctor or "").lower(), doctor)
+        out.append({"key": f"lecture:{m['id']}", "subject": subject,
+                    "chapter": {"title": CHAPTERS.get(subject) or (base.get("chapter") or "").capitalize(), "order": 1},
+                    "name": m["title"], "order": order + (0.5 if m.get("kind") in ("summary", "revision") else 0),
+                    "kind": "lesson" if m.get("kind", "lecture") == "lecture" else m["kind"],
+                    "doctorId": doctor if doctor and doctor.startswith("dr-") else None,
+                    "videoUrl": _re.sub(r"\?si=.*$", "", url) if url else None,
+                    "covers": [f"lecture:{c}" for c in m.get("covers") or []],
+                    "ranges": [{"from": r["from"], "to": r["to"]} for r in m.get("ranges") or []]})
+    return sorted(out, key=lambda r: (r["kind"] != "lesson", r["key"]))
+
+
 def cmd_site(args):
     """Writes lectures/<id>/site/ranges.jsonl (importHubData ranges) for each lecture, and prints the import command
     for those that know their site lesson. Nothing is written to the site here."""
     import lectures
     from flows.common import write_jsonl
+    for module in sorted({m["module"] for m in lectures.all_lectures()}):
+        rows = lesson_rows(module)
+        f = ROOT / "modules" / module / "site" / "lessons.jsonl"
+        f.parent.mkdir(exist_ok=True)
+        write_jsonl(f, rows)
+        print(f"{module}: {len(rows)} lessons -> {f}  (importHubData lessons --module {module} --file <that>)")
     ids = args.lectures or [m["id"] for m in lectures.all_lectures()]
     for lid in ids:
         meta = lectures.load(lid)

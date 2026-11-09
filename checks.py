@@ -837,3 +837,50 @@ def check_audit(rows, batch, lines=None, reference=None):
     if want - seen:
         errors.append(f"{len(want - seen)} items have no row")
     return errors
+
+
+# ---- a doctor's MCQ book, copied out (owner 2026-11-08) --------------------------------------------------------
+MCQ_KEYS = {"page", "n", "question", "options", "key", "key_from"}
+KEY_FROM = {"marked", "answer_list"}
+MCQ_TOKEN = re.compile(r"[^\W\d_]{3,}")
+OPTION_MARK = re.compile(r"(?m)^\s*(?:\(?[a-eA-E][).]|[a-eA-E]\s*-)\s+\S")
+MCQ_MIN_FOUND = 0.7      # share of a question's words that must be on its page (copied, never invented)
+
+
+def check_mcq(rows, batch, lines=None, reference=None):
+    """mcqs.jsonl: every question on the batch pages, copied from its page, with the book's own key or none."""
+    text = {p["page"]: p.get("text") or "" for p in batch}
+    words = {pg: {w.lower() for w in MCQ_TOKEN.findall(t)} for pg, t in text.items()}
+    errors, seen, per_page = [], set(), {}
+    for i, r in enumerate(rows, 1):
+        if not isinstance(r, dict) or set(r) != MCQ_KEYS:
+            errors.append(f"row {i}: keys must be exactly {sorted(MCQ_KEYS)}")
+            continue
+        where = f"page {r['page']} question {r['n']}"
+        if r["page"] not in text:
+            errors.append(f"row {i}: page {r['page']} is not in this job")
+            continue
+        if not isinstance(r["n"], int) or r["n"] < 1 or (r["page"], r["n"]) in seen:
+            errors.append(f"{where}: n must be 1, 2, ... once per page")
+        seen.add((r["page"], r["n"]))
+        per_page[r["page"]] = per_page.get(r["page"], 0) + 1
+        opts = r["options"]
+        if not isinstance(r["question"], str) or len(r["question"].split()) < 2:
+            errors.append(f"{where}: question is empty")
+        if not (isinstance(opts, list) and 2 <= len(opts) <= 6 and all(isinstance(o, str) and o.strip() for o in opts)):
+            errors.append(f"{where}: options must be 2 to 6 non-empty strings")
+            continue
+        k = r["key"]
+        if k is None:
+            if r["key_from"] is not None:
+                errors.append(f"{where}: key_from must be null when key is null")
+        elif not (isinstance(k, int) and not isinstance(k, bool) and 0 <= k < len(opts)) or r["key_from"] not in KEY_FROM:
+            errors.append(f"{where}: key must be an option index with key_from {sorted(KEY_FROM)}, or both null")
+        if len(text[r["page"]].strip()) > 50:  # a page with a text layer: the question must be copied from it
+            mine = {w.lower() for w in MCQ_TOKEN.findall(r["question"] or "")}
+            if mine and len(mine & words[r["page"]]) / len(mine) < MCQ_MIN_FOUND:
+                errors.append(f"{where}: the question is not on its page: copy it as the page prints it")
+    for pg, t in text.items():
+        if len(OPTION_MARK.findall(t)) >= 4 and not per_page.get(pg):
+            errors.append(f"page {pg} shows options but has no questions: copy every question on it")
+    return errors
