@@ -27,7 +27,11 @@ DOCTORS = {"elazouny": "Ibrahim Elazouny", "azouny": "Ibrahim Elazouny", "wagih"
            "basel": "Basel Sherif", "ammar": "Ahmed Ammar", "mahmoud": "Mahmoud Hisham", "mahran": "Mahran"}
 # The named lessons' doctors (lectures/<id>/lecture.json `doctor`) in the bank's spelling.
 LESSON_DOCTOR = {"dr-mohamed-zahran-hist": "Mohamed Zahran", "dr-amr-mesafer-anat": "Amr Mosafer",
-                 "dr-abdullah-el-samahi-phys": "Abdalla Elsamahy"}
+                 "dr-abdullah-el-samahi-phys": "Abdalla Elsamahy", "dr-ibrahim-el-azouni-anat": "Ibrahim Elazouny",
+                 "dr-naguib-el-husseiny-phys": "Nagib El-Husseiny", "dr-ahmed-ammar-hist": "Ahmed Ammar"}
+# Owner 2026-11-09: these doctors have no MCQ book; with no owner quiz, their Required set is their own poll questions
+# on the lines their lecture's transcript links to.
+TRANSCRIPT_REQUIRED = {"dr-ibrahim-el-azouni-anat", "dr-naguib-el-husseiny-phys", "dr-ahmed-ammar-hist"}
 # Index lesson name (lowercase words) -> handout lecture (reference list) per subject. First match wins.
 LECTURE_RULES = {
     "anatomy": [("spinal cord", "L03"), ("mo ", "L05"), ("medulla", "L05"), ("pons", "L05"), ("midbrain", "L05"),

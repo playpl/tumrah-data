@@ -25,8 +25,10 @@ ROOT = Path(__file__).resolve().parent
 MODULE = "year2-cns"
 SITE = ROOT / "modules" / MODULE / "site"
 # Handout lecture (label list) -> its pages. The named lessons that teach them are found from their ranges.
-LABEL_PAGES = {"year2-cns:L01": (10, 39), "year2-cns:L03": (49, 57), "year2-cns:L18": (136, 138),
-               "year2-cns:L19": (139, 144)}
+_REF = ROOT / "modules" / MODULE / "old" / "agent-lecture-list-2026-11-08" / "reference.json"
+# Every handout lecture: a question is searched only inside its own lecture's pages, and kept only when it lands in a
+# named lesson (owner, 2026-11-09: all doctors' lessons).
+LABEL_PAGES = {x["lecture_id"]: tuple(x["pdf_pages"]) for x in json.loads(_REF.read_text(encoding="utf-8"))["lectures"]}
 MIN_SCORE = 9.0     # summed IDF of matched words
 MIN_WORDS = 3       # distinct matched content words
 STOP = set("""the and for with that this from which what are was were has have had not but all any can its into
@@ -86,6 +88,18 @@ def build():
             del labels[wk]  # the index puts it in a lecture no named lesson teaches
     bank = read_jsonl(ROOT / "bank" / "questions.jsonl")
     base, skipped = site_questions.build(MODULE, bank)
+    # Dr. Nagib's chapter quizzes (nagib_quizzes.py, keys from the forms' own score pages): the owner's Required set,
+    # split to the Nagib lecture whose pages hold each question (owner, 2026-11-09).
+    quiz_lecture = {"receptor quiz": "year2-cns:L19", "Pain quiz": "year2-cns:L20", "Sensation Types Quiz": "year2-cns:L20"}
+    nagib = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("doctor") == "dr-naguib-el-husseiny-phys"}
+    keyed = SITE / "nagib_quiz_keyed.jsonl"
+    for r in read_jsonl(keyed) if keyed.exists() else []:
+        if r["key"] is None:
+            continue
+        wk = f"nagibform:{r['item_id']}"
+        bank.append({"word_key": wk, "question": r["question"], "options": r["options"], "key": r["key"], "sightings": [],
+                     "source_url": r["url"], "quiz": True, "importance_score": 3})
+        labels[wk] = {"word_key": wk, "lecture_id": quiz_lecture.get(r["form"], "year2-cns:L20"), "by": "owner_quiz"}
     have = {q["source_id"] for q in base["questions"]}
     metas = {m["id"]: m for m in lectures.all_lectures(MODULE)}
     lesson_key = {lid: f"lecture:{lid}" for lid in in_lesson}
@@ -116,18 +130,20 @@ def build():
             stats["weak_match"] += 1
             continue
         homes = [lid for lid, ids in in_lesson.items() if ln["id"] in ids]
+        if q.get("quiz"):
+            homes = [h for h in homes if h in nagib]
         if not homes:
             stats["outside_named_lessons"] += 1
             continue
         pl = by_page[ln["page"]]
         span = [x for x in pl[max(0, i - 1):i + 2] if toks[x["id"]] & set(qw)]
-        ih = index.get(q["word_key"]) or [{}]
+        ih = index.get(q["word_key"]) or ([{"branch": "owner_quiz", "doctor": "Nagib El-Husseiny"}] if q.get("quiz") else [{}])
         points[q["word_key"]] = {"lecture_id": lab["lecture_id"], "lines": [x["id"] for x in span] or [ln["id"]],
                                  "page": ln["page"], "printed": ln.get("printed"), "score": round(score, 1),
                                  "homes": homes, "by": lab.get("by", "label"),
                                  "branch": ih[0].get("branch"), "doctor": ih[0].get("doctor")}
         stats["by:" + lab.get("by", "label")] += 1
-        sid = "bank:" + L.short(q["word_key"])
+        sid = ("form:" if q.get("quiz") else "bank:") + L.short(q["word_key"])
         stats["kept"] += 1
         if sid in have:
             stats["already_in_owner_lists"] += 1
@@ -139,6 +155,7 @@ def build():
             "doctorId": None, "topic": m["title"], "stem": q["question"], "options": q["options"], "correct_index": q["key"],
             "explanation": q.get("solution") or None, "importance": max(1, q.get("importance_score") or 1),
             "repetition": q.get("repetition_count") or 1, "past_exam": False, "source_url": q.get("source_url"),
+            **({"doctorId": "dr-naguib-el-husseiny-phys"} if q.get("quiz") else {}),
             "appearances": [{"source_name": s.get("header"), "source_type": "telegram_poll", "doctor": s.get("doctor"),
                              "year_or_exam": (s.get("date") or "")[:10] or None, "source_url": s.get("link"),
                              "source_id": f"{s.get('chat')}:{s.get('msg_id')}"} for s in q["sightings"][:30]],
@@ -155,7 +172,7 @@ def build():
 def pointers():
     import db
     points = json.loads((SITE / "fast_points.json").read_text(encoding="utf-8"))
-    sid = {"bank:" + L.short(k): k for k in points}
+    sid = {("form:" if k.startswith("nagibform:") else "bank:") + L.short(k): k for k in points}
     r = db.Reader.live()
     ids = {}
     keys = list(sid)

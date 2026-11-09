@@ -35,11 +35,25 @@ def run():
         doc = index_map.LESSON_DOCTOR.get(m.get("doctor"))
         has_required = bool(owner.get(m["id"], {}).get("required"))
         req, dr = set(owner.get(m["id"], {}).get("required", set())), set(owner.get(m["id"], {}).get("doctor", set()))
+        by_transcript = m.get("doctor") in index_map.TRANSCRIPT_REQUIRED
+        linked = set()
+        if by_transcript and (lectures.folder(m["id"]) / "links.jsonl").exists():
+            for x in open(lectures.folder(m["id"]) / "links.jsonl", encoding="utf-8"):
+                linked |= set(json.loads(x).get("line_ids") or [])
+        # The owner's quiz for this doctor (Nagib's forms), split by where each question points: Required.
+        quiz = {"form:" + L.short(wk) for wk, p in points.items()
+                if p.get("branch") == "owner_quiz" and m["id"] in p.get("homes", [])}
+        req |= quiz
+        has_required = has_required or bool(quiz)
         for wk, p in points.items():
-            if m["id"] not in p.get("homes", []) or p.get("doctor") != doc or not doc:
+            if m["id"] not in p.get("homes", []) or p.get("doctor") != doc or not doc or p.get("branch") == "owner_quiz":
                 continue
-            sid = "bank:" + L.short(wk)
-            if p.get("branch") == "new" and not has_required:
+            sid = ("form:" if wk.startswith("nagibform:") else "bank:") + L.short(wk)
+            if has_required:
+                dr.add(sid)
+            elif by_transcript:  # his poll questions on what his recording explains
+                (req if linked & set(p["lines"]) else dr).add(sid)
+            elif p.get("branch") == "new":
                 req.add(sid)
             else:
                 dr.add(sid)
