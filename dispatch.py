@@ -91,6 +91,13 @@ class Dispatcher:
         try:
             while not self.stopping():
                 if cooling(self.fleet_state, account):
+                    # Code-only steps (flows with `expand`) need no account: run them while the account rests.
+                    code = [name for name, f in self.flows.items() if hasattr(f, "expand")]
+                    job = next((j for j in (q.claim(name, account, only=True) for name in code) if j), None)
+                    if job:
+                        with self._lock:
+                            self.stats[self.work(q, job, account)] += 1
+                        continue
                     if once:
                         return
                     self.stop.wait(60)

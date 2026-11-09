@@ -57,12 +57,13 @@ class Queue:
             [(f"{flow}:{j['key']}", flow, j["key"], json.dumps(j.get("payload")), now) for j in jobs])
         return cur.rowcount
 
-    def claim(self, lane, account):
+    def claim(self, lane, account, only=False):
+        """The oldest queued job of the lane's flow, else of the flow with most queued jobs (not with only=True)."""
         self.db.execute("BEGIN IMMEDIATE")
         try:
             row = self.db.execute("SELECT id FROM jobs WHERE status='queued' AND flow=? ORDER BY added, id LIMIT 1",
                                   (lane,)).fetchone()
-            if row is None:
+            if row is None and not only:
                 row = self.db.execute(
                     "SELECT id FROM jobs WHERE status='queued' AND flow=(SELECT flow FROM jobs WHERE status='queued' "
                     "GROUP BY flow ORDER BY COUNT(*) DESC, flow LIMIT 1) ORDER BY added, id LIMIT 1").fetchone()
