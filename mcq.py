@@ -17,11 +17,32 @@ ROOT = Path(__file__).resolve().parent
 PAGES_PER_JOB = 10
 
 
+def styled_text(page):
+    """The page's text with the marks a key hides in, so workers never need a picture (owner, 2026-11-09):
+    bold runs as [b]...[/b], coloured (non-black) runs as [c]...[/c]."""
+    out = []
+    for block in page.get_text("dict")["blocks"]:
+        for line in block.get("lines", []):
+            parts = []
+            for s in line["spans"]:
+                t = s["text"]
+                if not t.strip():
+                    parts.append(t)
+                    continue
+                if s["flags"] & 16 or "bold" in s.get("font", "").lower():
+                    t = f"[b]{t}[/b]"
+                if s.get("color", 0) not in (0, 0x231F20, 0x000001):
+                    t = f"[c]{t}[/c]"
+                parts.append(t)
+            out.append("".join(parts))
+    return "\n".join(out)
+
+
 def book_pages(pdf, first=None, last=None):
     import fitz
     with fitz.open(pdf) as doc:
         a, b = first or 1, min(last or doc.page_count, doc.page_count)
-        return [{"page": n, "text": doc[n - 1].get_text("text")} for n in range(a, b + 1)]
+        return [{"page": n, "text": styled_text(doc[n - 1])} for n in range(a, b + 1)]
 
 
 def queue_book(q, module, book, pdf, doctor, subject):

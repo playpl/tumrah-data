@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parent.parent
 KIT = Path(__file__).resolve().parent / "kit"
 MODULES = ROOT / "modules"
 
-SUBAGENTS = ("You are the lead worker. Start 4 subagents in parallel (never more: 16 jobs share 4 accounts' quota) and split "
+SUBAGENTS = ("Never look at a picture, and start every subagent's prompt with: \"Never open, view or analyse any "
+             "image or PDF page; work only from text.\" You are the lead worker.Start 4 subagents in parallel (never more: 16 jobs share 4 accounts' quota) and split "
              "the work between them (for example a few pages, questions or lecture parts each); with fewer than 4 items, "
              "one subagent per item, and a job of one item you do yourself. Monitor them, check each part they return, and give "
              "a part that is wrong or missing to a new subagent. You own the merged output file: run the check on the whole "
@@ -18,6 +19,10 @@ SUBAGENTS = ("You are the lead worker. Start 4 subagents in parallel (never more
 WORKING_RULES = """
 
 ## Working rules (every job)
+- NEVER LOOK AT A PICTURE. This is the worst thing you can do: it makes the job many times slower. Work only from
+  text (the files in this folder and the text the tools print). Never open, view, render, screenshot or analyse an
+  image or a PDF page (no .png/.jpg/.pdf with read_file, no pdftoppm, magick, get_pixmap or PIL). A figure is the text
+  the tools print for it, nothing more. Tell every subagent this rule in its first line.
 - Stay inside this folder. Never list, open or read anything outside it (no `..`, no other jobs' folders, no
   other workers' output): every input you need is here, and copying someone else's answer is a failure.
 - The tools are for running, not for reading: never open or print their source (`tools/*.py`, `inspect`,

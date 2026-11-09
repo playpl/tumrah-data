@@ -3,6 +3,7 @@
 Payload: {"module", "book", "doctor", "subject", "pdf", "pages": [{"page", "text"}]}. When the checker passes,
 `mcqs.jsonl` joins the book's question file (mcq.collect).
 """
+import shutil
 from pathlib import Path
 
 import checks
@@ -16,8 +17,10 @@ questions, exactly as printed, so each can be linked to the handout. You never a
 
 ## Inputs (read only)
 - `python tools/mcqpage.py` prints every page's text; `python tools/mcqpage.py 7` prints one page.
-- `pages/p0007.png` is the picture of page 7. Look at it when the text is unclear, out of order, or when the book
-  shows the right option by colour, bold, a tick or a circle (text loses those).
+- The text marks bold runs as `[b]...[/b]` and coloured runs as `[c]...[/c]`: that is how the book shows a right
+  option. Leave the marks out of what you copy.
+- There are no pictures in this job. Never open, render or analyse a picture or a PDF (no screenshots, no
+  pdftoppm, no get_pixmap). A page whose text is too short or garbled to read: skip it and name it in your reply.
 
 ## Output: `mcqs.jsonl`, one JSON object per question, in page order
 ```json
@@ -45,6 +48,7 @@ PAGE_TOOL = '''"""Prints this job's MCQ book pages.
 """
 import json
 import sys
+import shutil
 from pathlib import Path
 
 JOB = Path(__file__).resolve().parent.parent
@@ -53,8 +57,8 @@ want = int(sys.argv[1]) if len(sys.argv) > 1 else None
 for line in open(JOB / "batch.jsonl", encoding="utf-8"):
     p = json.loads(line)
     if want in (None, p["page"]):
-        print(f"===== page {p['page']} (picture: pages/p{p['page']:04d}.png) =====")
-        print(p["text"] if len(p["text"].strip()) >= 20 else "[almost no text: look at the picture]")
+        print(f"===== page {p['page']} =====")
+        print(p["text"] if len(p["text"].strip()) >= 20 else "[almost no text: skip this page, never look for a picture]")
 '''
 
 
@@ -64,17 +68,14 @@ class MCQFlow:
 
     def prepare(self, job, job_dir: Path):
         p = job["payload"]
-        common.build(job_dir, None, p["pages"], "check_mcq", "mcqs.jsonl",
-                     BRIEF.format(doctor=p.get("doctor") or "the doctor", subject=p.get("subject") or ""))
-        (job_dir / "tools" / "mcqpage.py").write_text(PAGE_TOOL, encoding="utf-8")
-        pics = job_dir / "pages"
-        pics.mkdir(exist_ok=True)
+        # Text only, with bold/colour marks; no page pictures ever (owner, 2026-11-09: pictures make workers slow).
         import fitz
         with fitz.open(p["pdf"]) as doc:
-            for pg in p["pages"]:
-                out = pics / f"p{pg['page']:04d}.png"
-                if not out.exists():
-                    doc[pg["page"] - 1].get_pixmap(dpi=110).save(out)
+            pages = [{**pg, "text": mcq.styled_text(doc[pg["page"] - 1])} for pg in p["pages"]]
+        common.build(job_dir, None, pages, "check_mcq", "mcqs.jsonl",
+                     BRIEF.format(doctor=p.get("doctor") or "the doctor", subject=p.get("subject") or ""))
+        (job_dir / "tools" / "mcqpage.py").write_text(PAGE_TOOL, encoding="utf-8")
+        shutil.rmtree(job_dir / "pages", ignore_errors=True)  # pictures left by older runs
         prompt = job_dir / "prompt.md"
         prompt.write_text(f"Read BRIEF.md in this folder to the end and follow it exactly. Your job has "
                           f"{len(p['pages'])} pages. {common.SUBAGENTS}\n", encoding="utf-8")
