@@ -14,7 +14,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-PIC = re.compile(r'"(?:read_file|view_file|view_image)"[^\n]{0,300}?\.(?:png|jpe?g|gif|webp|tiff?|pdf)\b|get_pixmap|pdftoppm', re.I)
+# Real tool calls only (the worker log also holds the prompt, whose no-picture rule names these words).
+PIC = re.compile(r'"name":"(?:read_file|view_file|view_image)","parameters":\{"Path":"[^"]+\.(?:png|jpe?g|gif|webp|tiff?|pdf)"'
+                 r'|"CommandLine":"[^"]*(?:get_pixmap|pdftoppm|magick|pdf2image|Image\.open)', re.I)
 
 
 def main():

@@ -14,21 +14,63 @@ import checks
 import lectures
 from flows import common
 
-TRANSCRIBE = """Step 1. Open {audio} with read_file: you can hear audio files directly. Do not split or convert it. Write a
-verbatim transcript of the WHOLE recording to transcript.txt: every word as spoken (Arabic speech in Arabic script,
-English terms in English), with a [mm:ss] timestamp at the start of each paragraph and a new paragraph at least every
-minute. Never summarise, translate, correct or skip a part, and keep going to the very end. Your timestamps only need
-to be rough: step 2 sets the real times.
+# Owner 2026-11-09: one read of a whole 55-minute recording ran into the model's 5-minute stream timeout after 48 minutes
+# of work, every time. Each worker now hears only {minutes}-minute pieces; tools/merge.py joins them with exact offsets.
+TRANSCRIBE = """Never open, view or analyse any image or PDF; you only listen to audio and write text.
 
-Step 2. Timing. The same recording is cut into {chunks} pieces of {minutes} minutes in chunks/: c00.ogg starts at 0:00,
-c01.ogg at {minutes}:00, and so on. For EVERY piece, open it with read_file, listen to its first spoken words, find them
-in transcript.txt (`python tools/paras.py` prints each paragraph's number), and write one line to timing.jsonl:
-{{"chunk": 0, "paragraph": <number of the paragraph where those words are>, "first_words": "<the first 6 or more words
-of the piece, copied exactly from transcript.txt>"}}
-A piece that starts in the middle of a word: begin at the next whole word. A piece with no speech at all:
-{{"chunk": <n>, "silent": true}}. You may give pieces to subagents (each needs its piece and transcript.txt).
+The recording is cut into {chunks} pieces of {minutes} minutes in chunks/ (c00.ogg, c01.ogg, ...). Never open the
+whole recording (audio.ogg): it is too long for one read.
 
-Run `python tools/check.py` and fix what it reports by listening again. Final reply: the PASS line."""
+Start 4 subagents in parallel and give each a share of the pieces (for example c00-c02, c03-c05, ...). Tell each:
+"Never open, view or analyse any image or PDF. For each of your pieces, open chunks/cNN.ogg with read_file (you can hear
+audio files directly) and write chunks/cNN.txt: a verbatim transcript of that piece only, every word as spoken (Arabic
+speech in Arabic script, English terms in English), with a [mm:ss] timestamp at the start of each paragraph, counted
+from the START OF THAT PIECE (the first paragraph is [00:00]), and a new paragraph at least every minute. Never
+summarise, translate, correct or skip a part. A piece with no speech at all: write an empty file."
+
+When every piece has its .txt, run `python tools/merge.py` (it joins them into transcript.txt and timing.jsonl with the
+right times), then `python tools/check.py`. Fix what it reports by listening to that piece again and rewriting its
+.txt, then merge again. Final reply: the PASS line."""
+
+MERGE = '''"""Joins chunks/cNN.txt (times from each piece's start) into transcript.txt (times from the recording's start) and
+writes timing.jsonl (each piece's first words as its anchor). Prints counts only.
+
+    python tools/merge.py
+"""
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import checks  # noqa: E402
+
+JOB = Path(__file__).resolve().parent.parent
+job = json.loads((JOB / "job.json").read_text(encoding="utf-8"))
+n, size = job["chunks"], job["chunk_s"]
+out, timing, para, missing = [], [], 0, []
+for c in range(n):
+    f = JOB / "chunks" / f"c{c:02d}.txt"
+    if not f.exists():
+        missing.append(c)
+        continue
+    paras = checks.paragraphs(f.read_text(encoding="utf-8"))
+    if not paras:
+        timing.append({"chunk": c, "silent": True})
+        continue
+    for i, (s, body) in enumerate(paras):
+        t = int(c * size + min(s, size - 1))
+        out.append(f"[{t // 60:02d}:{t % 60:02d}] {body}")
+        if i == 0:
+            words = checks.TOKEN.findall(body)
+            timing.append({"chunk": c, "paragraph": para + 1, "first_words": " ".join(words[:8])})
+        para += 1
+if missing:
+    sys.exit(f"pieces with no .txt yet: {missing}")
+(JOB / "transcript.txt").write_text("\\n".join(out) + "\\n", encoding="utf-8")
+(JOB / "timing.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\\n" for r in timing), encoding="utf-8")
+print(f"{n} pieces, {para} paragraphs -> transcript.txt, timing.jsonl")
+'''
 
 PARAS = '''"""Prints each paragraph of transcript.txt with its number and its first words.
 
@@ -115,6 +157,7 @@ class TranscribeFlow:
         common.build(job_dir, meta["module"], [], "check_transcript", "transcript.txt", "",
                      extra={"duration_s": meta["duration_s"], "chunks": n, "chunk_s": checks.CHUNK_SECONDS})
         (job_dir / "tools" / "paras.py").write_text(PARAS, encoding="utf-8")
+        (job_dir / "tools" / "merge.py").write_text(MERGE, encoding="utf-8")
         prompt = job_dir / "prompt.md"
         prompt.write_text(TRANSCRIBE.format(audio="audio.ogg", chunks=n, minutes=checks.CHUNK_SECONDS // 60),
                           encoding="utf-8")
