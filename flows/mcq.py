@@ -85,7 +85,11 @@ class MCQFlow:
         rows = common.output_rows(job_dir)
         if rows is None:
             return ["mcqs.jsonl is missing"]
-        return checks.check_mcq(rows, job["payload"]["pages"])
+        # The pages the worker saw (styled text from prepare), not the payload's older plain text: an answer-list
+        # page reads as "options without questions" in the plain text (2026-11-09).
+        batch = job_dir / "batch.jsonl"
+        pages = common.read_jsonl(batch) if batch.exists() and batch.stat().st_size else job["payload"]["pages"]
+        return checks.check_mcq(rows, pages)
 
     def then(self, job, job_dir):
         """The book's question file is rebuilt from every passed job, so a finished book is whole."""

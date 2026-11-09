@@ -304,6 +304,8 @@ class LectureLinkFlow:
         import db
         import highlights
         import queue_db
+        if not highlights.cfg().get("auto", True):  # owner 2026-11-09: highlighting skipped; the admin button still queues
+            return []
         try:
             reader = db.Reader.live()
         except Exception:  # noqa: BLE001 - the lecture itself passed; highlighting waits for the button
