@@ -1,6 +1,10 @@
 """Lecture flows (owner, 2026-11-07).
 
-transcribe      one worker hears the WHOLE lecture (audio.ogg) and writes raw.txt word for word with [mm:ss].
+transcribe      no worker (owner 2026-11-09: faster, fewer tokens): cuts audio.ogg into 5-minute pieces and queues one
+                `piece` job per piece.
+piece           one worker hears ONE piece (piece.ogg) and writes piece.txt word for word with [mm:ss] from the piece's
+                start; no brief, no tools, no subagents. When a lecture's last piece passes, code joins them with exact
+                offsets into raw.txt and queues lecture_links.
 lecture_links   one worker, one context: the full raw transcript plus the lecture's handout lines. It lays the speech
                 out (clean.txt, never a word changed), flags misheard words (fixes.jsonl; 0.9 or more replaces the
                 word), and splits the lecture into parts with times and handout line IDs (parts.jsonl).
@@ -143,9 +147,49 @@ for ln in lines():
 '''
 
 
+PIECE_PROMPT = """Never open, view or analyse any image or PDF. Do not start subagents. Do not read any other file.
+
+Open piece.ogg with read_file (you can hear audio files directly): it is a {minutes}-minute piece of a medical lecture.
+Write piece.txt: a verbatim transcript of it, every word as spoken (Arabic speech in Arabic script, English terms in
+English), with a [mm:ss] timestamp at the start of each paragraph counted from the start of this piece (the first is
+[00:00]) and a new paragraph at least every minute. Never summarise, translate, correct or skip a part. If the piece
+has no speech at all, write an empty piece.txt. Final reply: done."""
+
+
+def pieces_dir(lecture_id):
+    return lectures.folder(lecture_id) / "pieces"
+
+
+def merge_pieces(lecture_id, size=checks.CHUNK_SECONDS):
+    """raw.txt from every pieces/cNN.txt, times shifted by each piece's start. (text, errors); errors when a piece is
+    missing or the whole fails the transcript check."""
+    d = pieces_dir(lecture_id)
+    n = len(list(d.glob("c[0-9][0-9].ogg")))
+    out, missing = [], []
+    for c in range(n):
+        f = d / f"c{c:02d}.txt"
+        if not f.exists():
+            missing.append(c)
+            continue
+        for s, body in checks.paragraphs(f.read_text(encoding="utf-8")):
+            t = int(c * size + min(s, size - 1))
+            out.append(f"[{t // 60:02d}:{t % 60:02d}] {body}")
+    if missing:
+        return None, [f"pieces not done yet: {missing}"]
+    text = "\n".join(out) + "\n"
+    meta = lectures.load(lecture_id)
+    return text, checks.check_transcript(text, meta.get("duration_s") or n * size)
+
+
 class TranscribeFlow:
     lane = "transcribe"
     timeout = 120
+
+    def expand(self, job):
+        """No worker: cut the lecture into pieces and queue one piece job each (dispatch.py runs this instead)."""
+        lid = job["payload"]["lecture"]
+        n = lectures.chunks(lectures.folder(lid) / "audio.ogg", pieces_dir(lid), checks.CHUNK_SECONDS)
+        return [("piece", [{"key": f"{lid}-c{c:02d}", "payload": {"lecture": lid, "chunk": c}} for c in range(n)])]
 
     def prepare(self, job, job_dir: Path):
         meta = lectures.load(job["payload"]["lecture"])
@@ -177,6 +221,45 @@ class TranscribeFlow:
         if not lectures.load(job["payload"]["lecture"]).get("ranges"):
             return []
         return [("lecture_links", [{"key": job["payload"]["lecture"], "payload": job["payload"]}])]
+
+
+class PieceFlow:
+    lane = "piece"
+    timeout = 20
+
+    def prepare(self, job, job_dir: Path):
+        p = job["payload"]
+        job_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(pieces_dir(p["lecture"]) / f"c{p['chunk']:02d}.ogg", job_dir / "piece.ogg")
+        prompt = job_dir / "prompt.md"
+        prompt.write_text(PIECE_PROMPT.format(minutes=checks.CHUNK_SECONDS // 60), encoding="utf-8")
+        return prompt
+
+    def check(self, job, job_dir: Path):
+        f = job_dir / "piece.txt"
+        if not f.exists():
+            return ["piece.txt is missing"]
+        text = f.read_text(encoding="utf-8")
+        if not text.strip():
+            return []  # a silent piece
+        seconds = lectures.duration(job_dir / "piece.ogg")
+        errors = checks.check_transcript(text, seconds, end_slack=90)
+        return [e for e in errors if "before the end" not in e or seconds > 120]
+
+    def then(self, job, job_dir):
+        """Keep the piece; the lecture's last piece joins them all into raw.txt and queues linking."""
+        p = job["payload"]
+        shutil.copy2(job_dir / "piece.txt", pieces_dir(p["lecture"]) / f"c{p['chunk']:02d}.txt")
+        text, errors = merge_pieces(p["lecture"])
+        if text is None or errors:
+            return []
+        raw = lectures.folder(p["lecture"]) / "raw.txt"
+        if not raw.exists():
+            raw.write_text(text, encoding="utf-8")
+        meta = lectures.load(p["lecture"])
+        if not meta.get("ranges"):
+            return []  # the place flow queues linking once the lecture has pages
+        return [("lecture_links", [{"key": p["lecture"], "payload": {"lecture": p["lecture"]}}])]
 
 
 class LectureLinkFlow:

@@ -73,7 +73,7 @@ class TestTranscribe(Base):
         flow = lecture.TranscribeFlow()
         with mock.patch.object(lectures, "chunks", return_value=1):
             prompt = flow.prepare(self.job, self.dir)
-        self.assertIn("WHOLE recording", prompt.read_text())
+        self.assertIn("too long for one read", prompt.read_text())
         self.assertIn("cut into 1 pieces", prompt.read_text())
         self.assertTrue((self.dir / "audio.ogg").exists())
         self.assertEqual(flow.check(self.job, self.dir), ["transcript.txt and timing.jsonl missing"])

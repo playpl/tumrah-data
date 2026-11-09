@@ -43,6 +43,11 @@ class Dispatcher:
         if flow is None:
             q.finish(job["id"], "held", f"no flow named {job['flow']}")
             return "held"
+        if hasattr(flow, "expand"):  # a fan-out step done by code, no worker (transcribe -> one piece job per piece)
+            for flow_name, jobs in flow.expand(job):
+                q.add_jobs(flow_name, jobs)
+            q.finish(job["id"], "passed")
+            return "passed"
         job_dir = self.jobs_root / job["flow"] / job["key"]
         job_dir.mkdir(parents=True, exist_ok=True)
         prompt = flow.prepare(job, job_dir)

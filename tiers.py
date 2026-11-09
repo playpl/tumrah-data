@@ -15,6 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 import db
+import fast_lessons
 import index_map
 import labels as L
 import lectures
@@ -48,7 +49,7 @@ def run():
         for wk, p in points.items():
             if m["id"] not in p.get("homes", []) or p.get("doctor") != doc or not doc or p.get("branch") == "owner_quiz":
                 continue
-            sid = ("form:" if wk.startswith("nagibform:") else "bank:") + L.short(wk)
+            sid = fast_lessons.sid_of(wk)
             if has_required:
                 dr.add(sid)
             elif by_transcript:  # his poll questions on what his recording explains

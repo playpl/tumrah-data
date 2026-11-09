@@ -12,7 +12,7 @@
     "audit_every": 10
   },
   "lanes": {
-    "zero": "transcribe",
+    "zero": "piece",
     "work": "pointers",
     "personal": "books",
     "other": "lecture_links"

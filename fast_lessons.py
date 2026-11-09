@@ -17,6 +17,7 @@ from collections import Counter
 from pathlib import Path
 
 import labels as L
+import index_map
 import lectures
 import site_questions
 from flows.common import read_jsonl
@@ -37,6 +38,12 @@ will would should could may might must shall about between during after before u
 following true false except regarding concerning correct incorrect statement statements none both either
 one two three four five due because where when while how why who whom whose very much many some""".split())
 WORD = re.compile(r"[a-z][a-z0-9]{2,}")
+
+
+def sid_of(word_key):
+    """The site source_id of a question: bank:, form: (Nagib's quiz) or mcq: (a doctor's MCQ book)."""
+    prefix = "form:" if word_key.startswith("nagibform:") else "mcq:" if word_key.startswith("mcqbook:") else "bank:"
+    return prefix + L.short(word_key)
 
 
 def words(text):
@@ -100,6 +107,20 @@ def build():
         bank.append({"word_key": wk, "question": r["question"], "options": r["options"], "key": r["key"], "sightings": [],
                      "source_url": r["url"], "quiz": True, "importance_score": 3})
         labels[wk] = {"word_key": wk, "lecture_id": quiz_lecture.get(r["form"], "year2-cns:L20"), "by": "owner_quiz"}
+    # Doctors' MCQ books (mcq.py), keyed by the book's own answer list: the doctor's own questions, searched only in
+    # the pages of that doctor's lessons (owner, 2026-11-09: MCQ book questions are the doctor's).
+    for f in sorted((ROOT / "modules" / MODULE / "mcq").glob("*.jsonl")):
+        for r in read_jsonl(f):
+            if r.get("key") is None or not r.get("doctor"):
+                continue
+            mine = [m for m in lectures.all_lectures(MODULE) if m.get("doctor") == r["doctor"] and m.get("pdf_pages")]
+            if not mine:
+                continue
+            wk = f"mcqbook:{r['qid']}"
+            bank.append({"word_key": wk, "question": r["question"], "options": r["options"], "key": r["key"], "sightings": [],
+                         "source_url": None, "mcq_doctor": r["doctor"], "importance_score": 3})
+            labels[wk] = {"word_key": wk, "lecture_id": None, "by": "mcq_book",
+                          "pages": (min(m["pdf_pages"][0] for m in mine), max(m["pdf_pages"][1] for m in mine))}
     have = {q["source_id"] for q in base["questions"]}
     metas = {m["id"]: m for m in lectures.all_lectures(MODULE)}
     lesson_key = {lid: f"lecture:{lid}" for lid in in_lesson}
@@ -115,7 +136,7 @@ def build():
         qw = Counter(words(q["question"]))
         for w in words(q["options"][q["key"]]):
             qw[w] += 2  # the keyed answer is what the handout line must say
-        lo, hi = LABEL_PAGES[lab["lecture_id"]]
+        lo, hi = lab.get("pages") or LABEL_PAGES[lab["lecture_id"]]
         best = (0.0, 0, None, None)
         for page in range(lo, hi + 1):
             pl = by_page.get(page, [])
@@ -132,18 +153,22 @@ def build():
         homes = [lid for lid, ids in in_lesson.items() if ln["id"] in ids]
         if q.get("quiz"):
             homes = [h for h in homes if h in nagib]
+        if q.get("mcq_doctor"):
+            homes = [h for h in homes if metas[h].get("doctor") == q["mcq_doctor"]]
         if not homes:
             stats["outside_named_lessons"] += 1
             continue
         pl = by_page[ln["page"]]
         span = [x for x in pl[max(0, i - 1):i + 2] if toks[x["id"]] & set(qw)]
-        ih = index.get(q["word_key"]) or ([{"branch": "owner_quiz", "doctor": "Nagib El-Husseiny"}] if q.get("quiz") else [{}])
+        ih = index.get(q["word_key"]) or ([{"branch": "owner_quiz", "doctor": "Nagib El-Husseiny"}] if q.get("quiz") else
+                                         [{"branch": "mcq_book", "doctor": index_map.LESSON_DOCTOR.get(q["mcq_doctor"])}]
+                                         if q.get("mcq_doctor") else [{}])
         points[q["word_key"]] = {"lecture_id": lab["lecture_id"], "lines": [x["id"] for x in span] or [ln["id"]],
                                  "page": ln["page"], "printed": ln.get("printed"), "score": round(score, 1),
                                  "homes": homes, "by": lab.get("by", "label"),
                                  "branch": ih[0].get("branch"), "doctor": ih[0].get("doctor")}
         stats["by:" + lab.get("by", "label")] += 1
-        sid = ("form:" if q.get("quiz") else "bank:") + L.short(q["word_key"])
+        sid = sid_of(q["word_key"])
         stats["kept"] += 1
         if sid in have:
             stats["already_in_owner_lists"] += 1
@@ -155,7 +180,7 @@ def build():
             "doctorId": None, "topic": m["title"], "stem": q["question"], "options": q["options"], "correct_index": q["key"],
             "explanation": q.get("solution") or None, "importance": max(1, q.get("importance_score") or 1),
             "repetition": q.get("repetition_count") or 1, "past_exam": False, "source_url": q.get("source_url"),
-            **({"doctorId": "dr-naguib-el-husseiny-phys"} if q.get("quiz") else {}),
+            **({"doctorId": "dr-naguib-el-husseiny-phys"} if q.get("quiz") else {"doctorId": q["mcq_doctor"]} if q.get("mcq_doctor") else {}),
             "appearances": [{"source_name": s.get("header"), "source_type": "telegram_poll", "doctor": s.get("doctor"),
                              "year_or_exam": (s.get("date") or "")[:10] or None, "source_url": s.get("link"),
                              "source_id": f"{s.get('chat')}:{s.get('msg_id')}"} for s in q["sightings"][:30]],
@@ -172,7 +197,7 @@ def build():
 def pointers():
     import db
     points = json.loads((SITE / "fast_points.json").read_text(encoding="utf-8"))
-    sid = {("form:" if k.startswith("nagibform:") else "bank:") + L.short(k): k for k in points}
+    sid = {sid_of(k): k for k in points}
     r = db.Reader.live()
     ids = {}
     keys = list(sid)

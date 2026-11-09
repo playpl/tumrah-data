@@ -17,7 +17,7 @@ OUT = ROOT / "modules" / MODULE / "site" / "alignment"
 SUBJECT = {"hist": "histology", "phys": "physiology", "anat": "anatomy"}
 
 
-def export(book):
+def export(book, partial_ok=False):
     if book.startswith("azouny"):
         sys.exit("Dr. Elazouny's books are never aligned (owner, 2026-11-09)")
     db = sqlite3.connect(ROOT / "queue.db")
@@ -25,8 +25,9 @@ def export(book):
     if not rows:
         sys.exit(f"no books jobs for {book}")
     waiting = [k for k, s in rows if s != "passed"]
-    if waiting:
-        sys.exit(f"{book}: {len(waiting)} of {len(rows)} jobs not passed yet")
+    if waiting and not partial_ok:
+        sys.exit(f"{book}: {len(waiting)} of {len(rows)} jobs not passed yet (--done-only uploads the passed pages)")
+    rows = [(k, s) for k, s in rows if s == "passed"]
     pages = {}
     for key, _ in rows:
         for line in open(ROOT / "jobs" / "books" / key / "aligned.jsonl", encoding="utf-8"):
@@ -49,4 +50,4 @@ def export(book):
 
 
 if __name__ == "__main__":
-    export(sys.argv[1])
+    export(sys.argv[1], "--done-only" in sys.argv)
