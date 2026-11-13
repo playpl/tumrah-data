@@ -24,3 +24,8 @@ size, sha256}`. Today: Elsamahy's two "Ascending Tracts" PDFs (7.1 and 9.5 MB) o
 The Lesson model has only `bookUrl` and CourseResource is student-owned, so there is nowhere to show them. Add a lesson
 file store (private storage like the recordings, upload like `uploadLessonMedia.ts`) and show them on the lesson page.
 Azony's "all his files on every lecture" rule needs the same thing.
+
+## 4. Four Zahran mini lectures changed kind
+`lessons.jsonl` now lists cns-093 Perikaryon, cns-094 Processes & Classification, cns-095 Ganglia (were `kind: lesson`)
+as `kind: summary` with `covers` (cns-001, cns-004, cns-020), and adds cns-106 Nerve fiber (mini lecture, covers cns-019).
+If the site already has cns-093 to cns-095 as plain lessons, the import must change their kind and `covers`, not duplicate them.
