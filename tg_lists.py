@@ -21,7 +21,7 @@ OUT = ROOT / "sources" / "lists"
 CHANNEL = "RecordsBatch58ATM"
 LINK = re.compile(r"https?://t\.me/(?:c/(\d+)|([A-Za-z0-9_]+))/(\d+)")
 ARABIC = re.compile(r"[\u0600-\u06FF]")
-SECTIONS = (("pdf", "pdfs"), ("lecture", "lectures"), ("revision", "revisions"))
+SECTIONS = (("mini", "minis"), ("pdf", "pdfs"), ("lecture", "lectures"), ("revision", "revisions"))  # "Mini Lectures" before "lecture"
 
 
 def message_id(url):
@@ -53,6 +53,7 @@ def parse(msg):
         for name, key in SECTIONS + (("notebook", "pdfs"),):
             if name in low and len(low) < 30:
                 sec_at.append((lines[i][0], key))
+                break  # one header, one section ("Mini Lectures" is not also "Lectures")
     if len(sec_at) < 2:
         # An older list (Mossafer's, Wagih's old data): the headers are not in plain English. A header with no numbered
         # line under it is the PDFs; the first numbered block is the lectures, the next the revisions, any more "other".
@@ -65,7 +66,7 @@ def parse(msg):
                 if numbered_under:
                     seen.append(key)
                 sec_at.append((lines[i][0], key))
-    sections = {k: [] for k in ("pdfs", "lectures", "revisions", "other")}
+    sections = {k: [] for k in ("pdfs", "lectures", "minis", "revisions", "other")}
     items = {}
     for ent, label in msg.get_entities_text():
         url = getattr(ent, "url", None) or (label if type(ent).__name__ == "MessageEntityUrl" else None)

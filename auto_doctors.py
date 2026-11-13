@@ -77,7 +77,7 @@ def known(module, posts):
 
 
 def local_pdf_sizes(folder):
-    return {f.stat().st_size for f in Path(folder).glob("*.pdf")}
+    return {f.stat().st_size for f in Path(folder).rglob("*.pdf")}  # also the whiteboard folders inside chapter folders
 
 
 def parts_of(lst, section):
@@ -99,6 +99,48 @@ def lecture_title(d, item, n, count):
     return f"{doctors_folder.nice(item)}{f' part {n}' if count > 1 else ''}"
 
 
+_STOP = {"of", "the", "and", "part", "mini", "lecture", "lectures", "&", "a", "in"}
+
+
+def _words(s):
+    return {w for w in re.findall(r"[a-z0-9]+", (s or "").lower()) if w not in _STOP}
+
+
+def mini_parent(module, doctor, subject, item, exclude=()):
+    """The lecture a mini lecture shortens (owner, 2026-11-13: a list's "Mini Lectures" section). First the doctor's lecture whose
+    title shares the most words with the mini's title; else the handout heading (outline.json) that shares words with it, and
+    the doctor's lecture whose pages hold that heading. None when nothing fits."""
+    mine = _words(item)
+    lecs = [m for m in lectures.all_lectures(module) if m.get("doctor") == doctor and m.get("kind", "lecture") == "lecture"
+            and m["id"] not in exclude and m.get("ranges")]
+    scored = sorted(((len(mine & _words(m["title"])), m) for m in lecs), key=lambda x: -x[0])
+    if scored and scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+        return scored[0][1]
+    f = ROOT / "modules" / module / "outline.json"
+    if not f.exists() or not mine:
+        return None
+    heads = [(len(mine & _words(s["title"])), s["page"]) for s in json.loads(f.read_text(encoding="utf-8"))
+             if (s.get("subject") or "").lower() == (subject or "").lower()]
+    heads = [h for h in heads if h[0] > 0]
+    if not heads:
+        return None
+    page = max(heads, key=lambda h: h[0])[1]
+    inside = [(r["pages"][1] - r["pages"][0], m) for m in lecs for r in m["ranges"] if r["pages"][0] <= page <= r["pages"][1]]
+    return min(inside, key=lambda x: x[0])[1] if inside else None
+
+
+def mini_title(item):
+    return item if "mini" in item.lower() else f"{item} (mini lecture)"
+
+
+def make_summary(meta, parent):
+    """A lecture the list showed as a plain lecture is a mini lecture: kind summary covering its parent (pages follow it)."""
+    meta.update(kind="summary", covers=[parent["id"]], title=meta["title"] if "mini" in meta["title"].lower() else mini_title(meta["title"]))
+    lectures.save(meta)
+    lectures.cover_ranges(meta)
+    return meta
+
+
 def plan(lists=None):
     """What a sync would do: per doctor, new lecture parts, big videos, PDFs not in the folder, revisions."""
     lists = lists or {i: tg_lists.load(i) for d in auto_doctors() for i in [d["auto"]] if i}
@@ -110,22 +152,27 @@ def plan(lists=None):
             continue
         have = known(d["module"], posts)
         by_title = {m["title"].lower(): m for m in lectures.all_lectures(d["module"]) if m.get("doctor") == d["doctor_id"]}
-        row = {"doctor": d, "new": [], "have": 0, "pdfs": [], "revisions": []}
+        row = {"doctor": d, "new": [], "have": 0, "pdfs": [], "revisions": [], "minis": [], "convert": []}
         sizes = local_pdf_sizes(d["folder"])
-        for section in ("lectures", "revisions"):
+        kinds = {m["id"]: m.get("kind", "lecture") for m in lectures.all_lectures(d["module"])}
+        for section in ("lectures", "minis", "revisions"):
             for item, n, count, part, post in parts_of(lst, section):
-                if post and post.get("kind") in ("pdf", "file") and section == "lectures":
+                if post and post.get("kind") in ("pdf", "file") and section in ("lectures", "minis"):
                     row["pdfs"].append({"title": item, "post": part["post"], "size": post.get("size")})  # a diagram sheet, not a recording
                     continue
+                if section == "minis" and have.get(part["post"]) and kinds.get(have[part["post"]]) == "lecture":
+                    row["convert"].append({"id": have[part["post"]], "item": item})  # filed as a plain lecture before: fix it
                 if part["post"] in have or not post or post.get("kind") in (None, "none", "text") and not post.get("youtube"):
                     row["have"] += part["post"] in have
                     continue
-                title = lecture_title(d, item, n, count)
+                title = lecture_title(d, mini_title(item) if section == "minis" else item, n, count)
                 same = by_title.get(title.lower())
+                if section == "minis" and same and same.get("kind") != "summary":
+                    same = None  # a lecture of the same name ("Nerve fiber") is not its mini lecture
                 if same and not same.get("backup"):
                     row["have"] += 1
                     continue
-                row["new" if section == "lectures" else "revisions"].append({
+                row[{"lectures": "new", "minis": "minis", "revisions": "revisions"}[section]].append({
                     "title": title, "item": item, "post": part["post"], "kind": post["kind"], "size": post.get("size"),
                     "duration": post.get("duration"), "youtube": (post.get("youtube") or [None])[0], "url": part["url"],
                     "replace": same["id"] if same else None})  # the batch's own recording for a lecture on a backup
@@ -141,9 +188,11 @@ def describe(rows):
     for r in rows:
         d = r["doctor"]
         head = f"{d['key']} ({d['subject']}, {d['doctor_id'] or 'NO SITE DOCTOR'}): {r['have']} known, {len(r['new'])} new lecture(s), " \
-               f"{len(r['revisions'])} revision(s), {len(r['pdfs'])} PDF(s) not in the folder"
+               f"{len(r['minis'])} new mini lecture(s), {len(r['revisions'])} revision(s), {len(r['pdfs'])} PDF(s) not in the folder"
         lines.append(head)
-        for x in r["new"] + r["revisions"]:
+        for x in r["convert"]:
+            lines.append(f"   {x['id']} '{x['item']}' is a mini lecture in the list, filed as a plain lecture: will be fixed")
+        for x in r["new"] + r["minis"] + r["revisions"]:
             mb = f"{x['size'] / 1e6:.0f} MB" if x.get("size") else "link"
             lines.append(f"   + {tg_lists.ascii_label(x['title'])} [{x['kind']}, {mb}, post {x['post']}]"
                          + (f" replaces the backup of {x['replace']}" if x.get("replace") else ""))
@@ -166,10 +215,23 @@ def sync(q, dry=False, big_mb=BIG_MB):
         return report
     for r in rows:
         d = r["doctor"]
-        for kind, items in (("lecture", r["new"]), ("revision", r["revisions"])):
+        for x in r["convert"]:
+            report += convert_to_mini(q, d, x)
+        for kind, items in (("lecture", r["new"]), ("summary", r["minis"]), ("revision", r["revisions"])):
             for x in items:
                 report += make(q, d, x, kind, big_mb)
     return report
+
+
+def convert_to_mini(q, d, x):
+    """A lecture the list names under "Mini Lectures": becomes kind summary covering the lecture it shortens, no place job."""
+    meta = lectures.load(x["id"])
+    parent = mini_parent(d["module"], meta.get("doctor"), d["subject"], x["item"], exclude=(x["id"],))
+    if not parent:
+        return [f"{x['id']} '{x['item']}': a mini lecture, but no lecture of {d['key']} fits as its parent yet, waits"]
+    make_summary(meta, parent)
+    q.db.execute("DELETE FROM jobs WHERE flow = 'place' AND key = ? AND status = 'queued'", (x["id"],))
+    return [f"{x['id']}: '{x['item']}' is now a mini lecture of {parent['id']} '{parent['title']}'"]
 
 
 def make(q, d, x, kind, big_mb):
@@ -180,6 +242,11 @@ def make(q, d, x, kind, big_mb):
         meta, lid = lectures.load(x["replace"]), x["replace"]
         note = f"{lid}: '{x['title']}' (the batch's own recording replaces the backup)"
         return add_recording(q, d, x, lid, doctor, note, big_mb)
+    if kind == "summary":
+        parent = mini_parent(d["module"], doctor, d["subject"], x["item"])
+        if not parent:
+            return [f"mini lecture '{x['title']}': no lecture of {d['key']} fits as its parent yet, waits"]
+        ctx["covers"] = [parent["id"]]
     if kind == "revision":
         ctx["covers"] = doctors_folder.revision_covers({"module": d["module"], "doctor_id": d["doctor_id"], "doctor_folder": d["folder"].name,
                                                         "chapter": chapter, "title": x["item"]})
@@ -187,7 +254,8 @@ def make(q, d, x, kind, big_mb):
             return [f"revision '{x['title']}': no lecture of {d['key']} to cover yet, waits"]
     meta = lectures.create(d["module"], x["title"], doctor, kind=kind, subject=d["subject"], chapter=chapter, **ctx)
     lid = meta["id"]
-    q.add_jobs("place", [{"key": lid, "payload": {"lecture": lid}}])
+    if kind != "summary":  # a mini lecture takes its parent's pages
+        q.add_jobs("place", [{"key": lid, "payload": {"lecture": lid}}])
     note = f"{lid}: '{x['title']}' ({kind}, {d['doctor_id'] or 'no site doctor: ask the owner'})"
     return add_recording(q, d, x, lid, doctor, note, big_mb)
 
