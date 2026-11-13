@@ -15,6 +15,8 @@ and prints one report. Then tell the owner what changed, what waits (the fleet i
 only queue) and what needs a decision. Details: `update_data.py` docstring. Flags: `--dry`, `--no-telegram`.
 - ALWAYS IMPORT (owner, 2026-11-13): if anything needs importing (lecture, revision, quiz, book), run the real
   `py update_data.py` at once. Never wait for permission, never ask first. Always keep data updated.
+- Chapters (owner, 2026-11-13): a lesson's site chapter is the handout lecture its pages fall in (`dm.chapter_of`), never the
+  subject's first chapter. After Update data read the "chapter guess" lines and the chapter spread per doctor.
 - Never touch the website from it: importers write production. Publish only when the owner says so (dry run first).
 - Auto doctors: `auto_doctors.py` (`plan`, `sync`, `download <lecture>`). Telegram lists: `tg_lists.py`. A doctor with no
   site doctor id (Cocci) is reported, never guessed. Aliases live in `doctors_folder.ALIASES`.

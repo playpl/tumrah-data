@@ -130,6 +130,47 @@ def cmd_lecture(args):
 CHAPTERS = {"anatomy": "Spinal cord", "histology": "Nervous tissue", "physiology": "Sensations"}
 
 
+# The three chapters the site already has keep their names; they are these handout lectures (owner, 2026-11-08).
+LEGACY_CHAPTERS = {"year2-cns:L03": "Spinal cord", "year2-cns:L01": "Nervous tissue", "year2-cns:L20": "Sensations"}
+_STOP = {"of", "the", "and", "part", "anatomy", "physiology", "histology", "features", "general", "revision", "&"}
+
+
+def handout_chapters(module):
+    """{subject: [{"id", "title", "order", "pages": [a, b]}]}: a chapter is a handout lecture, in handout order per subject."""
+    import outline
+    out = {}
+    for ref in outline.reference(module):
+        rows = out.setdefault(ref["subject"].lower(), [])
+        rows.append({"id": ref["lecture_id"], "title": LEGACY_CHAPTERS.get(ref["lecture_id"], ref["title"]),
+                     "handout_title": ref["title"], "order": len(rows) + 1, "pages": ref["pdf_pages"]})
+    return out
+
+
+def chapter_of(meta, subject, chapters):
+    """(chapter row, how): the handout lecture the lesson's pages fall in (most pages; the earlier one on a tie). A lesson
+    not placed yet falls back to the chapter whose title shares the most words with its title, else the subject's first
+    chapter ('guess'). owner, 2026-11-13: a doctor's lectures are never all filed under the first chapter."""
+    import re as _re
+    rows = chapters.get(subject) or []
+    if not rows:
+        return None, "none"
+    pages = [r.get("pages") or [] for r in meta.get("ranges") or []]
+    best, score = None, 0
+    for row in rows:
+        n = sum(max(0, min(p[1], row["pages"][1]) - max(p[0], row["pages"][0]) + 1) for p in pages if len(p) == 2)
+        if n > score:
+            best, score = row, n
+    if best:
+        return best, "pages"
+    words = lambda s: {w for w in _re.findall(r"[a-z0-9]+", (s or "").lower()) if w not in _STOP}
+    mine = words(meta.get("title"))
+    for row in rows:
+        n = len(mine & words(row["handout_title"]))
+        if n > score:
+            best, score = row, n
+    return (best, "title") if best else (rows[0], "guess")
+
+
 def lesson_order(metas):
     """{lecture id: site order}. A doctor's lectures are numbered 1, 2, 3... by the owner's file numbers in his folder, then in
     the order they were named (owner, 2026-11-10: Pain 1 showed after Pain 2 because titles and stale chapter lists set the
@@ -163,15 +204,20 @@ def lesson_rows(module):
     metas = lectures.all_lectures(module)
     by_id = {m["id"]: m for m in metas}
     order_of = lesson_order(metas)
+    chapters = handout_chapters(module)
     for m in metas:
         base = by_id[m["covers"][0]] if m.get("covers") else m
         subject = (base.get("subject") or "").lower()
         order = order_of[m["id"]]
+        chap, how = chapter_of(base, subject, chapters)
+        if how in ("guess", "none"):
+            print(f"  chapter guess: {m['id']} '{m['title']}' is not placed in the handout yet, filed under the first chapter")
         url = (m.get("source") or {}).get("youtube")
         doctor = m.get("doctor")
         doctor = doctors_folder.ALIASES.get((doctor or "").lower(), doctor)
         out.append({"key": f"lecture:{m['id']}", "subject": subject,
-                    "chapter": {"title": CHAPTERS.get(subject) or (base.get("chapter") or "").capitalize(), "order": 1},
+                    "chapter": ({"title": chap["title"], "order": chap["order"]} if chap else
+                                {"title": CHAPTERS.get(subject) or (base.get("chapter") or "").capitalize(), "order": 1}),
                     "name": m["title"], "order": order,
                     "kind": "lesson" if m.get("kind", "lecture") == "lecture" else m["kind"],
                     "doctorId": doctor if doctor and doctor.startswith("dr-") else None,
