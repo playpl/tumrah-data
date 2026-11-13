@@ -17,6 +17,12 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
   `py update_data.py` at once. Never wait for permission, never ask first. Always keep data updated.
 - Chapters (owner, 2026-11-13): a lesson's site chapter is the handout lecture its pages fall in (`dm.chapter_of`), never the
   subject's first chapter. After Update data read the "chapter guess" lines and the chapter spread per doctor.
+- READ THE MESSAGES YOURSELF (owner, 2026-11-13): in every Update data, read each doctor's Telegram list message and its
+  posts' captions yourself (`py tg_lists.py text <id> ...`; ids are in each folder's `all here updates (auto).txt`) and check
+  every item (PDFs, lectures, mini lectures, revisions, notes) against what was imported. Do not trust the report alone.
+- Whiteboard notes (owner, 2026-11-13): a PDF in a folder inside a chapter folder ("ملفات السبورة ...") belongs to the lesson
+  with its number. `lesson_files.py` writes `modules/<m>/site/lesson_files.jsonl` (Update data runs it). The site has no
+  place for them yet: the website agent must add one.
 - Never touch the website from it: importers write production. Publish only when the owner says so (dry run first).
 - Auto doctors: `auto_doctors.py` (`plan`, `sync`, `download <lecture>`). Telegram lists: `tg_lists.py`. A doctor with no
   site doctor id (Cocci) is reported, never guessed. Aliases live in `doctors_folder.ALIASES`.

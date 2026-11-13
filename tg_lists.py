@@ -221,6 +221,12 @@ if __name__ == "__main__":
     if cmd == "fetch":
         for i, d in fetch_many(ids).items():
             print(f"saved {i}: {sum(len(it['parts']) for s in d['sections'].values() for it in s)} links, {len(d['posts'])} posts")
+    elif cmd == "text":  # the list message exactly as the doctor's channel shows it, then each linked post's caption
+        for i in ids:
+            d = load(i)
+            print(f"== {i} edited {d['edit_date']}\n{d['text']}\n-- posts")
+            for k, p in d["posts"].items():
+                print(f"{k} {p['kind']} {p.get('size') or ''} {p.get('file_name') or ''} | {(p.get('caption') or '').strip()[:120]}".replace("\n", " "))
     elif cmd == "show":
         for i in ids:
             show(i)

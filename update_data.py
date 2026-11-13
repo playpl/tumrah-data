@@ -104,7 +104,12 @@ def waiting_telegram(q, dry):
 
 def site_files():
     res = subprocess.run(["py", str(ROOT / "site_lessons.py"), "write"], capture_output=True, text=True, cwd=ROOT, encoding="utf-8")
-    return [ln for ln in res.stdout.splitlines() if "lessons" in ln] or [res.stderr.strip()[-200:]]
+    out = [ln for ln in res.stdout.splitlines() if "lessons" in ln] or [res.stderr.strip()[-200:]]
+    import lesson_files  # whiteboard notes and other per-lesson files: modules/<m>/site/lesson_files.jsonl
+    for module in sorted({m["module"] for m in __import__("lectures").all_lectures()}):
+        f, rows, report = lesson_files.write(module)
+        out += [f"{module}: {len(rows)} lesson file(s) -> {f}"] + report
+    return out
 
 
 def state(q):
