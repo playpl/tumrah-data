@@ -12,7 +12,6 @@ from pathlib import Path
 
 import dm
 import lectures
-import new_doctors
 
 ROOT = Path(__file__).resolve().parent
 MODULE = "year2-cns"
@@ -22,24 +21,27 @@ MEDIA = {
     "cns-008": ("videoUrl", "r2:lectures/year2-cns/azouny/spinal_cord_1.mp4"),
     "cns-009": ("videoUrl", "r2:lectures/year2-cns/azouny/spinal_cord_2.mp4"),
     "cns-010": ("videoUrl", "r2:lectures/year2-cns/azouny/spinal_cord_3_and_medulla.mp4"),
-    "cns-015": ("audioUrl", "r2:lectures/year2-cns/cns-015/recording.m4a"),
 }
 
 
 def write():
     held = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("hold")}
-    titles = [t for _, _, _, t, _, _ in new_doctors.LECTURES]
     rows = []
+    mf = SITE / "media.json"
+    uploaded = {x["lecture"]: x for x in json.loads(mf.read_text(encoding="utf-8"))} if mf.exists() else {}
     for r in dm.lesson_rows(MODULE):
         lid = r["key"].split(":", 1)[1]
         if lid in held:
             continue
         meta = lectures.load(lid)
-        if meta["title"] in titles:  # the new doctors' lectures follow their list order, after the first lessons
-            r["order"] = 10 + titles.index(meta["title"])
+        # A held lecture is not in the file, and the importer refuses a revision that covers a lesson that is not in it
+        # (2026-11-12: cns-081 covered the held duplicate cns-016, whose twin cns-015 it covers as well).
+        r["covers"] = [c for c in r.get("covers") or [] if c.split(":", 1)[-1] not in held]
         if lid in MEDIA:
             field, url = MEDIA[lid]
             r[field] = url
+        elif lid in uploaded and not r.get("videoUrl"):  # media.json rows (doctors_folder.media_merge): key = the upload's r2 key
+            r[uploaded[lid]["field"]] = "r2:" + uploaded[lid]["key"]
         rows.append(r)
     out = SITE / "lessons.jsonl"
     out.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows), encoding="utf-8")

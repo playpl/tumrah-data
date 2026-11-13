@@ -22,21 +22,23 @@ ROOT = Path(__file__).resolve().parent
 MODULE = "year2-cns"
 DOC = ROOT / "doctors" / "cns"
 SITE = ROOT / "modules" / MODULE / "site"
-AZ = DOC / "anatomy" / "azony"
+import doctors_folder  # noqa: E402
+
+AZ = doctors_folder.find_doctor_folder("anatomy", "azony")  # "azony (auto)" since 2026-11-10
 
 # (doctor id, subject, chapter, title, source, coarse handout pages)
 LECTURES = [
-    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 1 (Dr. Azouny)", {"file": AZ / "spinal cord 1.mp4"}, [[49, 57]]),
-    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 2 (Dr. Azouny)", {"file": AZ / "Spinal cord 2.mp4"}, [[49, 57]]),
-    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 3 and medulla (Dr. Azouny)",
+    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 1", {"file": AZ / "spinal cord 1.mp4"}, [[49, 57]]),
+    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 2", {"file": AZ / "Spinal cord 2.mp4"}, [[49, 57]]),
+    ("dr-ibrahim-el-azouni-anat", "anatomy", "chapter 1", "Spinal cord 3 and medulla",
      {"file": AZ / "spinal cord 3 and medulla.mp4"}, [[49, 57], [71, 76]]),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Lecture 1 (Dr. Nagib)", {"youtube": "https://youtu.be/kyWw4dbPAhA"}, []),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Lecture 2 (Dr. Nagib)", {"youtube": "https://youtu.be/tD5RZPGk7Ik"}, []),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Sensory receptors 1 (Dr. Nagib)", {"youtube": "https://youtu.be/Xszh4uAs98o"}, [[139, 144]]),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Sensory receptors 2 (Dr. Nagib)", {"youtube": "https://youtu.be/-uma7XhtIGQ"}, [[139, 144]]),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Pain 1 (Dr. Nagib)", {"telegram": 1685}, [[145, 168]]),
-    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Pain 2 (Dr. Nagib)", {"telegram": 1686}, [[145, 168]]),
-    ("dr-ahmed-ammar-hist", "histology", "nervous tissue", "Classification of neuron & Nerve fiber (Dr. Ammar)",
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Lecture 1", {"youtube": "https://youtu.be/kyWw4dbPAhA"}, []),
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Lecture 2", {"youtube": "https://youtu.be/tD5RZPGk7Ik"}, []),
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Sensory receptors 1", {"youtube": "https://youtu.be/Xszh4uAs98o"}, [[139, 144]]),
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Sensory receptors 2", {"youtube": "https://youtu.be/-uma7XhtIGQ"}, [[139, 144]]),
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Pain 1", {"telegram": 1685}, [[145, 168]]),
+    ("dr-naguib-el-husseiny-phys", "physiology", "sensations", "Pain 2", {"telegram": 1686}, [[145, 168]]),
+    ("dr-ahmed-ammar-hist", "histology", "nervous tissue", "Classification of neuron & Nerve fiber",
      {"youtube": "https://youtu.be/pnanTke7MZA"}, [[11, 25]]),
     ("dr-abdullah-el-samahi-phys", "physiology", "sensations", "Pain 1", {"youtube": "https://www.youtube.com/watch?v=GABrSUDznYE"}, [[145, 168]]),
 ]
@@ -90,8 +92,8 @@ def create():
                           "field": "videoUrl" if ext in (".mp4", ".webm") else "audioUrl"})
         report.append({"lecture": lid, "title": title, "next": nxt, "transcript": (meta.get("source") or {}).get("transcript"),
                        "duration_s": meta.get("duration_s"), "pages": lectures.page_ranges(meta)})
-    SITE.mkdir(parents=True, exist_ok=True)
-    (SITE / "media.json").write_text(json.dumps(media, indent=1), encoding="utf-8")
+    import doctors_folder
+    doctors_folder.media_merge(MODULE, media)  # keeps rows other scripts (doctors_folder.import_all) added
     sys.stdout.reconfigure(encoding="utf-8")
     for r in report:
         print(json.dumps(r, ensure_ascii=False))

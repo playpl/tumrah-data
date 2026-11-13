@@ -18,7 +18,7 @@ import doctors_folder
 import page
 
 ROOT = Path(__file__).resolve().parent
-NAGEB = ROOT / "doctors" / "cns" / "physiology" / "nageb"
+NAGEB = doctors_folder.find_doctor_folder("physiology", "nageb")
 OUT = ROOT / "modules" / "year2-cns" / "site" / "nagib_quiz.json"
 
 

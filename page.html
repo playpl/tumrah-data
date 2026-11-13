@@ -50,6 +50,15 @@ tr + tr td { border-top: 1px solid var(--inset); }
 .legend span { margin-right: 1rem; font-size: .8125rem; }
 .out { white-space: pre-wrap; font-size: .8125rem; background: var(--inset); border-radius: var(--r-control); padding: .5rem .75rem; }
 .hide { display: none; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .625rem; margin-top: .75rem; }
+.tm { background: var(--inset); border-radius: var(--r-control); padding: .6rem .8rem; }
+.tm.tw { box-shadow: inset 0 0 0 2px var(--warn); }
+.tv { font-size: 1.5rem; font-weight: 600; } .tv small { font-size: .75rem; font-weight: 400; }
+.tsmall .tm { padding: .4rem .7rem; font-size: .8125rem; }
+.tc { display: flex; gap: .6rem; align-items: center; flex-wrap: wrap; padding: .7rem 0; }
+.tc + .tc { border-top: 1px solid var(--inset); }
+.tt { flex: 1 1 18rem; min-width: 0; }
+.tch { background: var(--inset); border-radius: var(--r-control); padding: .6rem .8rem; margin-top: .5rem; }
 td.text { max-width: 42rem; }
 .lesson { white-space: pre-line; line-height: 1.9; max-width: 48rem; }
 .lesson .pg { display: block; margin: .75rem 0 .25rem; color: var(--ink2); font-size: .75rem; font-weight: 600; }
@@ -58,6 +67,56 @@ td.text { max-width: 42rem; }
 .u1 { text-decoration-color: #c2413b; } .u2 { text-decoration-color: #3b6fe0; } .u3 { text-decoration-color: #1f8a5b; }
 .mcq { outline: 2px solid #c2413b; border-radius: 999px; padding: 0 .2rem; }
 .mcqtag { font-size: .625rem; font-weight: 700; color: #fff; background: #c2413b; border-radius: 999px; padding: 0 .35rem; margin-left: .25rem; }
+/* ---- Claude tab (control.py) ---- */
+.pulse { display: flex; gap: .5rem 1.25rem; align-items: center; flex-wrap: wrap; }
+.dot { width: .75rem; height: .75rem; border-radius: 50%; background: var(--bad); display: inline-block; margin-right: .4rem; vertical-align: -1px; }
+.dot.live { background: var(--ok); animation: beat 2s ease-out infinite; }
+.dot.busy { background: var(--accent); animation: beat 1s ease-out infinite; }
+@keyframes beat { 0% { box-shadow: 0 0 0 0 rgba(31,138,91,.5); } 100% { box-shadow: 0 0 0 .6rem rgba(31,138,91,0); } }
+@media (prefers-reduced-motion: reduce) { .dot.live, .dot.busy { animation: none; } }
+.pi { font-size: .875rem; } .pi b { font-weight: 600; } .pi a { color: inherit; }
+.pi code, .tool code, .msg code { font-family: ui-monospace, Consolas, monospace; font-size: .8125rem; background: var(--inset); border-radius: .3rem; padding: 0 .3rem; }
+.cr { display: grid; grid-template-columns: minmax(15rem, 1fr) minmax(0, 2.2fr) minmax(15rem, 1fr); gap: 1rem; align-items: start; margin-top: 1rem; }
+@media (max-width: 75rem) { .cr { grid-template-columns: 1fr; } }
+.cr .card { margin-bottom: 0; min-width: 0; }
+.grp { font-size: .6875rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ink2); font-weight: 600; margin: .6rem 0 .3rem; }
+.btns { display: flex; flex-wrap: wrap; gap: .375rem; }
+.btns button { font-size: .8125rem; padding: .3rem .65rem; }
+.runs { margin-top: .75rem; }
+.runrow { display: flex; gap: .5rem; align-items: center; padding: .35rem .5rem; border-radius: .5rem; cursor: pointer; font-size: .8125rem; }
+.runrow:hover, .runrow.on { background: var(--inset); }
+.runrow .lab { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st { font-size: .6875rem; font-weight: 700; border-radius: 999px; padding: 0 .45rem; background: var(--inset); white-space: nowrap; }
+.st.running, .st.doing, .st.stopping { background: #dbe6ff; color: var(--accent); } .st.done { background: #d6f0e2; color: var(--ok); }
+.st.failed, .st.stopped { background: #f8dcda; color: var(--bad); } .st.todo { color: var(--ink2); cursor: pointer; } .st.doing { cursor: pointer; }
+.log { white-space: pre-wrap; overflow-wrap: anywhere; font: .75rem/1.45 ui-monospace, Consolas, monospace; background: #1d2433; color: #dfe5f1;
+  border-radius: var(--r-control); padding: .6rem .75rem; max-height: 26rem; overflow: auto; margin-top: .5rem; }
+.plan { list-style: none; margin: 0 0 .75rem; padding: .6rem .75rem; background: var(--inset); border-radius: var(--r-control); }
+.plan li { display: flex; gap: .5rem; align-items: baseline; padding: .15rem 0; font-size: .875rem; }
+.plan li .mk { width: 1rem; flex: none; text-align: center; font-weight: 700; }
+.plan li.completed { color: var(--ink2); text-decoration: line-through; } .plan li.completed .mk { color: var(--ok); }
+.plan li.in_progress { font-weight: 600; } .plan li.in_progress .mk { color: var(--accent); }
+.tl { max-height: 60vh; overflow: auto; display: flex; flex-direction: column; gap: .4rem; padding-right: .25rem; }
+.msg { border-radius: var(--r-control); padding: .5rem .75rem; max-width: 46rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.you { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
+.msg.claude { background: var(--raised); border: 2px solid var(--edge); }
+.msg.error { background: #f8dcda; color: var(--bad); font-size: .8125rem; }
+.tool { font-size: .8125rem; border-left: 3px solid var(--edge); padding: .15rem .6rem; color: var(--ink2); cursor: pointer; }
+.tool .tn { font-weight: 700; color: var(--ink); margin-right: .4rem; }
+.tool.running { border-left-color: var(--accent); } .tool.ok { border-left-color: var(--ok); } .tool.bad { border-left-color: var(--bad); }
+.tool .tx { white-space: pre-wrap; overflow-wrap: anywhere; }
+.tool .tx.short { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sep { text-align: center; font-size: .75rem; color: var(--ink2); margin: .25rem 0; }
+.ask { display: flex; gap: .5rem; margin-top: .75rem; align-items: flex-end; }
+.ask textarea { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--inset); border: 2px solid var(--edge); border-radius: var(--r-control);
+  padding: .5rem .7rem; min-height: 3.2rem; resize: vertical; }
+.bitem { display: flex; gap: .4rem; align-items: center; padding: .3rem 0; flex-wrap: wrap; }
+.bitem + .bitem { border-top: 1px solid var(--inset); }
+.bitem input[type=text] { flex: 1 1 8rem; background: transparent; border-color: transparent; padding: .2rem .4rem; }
+.bitem input[type=text]:focus { background: var(--inset); border-color: var(--edge); }
+.bitem.done input[type=text] { text-decoration: line-through; color: var(--ink2); }
+.bitem .by { font-size: .625rem; font-weight: 700; color: var(--accent); }
+.mini { font-size: .75rem; padding: .15rem .45rem; border-bottom-width: 3px; }
 @media (max-width: 40rem) { header, main { padding-left: 1rem; padding-right: 1rem; } }
 </style>
 </head>
@@ -67,6 +126,62 @@ td.text { max-width: 42rem; }
   <nav id="tabs"></nav>
 </header>
 <main>
+  <section data-tab="Claude">
+    <div class="card pulse">
+      <span class="pi" id="cPulse"><span class="dot"></span>Connecting...</span>
+      <span class="pi" id="cWho"></span>
+      <span class="pi" id="cWork"></span>
+      <span class="pi" id="cCards"></span>
+      <span class="pi muted" id="cSession"></span>
+    </div>
+    <div class="cr">
+      <div class="card">
+        <h2>Run</h2>
+        <div id="cBtns"></div>
+        <div class="runs" id="cRuns"></div>
+        <div class="hide" id="cLogBox">
+          <div class="row" style="margin:.75rem 0 0"><b id="cLogName" style="flex:1"></b><button class="mini" id="cLogStop">Stop</button><button class="mini" id="cLogAsk">Ask Claude about it</button></div>
+          <div class="log" id="cLog"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row"><h2 style="margin:0;flex:1">Claude</h2><span class="chip" id="cState">Idle</span>
+          <button class="mini" id="cStop" disabled>Stop</button><button class="mini" id="cNew">New chat</button></div>
+        <ul class="plan hide" id="cPlan"></ul>
+        <div class="tl" id="cTl"></div>
+        <div class="ask">
+          <textarea id="cText" placeholder="Tell Claude what to do. Ctrl+Enter sends."></textarea>
+          <button class="primary" id="cSend">Send</button>
+        </div>
+        <div class="btns" style="margin-top:.5rem" id="cQuick"></div>
+      </div>
+      <div class="card">
+        <h2>Board <span class="muted" style="font-weight:400">your list; Claude ticks it too</span></h2>
+        <div class="row"><input id="bText" placeholder="Add an item" style="flex:1"><button id="bAdd">Add</button></div>
+        <div id="bList"></div>
+        <details style="margin-top:.5rem"><summary class="muted" style="cursor:pointer;font-size:.8125rem">Done</summary><div id="bDone"></div></details>
+      </div>
+    </div>
+  </section>
+
+  <section data-tab="Today">
+    <div class="card">
+      <div class="row"><h2 style="margin:0;flex:1">Today</h2><span class="chip" id="tRunner"></span><button id="tRefresh">Refresh</button></div>
+      <div class="tgrid" id="tMetrics"></div>
+      <div class="tgrid tsmall" id="tPipe"></div>
+    </div>
+    <div class="card hide" id="tReview"></div>
+    <div class="card">
+      <h2>Decisions <span class="muted" style="font-weight:400">the first button is the suggested one; anything left undecided stays off the site</span></h2>
+      <div id="tCards"></div>
+      <div class="out hide" id="tOut"></div>
+    </div>
+    <div class="card">
+      <div class="row"><h2 style="margin:0;flex:1">Import report</h2><button id="tCopy">Copy</button></div>
+      <div class="out" id="tReport"></div>
+    </div>
+  </section>
+
   <section data-tab="Progress">
     <div class="card"><div class="row"><h2 style="margin:0;flex:1">Jobs</h2><span class="chip" id="fState">Stopped</span><button class="primary" id="fStart">Run</button><button id="fStop">Stop</button></div><div id="flows"></div></div>
     <div class="card"><h2>Accounts</h2><div id="accounts"></div></div>
@@ -614,9 +729,237 @@ function poll(name, el, then) {
   }, 2000);
 }
 
-let first = "Progress";
+loaders.Today = async (fresh) => {
+  const t = await get("/api/today" + (fresh === true ? "?fresh=1" : ""));
+  const m = t.metrics, e = m.error, pc = (x) => Math.round(x * 100);
+  $("tRunner").textContent = t.runner.working ? `${t.runner.working === "web" ? "Gemini web" : "Fleet"} runs the jobs` : "No AI can work now";
+  $("tRunner").className = "chip " + (t.runner.working ? "ok" : "bad");
+  $("tMetrics").innerHTML = [
+    ["Ready for the site", m.ready.toLocaleString()],
+    ["Measured error", e.checked ? `${(e.rate * 100).toFixed(1)}% <small class="muted">${pc(e.low)}-${pc(e.high)}%, ${e.checked} checked</small>` : `<small class="muted">not measured yet</small>`],
+    ["Not checked yet", m.unchecked.toLocaleString()],
+    ["Waiting for you", t.cards.length],
+  ].map(([k, v]) => `<div class="tm"><div class="muted">${k}</div><div class="tv">${v}</div></div>`).join("");
+  $("tPipe").innerHTML = t.pipeline.map((p) => `<div class="tm ${p.warn ? "tw" : ""}"><div class="muted">${esc(p.name)}</div><b>${esc(p.text)}</b></div>`).join("");
+  $("tCards").innerHTML = t.cards.length ? t.cards.map((c) => `<div class="tc" data-id="${esc(c.id)}"><div class="tt"><b dir="auto">${esc(c.title)}</b><div class="muted" dir="auto">${esc(c.detail)}</div>${
+    c.payload.input ? `<input placeholder="${esc(c.payload.input)}" aria-label="${esc(c.payload.input)}" style="margin-top:.4rem">` : ""}</div>${
+    c.options.map((o, i) => `<button class="${!i && c.kind === "bounds_bulk" ? "primary" : ""}" data-i="${i}">${esc(o)}</button>`).join("")}</div>`).join("")
+    : `<p class="muted">Nothing waits for you.</p>`;
+  $("tReport").textContent = t.report;
+};
+$("tRefresh").onclick = () => loaders.Today(true);
+$("tCopy").onclick = () => navigator.clipboard.writeText($("tReport").textContent).then(() => show($("tOut"), "Report copied"));
+$("tCards").onclick = async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const card = b.closest(".tc"), inp = card.querySelector("input");
+  const r = await post("/api/decide", {id: card.dataset.id, choice: +b.dataset.i, value: inp ? inp.value : null});
+  if (r.error) return show($("tOut"), r.error);
+  if (r.review) return review(r.review);
+  if (r.open) return open(r.open);
+  if (r.job) { show($("tOut"), "Started. The readings take a while; this screen updates when they end."); return poll(r.job, $("tOut"), () => loaders.Today(true)); }
+  show($("tOut"), r.message || "Saved");
+  loaders.Today();
+};
+
+let rv = {kind: null, items: [], i: 0};
+async function review(kind) {
+  rv = {kind, items: await get(`/api/review?kind=${kind}`), i: 0};
+  $("tReview").classList.remove("hide");
+  drawReview();
+  $("tReview").scrollIntoView({block: "start"});
+}
+const mmss = (s) => `${Math.floor((s || 0) / 60)}:${String(Math.floor((s || 0) % 60)).padStart(2, "0")}`;
+function drawReview() {
+  const it = rv.items[rv.i];
+  if (!it) { $("tReview").classList.add("hide"); return loaders.Today(); }
+  const s = it.source, two = rv.kind === "conflict";
+  const src = it.kind === "question"
+    ? `<p dir="auto"><b>${esc(s.question)}</b></p><ol type="A">${(s.options || []).map((o, j) => `<li dir="auto" class="${j === s.key ? "ok" : ""}">${esc(o)}${j === s.key ? " (key)" : ""}</li>`).join("")}</ol>`
+    : it.kind === "block" ? `<p class="muted">${esc(s.book)}, page ${esc(s.page)} (${esc(s.match)})</p><p dir="auto"><b>${esc(s.text)}</b></p>`
+    : `<p><b>${esc(s.lecture)}: ${esc(s.title)}</b> <span class="muted">${mmss(s.start)} to ${mmss(s.end)}</span></p>`;
+  const choices = it.choices.map((c, j) => `<div class="tch"><div class="muted">${two ? `Reader ${j + 1} (${esc(c.runner)})` : `Linked by ${esc(c.runner)} to these handout lines`}</div>${
+    c.lines.map((l) => `<div><span class="chip">p${l.page}</span> ${esc(l.text)}</div>`).join("")}${
+    two ? `<button data-pick="${esc(c.runner)}" style="margin-top:.5rem">These lines teach it</button>` : ""}</div>`).join("");
+  $("tReview").innerHTML = `<h2>${two ? "Which lines teach it?" : "Is this link right?"} <span class="muted" style="font-weight:400">${rv.i + 1} of ${rv.items.length}</span></h2>${src}${choices}<div class="row" style="margin:.75rem 0 0">${
+    two ? `<button data-pick="">Neither</button>` : `<button class="primary" data-right="1">Right</button><button data-right="0">Wrong</button>`}<button data-skip="1">Skip</button><button data-close="1">Close</button></div>`;
+}
+$("tReview").onclick = async (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  const it = rv.items[rv.i];
+  if (b.dataset.close) { rv.items = []; return drawReview(); }
+  if (!b.dataset.skip) {
+    await post("/api/review", {kind: it.kind, src: it.src,
+      pick: b.dataset.right != null ? {runner: it.choices[0].runner, right: b.dataset.right === "1"} : {runner: b.dataset.pick || null}});
+  }
+  rv.i++;
+  drawReview();
+};
+
+// ---- Claude tab (control.py) ----
+const cr = {chatNext: 0, log: null, logNext: 0, toolRows: {}, look: null, lastBeat: -1, beatAt: 0, plan: ""};
+const crOn = () => !document.querySelector('section[data-tab="Claude"]').classList.contains("hide");
+const md = (s) => esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+const QUICK = ["Update data", "What is waiting on me?", "What did the last run change?", "Work through my board"];
+
+async function crLook() {
+  let d = null;
+  try { d = await get("/api/control"); } catch (e) {}
+  if (d && d.beat !== cr.lastBeat) { cr.beatAt = Date.now(); cr.lastBeat = d.beat; }
+  const fresh = d && Date.now() - cr.beatAt < 6000;
+  $("cPulse").innerHTML = `<span class="dot ${fresh ? "live" : ""}"></span>` +
+    (fresh ? `<b>Server up</b> &middot; beat ${d.beat}` : `<b class="bad">Server not answering</b>: double-click Admin page.bat`);
+  if (!d) return;
+  cr.look = d;
+  $("cWho").innerHTML = d.claude ? `<span class="dot ${d.busy ? "busy" : "live"}"></span><b>Claude</b> ${d.busy ? "working" : "ready"}`
+    : `<span class="dot"></span><b class="bad">Claude not installed</b>`;
+  const w = d.workers || {};
+  $("cWork").innerHTML = w.fleet ? `<b>Fleet</b> ${esc(w.fleet)} &middot; <b>Gemini web</b> ${esc(w.web)}` : "";
+  $("cCards").innerHTML = d.cards != null ? `<a href="#" id="cToday"><b>${d.cards}</b> decisions wait on Today</a>` : "";
+  const t = $("cToday"); if (t) t.onclick = (e) => { e.preventDefault(); open("Today"); };
+  $("cSession").innerHTML = d.session
+    ? `Session <code title="Open the same chat in the Claude app: claude --resume ${esc(d.session)}">${esc(d.session.slice(0, 8))}</code>` : "No chat yet";
+  const groups = {};
+  d.commands.forEach((c) => (groups[c.group] = groups[c.group] || []).push(c));
+  const running = new Set(d.runs.filter((r) => r.state === "running").map((r) => r.label));
+  const btns = Object.entries(groups).map(([g, cs]) => `<div class="grp">${esc(g)}</div><div class="btns">${
+    cs.map((c) => `<button data-run="${c.key}"${running.has(c.label) ? " disabled" : ""}${c.key === "update" ? ' class="primary"' : ""}>${esc(c.label)}</button>`).join("")}</div>`).join("");
+  if ($("cBtns").innerHTML !== btns) $("cBtns").innerHTML = btns;
+  $("cRuns").innerHTML = d.runs.length ? `<div class="grp">Runs</div>` + d.runs.map((r) => `<div class="runrow ${cr.log === r.id ? "on" : ""}" data-log="${r.id}">
+    <span class="st ${r.state}">${r.state}</span><span class="lab" title="${esc(r.last)}">${esc(r.label)}</span><span class="muted">${r.started}</span></div>`).join("") : "";
+  crBoard(d.board);
+}
+
+$("cBtns").onclick = async (e) => {
+  const b = e.target.closest("button[data-run]"); if (!b) return;
+  const key = b.dataset.run;
+  if (key.startsWith("update") && key !== "update-dry" && !confirm("Run Update data now? It imports new files into this folder. The website is not touched.")) return;
+  b.disabled = true;
+  const r = await post("/api/control/run", {key});
+  if (r.error) alert(r.error); else crOpenLog(r.id, b.textContent);
+  crLook();
+};
+$("cRuns").onclick = (e) => { const r = e.target.closest("[data-log]"); if (r) crOpenLog(r.dataset.log, r.querySelector(".lab").textContent); };
+function crOpenLog(id, name) {
+  cr.log = id; cr.logNext = 0;
+  $("cLog").textContent = ""; $("cLogBox").classList.remove("hide");
+  $("cLogName").textContent = name || id;
+  crLog();
+}
+async function crLog() {
+  if (!cr.log) return;
+  const d = await get(`/api/control/log?id=${encodeURIComponent(cr.log)}&since=${cr.logNext}`);
+  if (d.error) return;
+  const box = $("cLog"), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+  if (d.lines.length) box.textContent += d.lines.join("\n") + "\n";
+  cr.logNext = d.next;
+  $("cLogStop").classList.toggle("hide", d.state !== "running");
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+$("cLogStop").onclick = async () => { await post("/api/control/stop-run", {id: cr.log}); crLook(); };
+$("cLogAsk").onclick = () => {
+  $("cText").value = `Read the log of the run "${$("cLogName").textContent}" (control/runs/${cr.log}.log) and tell me what changed, what waits, and what needs me.`;
+  $("cText").focus();
+};
+
+async function crChat() {
+  const d = await get(`/api/control/chat?since=${cr.chatNext}`);
+  const tl = $("cTl"), stick = tl.scrollTop + tl.clientHeight >= tl.scrollHeight - 40;
+  for (const r of d.rows) {
+    if (r.kind === "output") {
+      const t = cr.toolRows[r.of];
+      if (t) { t.classList.remove("running"); t.classList.add(r.error ? "bad" : "ok"); t.querySelector(".log").textContent = r.text || "(no output)"; }
+      continue;
+    }
+    const el = document.createElement("div");
+    if (r.kind === "you") { el.className = "msg you"; el.textContent = r.text; }
+    else if (r.kind === "claude") { el.className = "msg claude"; el.innerHTML = md(r.text); }
+    else if (r.kind === "error") { el.className = "msg error"; el.textContent = r.text; }
+    else if (r.kind === "done") { el.className = "sep"; el.textContent = `${r.text} · ${r.at}`; }
+    else if (r.kind === "tool") {
+      el.className = "tool running"; el.title = "Click to see the output";
+      el.innerHTML = `<span class="tn">${esc(r.tool)}</span><span class="tx short">${esc(r.text)}</span><div class="log hide"></div>`;
+      el.onclick = () => { el.querySelector(".log").classList.toggle("hide"); el.querySelector(".tx").classList.toggle("short"); };
+      cr.toolRows[r.n] = el;
+    } else continue;
+    tl.append(el);
+  }
+  cr.chatNext = d.next;
+  if (!d.busy) tl.querySelectorAll(".tool.running").forEach((t) => t.classList.remove("running"));
+  if (!tl.querySelector(".msg, .tool, .sep")) tl.innerHTML = `<p class="muted">Nothing yet. Ask Claude for anything: "Update data", "why is this lecture held?", "fix the failing test". Every step shows here as it happens.</p>`;
+  else tl.querySelector("p.muted")?.remove();
+  if (d.rows.length && stick) tl.scrollTop = tl.scrollHeight;
+  $("cState").textContent = d.busy ? `Working since ${d.since}` : "Idle";
+  $("cState").className = "chip " + (d.busy ? "warn" : "ok");
+  $("cStop").disabled = !d.busy; $("cSend").disabled = d.busy; $("cNew").disabled = d.busy;
+  const plan = JSON.stringify(d.todos);
+  if (plan !== cr.plan) {
+    cr.plan = plan;
+    $("cPlan").classList.toggle("hide", !d.todos.length);
+    $("cPlan").innerHTML = d.todos.map((t) => `<li class="${t.state}"><span class="mk">${t.state === "completed" ? "✓" : t.state === "in_progress" ? "▶" : "○"}</span>${esc(t.text)}</li>`).join("");
+  }
+}
+async function crSend(text) {
+  text = (text ?? $("cText").value).trim(); if (!text) return;
+  const r = await post("/api/control/ask", {text});
+  if (r.error) return alert(r.error);
+  if (text === $("cText").value.trim()) $("cText").value = "";
+  crChat();
+}
+$("cSend").onclick = () => crSend();
+$("cText").onkeydown = (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); crSend(); } };
+$("cStop").onclick = async () => { await post("/api/control/stop", {}); crChat(); };
+$("cNew").onclick = async () => {
+  if (!confirm("Start a new chat? The old one is kept in the control folder.")) return;
+  const r = await post("/api/control/new", {}); if (r.error) return alert(r.error);
+  cr.chatNext = 0; cr.toolRows = {}; cr.plan = ""; $("cTl").innerHTML = ""; crChat();
+};
+$("cQuick").innerHTML = QUICK.map((q) => `<button class="mini" data-q="${esc(q)}">${esc(q)}</button>`).join("");
+$("cQuick").onclick = (e) => { const b = e.target.closest("button[data-q]"); if (b) crSend(b.dataset.q); };
+
+let crBoardSig = "";
+function crBoard(items) {
+  const sig = JSON.stringify(items);
+  if (sig === crBoardSig || document.activeElement?.closest("#bList, #bDone")) return;  // never redraw under the cursor
+  crBoardSig = sig;
+  const row = (it) => `<div class="bitem ${it.state}" data-id="${it.id}">
+    <input type="checkbox" ${it.state === "done" ? "checked" : ""} title="Done">
+    <input type="text" value="${esc(it.text)}">
+    ${it.by === "claude" ? '<span class="by" title="Added by Claude">AI</span>' : ""}
+    ${it.state !== "done" ? `<span class="st ${it.state}" data-cycle title="Click: todo or doing">${it.state}</span><button class="mini" data-give title="Ask Claude to do this">Give to Claude</button>` : ""}
+    <button class="mini" data-del title="Delete">✕</button></div>`;
+  const open_ = items.filter((i) => i.state !== "done"), done = items.filter((i) => i.state === "done");
+  $("bList").innerHTML = open_.length ? open_.map(row).join("") : `<p class="muted">Empty. Add what you want done.</p>`;
+  $("bDone").innerHTML = done.slice().reverse().map(row).join("");
+}
+async function bOp(b) { const r = await post("/api/control/board", b); if (r.error) alert(r.error); crBoardSig = ""; if (r.items) crBoard(r.items); }
+$("bAdd").onclick = () => { const t = $("bText").value.trim(); if (t) { $("bText").value = ""; bOp({op: "add", text: t}); } };
+$("bText").onkeydown = (e) => { if (e.key === "Enter") $("bAdd").click(); };
+for (const id of ["bList", "bDone"]) {
+  $(id).onclick = (e) => {
+    const it = e.target.closest(".bitem"); if (!it) return;
+    const iid = it.dataset.id, text = it.querySelector("input[type=text]").value;
+    if (e.target.type === "checkbox") return bOp({op: "state", id: iid, state: e.target.checked ? "done" : "todo"});
+    if (e.target.dataset.cycle != null) return bOp({op: "state", id: iid, state: e.target.textContent === "todo" ? "doing" : "todo"});
+    if (e.target.dataset.del != null) return confirm("Delete this item?") && bOp({op: "delete", id: iid});
+    if (e.target.dataset.give != null) { bOp({op: "state", id: iid, state: "doing"}); crSend(`Board item ${iid}: ${text}\nDo it, then tick it on the board.`); }
+  };
+  $(id).addEventListener("change", (e) => {
+    if (e.target.type !== "text") return;
+    bOp({op: "edit", id: e.target.closest(".bitem").dataset.id, text: e.target.value});
+  });
+  $(id).addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.type === "text") e.target.blur(); });
+}
+
+loaders.Claude = () => { crLook(); crChat(); };
+setInterval(() => !document.hidden && crLook(), 2000);
+setInterval(() => !document.hidden && crOn() && crChat(), 1500);
+setInterval(() => !document.hidden && crOn() && cr.log && crLog(), 1000);
+
+let first = "Claude";
 try { first = localStorage.getItem("tab") || first; } catch (e) {}
-open(tabs.some((s) => s.dataset.tab === first) ? first : "Progress");
+open(tabs.some((s) => s.dataset.tab === first) ? first : "Claude");
 setInterval(() => !document.hidden && !$("flows").closest("section").classList.contains("hide") && loaders.Progress(), 10000);
 </script>
 </body>

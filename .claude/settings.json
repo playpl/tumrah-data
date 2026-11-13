@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "py \"$CLAUDE_PROJECT_DIR/doctors_watch.py\" hook",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

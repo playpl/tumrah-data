@@ -50,38 +50,17 @@ def words(text):
     return [w for w in WORD.findall(str(text or "").lower()) if w not in STOP]
 
 
-def lesson_lines(lines):
-    """lecture id -> set of handout line ids inside its ranges (by page, cut at the end line)."""
-    out = {}
-    for m in lectures.all_lectures(MODULE):
-        if not m.get("lesson") or m.get("kind", "lecture") != "lecture":
-            continue
-        ids = set()
-        for r in m.get("ranges") or []:
-            a, b = r["from"].split(":"), r["to"].split(":")
-            pa, pb = int(a[2][1:]), int(b[2][1:])
-            end_n = int(b[3][1:]) if b[3].startswith("l") else 10 ** 6
-            for ln in lines:
-                if pa <= ln["page"] <= pb and not (ln["page"] == pb and ln["id"].split(":")[3].startswith("l")
-                                                     and int(ln["id"].split(":")[3][1:]) > end_n):
-                    ids.add(ln["id"])
-        out[m["id"]] = ids
-    return out
+def lesson_lines(lines=None):
+    """lecture id -> set of handout line ids inside its ranges, for the lectures that are lessons on the site
+    (ledger.lesson_ids: a range cut at a heading is read line by line, an older one by whole pages)."""
+    import ledger
+    site = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("lesson")}
+    return {lid: ids for lid, ids in ledger.lesson_ids(MODULE).items() if lid in site}
 
 
-def build():
-    lines = read_jsonl(ROOT / "modules" / MODULE / "lines.jsonl")
-    text_lines = [ln for ln in lines if ln.get("text")]
-    df = Counter()
-    toks = {}
-    for ln in text_lines:
-        toks[ln["id"]] = set(words(ln["text"]))
-        df.update(toks[ln["id"]])
-    idf = {w: math.log(len(text_lines) / (1 + n)) for w, n in df.items()}
-    by_page = {}
-    for ln in text_lines:
-        by_page.setdefault(ln["page"], []).append(ln)
-    in_lesson = lesson_lines(lines)
+def labelled():
+    """(bank, labels, index, n_bank): every question that has a place to be searched in. bank = the bank's rows, then
+    the owner's quiz rows and the doctors' MCQ-book rows (after n_bank); labels = word_key -> {lecture_id | pages, by}."""
     labels = {r["word_key"]: r for r in read_jsonl(ROOT / "bank" / "labels.jsonl")
               if r["module"] == MODULE and r.get("lecture_id") in LABEL_PAGES}
     # The channel index (index_map.py) names the exact lecture, doctor and branch; it wins over the label.
@@ -94,7 +73,7 @@ def build():
         elif lec and wk in labels:
             del labels[wk]  # the index puts it in a lecture no named lesson teaches
     bank = read_jsonl(ROOT / "bank" / "questions.jsonl")
-    base, skipped = site_questions.build(MODULE, bank)
+    n_bank = len(bank)
     # Dr. Nagib's chapter quizzes (nagib_quizzes.py, keys from the forms' own score pages): the owner's Required set,
     # split to the Nagib lecture whose pages hold each question (owner, 2026-11-09).
     quiz_lecture = {"receptor quiz": "year2-cns:L19", "Pain quiz": "year2-cns:L20", "Sensation Types Quiz": "year2-cns:L20"}
@@ -121,6 +100,33 @@ def build():
                          "source_url": None, "mcq_doctor": r["doctor"], "importance_score": 3})
             labels[wk] = {"word_key": wk, "lecture_id": None, "by": "mcq_book",
                           "pages": (min(m["pdf_pages"][0] for m in mine), max(m["pdf_pages"][1] for m in mine))}
+    return bank, labels, index, n_bank
+
+
+def build():
+    lines = read_jsonl(ROOT / "modules" / MODULE / "lines.jsonl")
+    text_lines = [ln for ln in lines if ln.get("text")]
+    df = Counter()
+    toks = {}
+    for ln in text_lines:
+        toks[ln["id"]] = set(words(ln["text"]))
+        df.update(toks[ln["id"]])
+    idf = {w: math.log(len(text_lines) / (1 + n)) for w, n in df.items()}
+    by_page = {}
+    for ln in text_lines:
+        by_page.setdefault(ln["page"], []).append(ln)
+    in_lesson = lesson_lines(lines)
+    bank, labels, index, n_bank = labelled()
+    base, skipped = site_questions.build(MODULE, bank)  # the full bank: Required items may be MCQ-book questions (required_rule.py)
+    # The ledger's better readings (owner, agreed, or an AI reader that passed its spot checks) replace the word-overlap
+    # choice, and a link the owner marked wrong is dropped (owner, 2026-11-10: lowest error rate).
+    import ledger
+    ldb = ledger.connect()
+    better = {src: json.loads(r["lines"]) for src, r in ledger.ready(ldb, MODULE, "question").items() if r["runner"] != "script"}
+    rejected = {r["src"] for r in ldb.execute("SELECT src FROM links WHERE kind='question' AND runner='script' AND state='rejected'")}
+    ldb.close()
+    by_id = {ln["id"]: ln for ln in lines}
+    nagib = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("doctor") == "dr-naguib-el-husseiny-phys"}
     have = {q["source_id"] for q in base["questions"]}
     metas = {m["id"]: m for m in lectures.all_lectures(MODULE)}
     lesson_key = {lid: f"lecture:{lid}" for lid in in_lesson}
@@ -133,24 +139,35 @@ def build():
                 or any(not str(o).strip() for o in q["options"]):
             stats["no_clean_key"] += 1
             continue
-        qw = Counter(words(q["question"]))
-        for w in words(q["options"][q["key"]]):
-            qw[w] += 2  # the keyed answer is what the handout line must say
-        lo, hi = lab.get("pages") or LABEL_PAGES[lab["lecture_id"]]
-        best = (0.0, 0, None, None)
-        for page in range(lo, hi + 1):
-            pl = by_page.get(page, [])
-            for i, ln in enumerate(pl):
-                ctx = toks[ln["id"]] | (toks[pl[i - 1]["id"]] if i else set()) | (toks[pl[i + 1]["id"]] if i + 1 < len(pl) else set())
-                hit = [w for w in qw if w in ctx]
-                s = sum(idf.get(w, 0) * (1 + 0.5 * (qw[w] > 1)) for w in hit)
-                if s > best[0]:
-                    best = (s, len(hit), ln, i)
-        score, nhit, ln, i = best
-        if ln is None or score < MIN_SCORE or nhit < MIN_WORDS:
-            stats["weak_match"] += 1
-            continue
-        homes = [lid for lid, ids in in_lesson.items() if ln["id"] in ids]
+        ai = [x for x in better.get(q["word_key"], []) if x in by_id]
+        if ai:
+            ln, score, span_ids = by_id[ai[0]], 0.0, ai
+            homes = [lid for lid, ids in in_lesson.items() if set(ai) & ids]
+            stats["better_reading"] += 1
+        else:
+            if q["word_key"] in rejected:
+                stats["rejected_by_owner"] += 1
+                continue
+            qw = Counter(words(q["question"]))
+            for w in words(q["options"][q["key"]]):
+                qw[w] += 2  # the keyed answer is what the handout line must say
+            lo, hi = lab.get("pages") or LABEL_PAGES[lab["lecture_id"]]
+            best = (0.0, 0, None, None)
+            for page in range(lo, hi + 1):
+                pl = by_page.get(page, [])
+                for i, ln in enumerate(pl):
+                    ctx = toks[ln["id"]] | (toks[pl[i - 1]["id"]] if i else set()) | (toks[pl[i + 1]["id"]] if i + 1 < len(pl) else set())
+                    hit = [w for w in qw if w in ctx]
+                    s = sum(idf.get(w, 0) * (1 + 0.5 * (qw[w] > 1)) for w in hit)
+                    if s > best[0]:
+                        best = (s, len(hit), ln, i)
+            score, nhit, ln, i = best
+            if ln is None or score < MIN_SCORE or nhit < MIN_WORDS:
+                stats["weak_match"] += 1
+                continue
+            homes = [lid for lid, ids in in_lesson.items() if ln["id"] in ids]
+            pl = by_page[ln["page"]]
+            span_ids = [x["id"] for x in pl[max(0, i - 1):i + 2] if toks[x["id"]] & set(qw)] or [ln["id"]]
         if q.get("quiz"):
             homes = [h for h in homes if h in nagib]
         if q.get("mcq_doctor"):
@@ -158,15 +175,14 @@ def build():
         if not homes:
             stats["outside_named_lessons"] += 1
             continue
-        pl = by_page[ln["page"]]
-        span = [x for x in pl[max(0, i - 1):i + 2] if toks[x["id"]] & set(qw)]
         ih = index.get(q["word_key"]) or ([{"branch": "owner_quiz", "doctor": "Nagib El-Husseiny"}] if q.get("quiz") else
                                          [{"branch": "mcq_book", "doctor": index_map.LESSON_DOCTOR.get(q["mcq_doctor"])}]
                                          if q.get("mcq_doctor") else [{}])
-        points[q["word_key"]] = {"lecture_id": lab["lecture_id"], "lines": [x["id"] for x in span] or [ln["id"]],
+        points[q["word_key"]] = {"lecture_id": lab["lecture_id"], "lines": span_ids,
                                  "page": ln["page"], "printed": ln.get("printed"), "score": round(score, 1),
                                  "homes": homes, "by": lab.get("by", "label"),
-                                 "branch": ih[0].get("branch"), "doctor": ih[0].get("doctor")}
+                                 "branch": ih[0].get("branch"), "doctor": ih[0].get("doctor"),
+                                 **({"reader": "ledger"} if ai else {})}  # not the script's own choice: ledger.sync skips it
         stats["by:" + lab.get("by", "label")] += 1
         sid = sid_of(q["word_key"])
         stats["kept"] += 1

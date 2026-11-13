@@ -46,17 +46,31 @@ def book_pages(pdf, first=None, last=None):
 
 
 def queue_book(q, module, book, pdf, doctor, subject):
+    """Queues a book's MCQ page jobs. A longer book whose first pages are the kept (shorter) book's pages replaces it
+    (owner, 2026-11-10: the first chapter's MCQs, then the full MCQ book); pages already in a job (passed or not) are
+    not queued again, so questions already copied keep their ids (`mcq:<book>:p<page>:<n>`)."""
+    import fitz
+    import books_merge
     keep = ROOT / "modules" / module / "mcq" / f"{book}.pdf"
     keep.parent.mkdir(parents=True, exist_ok=True)
     if not keep.exists():
         keep.write_bytes(Path(pdf).read_bytes())
+    elif Path(pdf).resolve() != keep.resolve():
+        with fitz.open(keep) as a, fitz.open(pdf) as b:
+            longer = b.page_count > a.page_count
+        if longer and books_merge.same_prefix(keep, pdf):
+            keep.write_bytes(Path(pdf).read_bytes())
     pages = book_pages(keep)
-    jobs = [{"key": f"{module}-{book}-p{pages[i]['page']:04d}",
+    covered = set()
+    for (p,) in q.db.execute("SELECT payload FROM jobs WHERE flow='mcq' AND key LIKE ?", (f"{module}-{book}-p%",)):
+        covered |= {x["page"] for x in json.loads(p)["pages"]}
+    todo = [x for x in pages if x["page"] not in covered]
+    jobs = [{"key": f"{module}-{book}-p{todo[i]['page']:04d}",
              "payload": {"module": module, "book": book, "doctor": doctor, "subject": subject,
-                         "pdf": str(keep), "pages": pages[i:i + PAGES_PER_JOB]}}
-            for i in range(0, len(pages), PAGES_PER_JOB)]
+                         "pdf": str(keep), "pages": todo[i:i + PAGES_PER_JOB]}}
+            for i in range(0, len(todo), PAGES_PER_JOB)]
     added = q.add_jobs("mcq", jobs)
-    return f"{len(pages)} pages, {len(jobs)} jobs, {added} new"
+    return f"{len(pages)} pages, {len(covered)} already in jobs, {len(jobs)} new jobs, {added} added"
 
 
 def qid(book, page, n):

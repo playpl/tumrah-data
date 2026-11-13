@@ -40,10 +40,12 @@
     "ai"
   ],
   "audit_sample": 0.05,
+  "ready": {"max_error": 0.01, "min_checked": 100},
   "shortlist": {"cap": 800, "max": 2000, "floor": 0.0, "share": 0.3, "max_df": 0.3},
   "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
   "db_name": "tumrah",
   "lecture_audio_kbps": 16,
+  "fleet": {"down": true, "since": "2026-11-12", "note": "Not reset yet: accounts in quota rest until about 11:35 (owner, 2026-11-12)"},
   "module_windows": {
     "year1-musculoskeletal": [
       {

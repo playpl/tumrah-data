@@ -130,6 +130,30 @@ def cmd_lecture(args):
 CHAPTERS = {"anatomy": "Spinal cord", "histology": "Nervous tissue", "physiology": "Sensations"}
 
 
+def lesson_order(metas):
+    """{lecture id: site order}. A doctor's lectures are numbered 1, 2, 3... by the owner's file numbers in his folder, then in
+    the order they were named (owner, 2026-11-10: Pain 1 showed after Pain 2 because titles and stale chapter lists set the
+    order; one rule now for every doctor).
+    A mini lecture or revision sits just after the last lesson it covers (+0.5)."""
+    order, count, taken = {}, {}, set()
+    # The owner's own numbers win ("4- Pain analgesia.mp3": lecture.json `order_key` [chapter, number] from the doctors/ folder);
+    # lectures without one (auto lists) follow, in the order they were named.
+    def sequence(m):
+        k = m.get("order_key")
+        return (0, k[0], k[1], m["id"]) if k else (1, 0, 0, m["id"])
+    for m in sorted((m for m in metas if m.get("kind", "lecture") == "lecture"), key=sequence):
+        count[m.get("doctor")] = count.get(m.get("doctor"), 0) + 1
+        order[m["id"]] = count[m.get("doctor")]
+    for m in sorted((m for m in metas if m.get("kind", "lecture") != "lecture"), key=lambda m: m["id"]):
+        covered = [order[c] for c in m.get("covers") or [] if c in order]
+        at = (max(covered) if covered else count.get(m.get("doctor"), 0) + 1) + 0.5
+        while (m.get("doctor"), at) in taken:  # two revisions after the same lesson keep their naming order
+            at = round(at + 0.01, 2)
+        taken.add((m.get("doctor"), at))
+        order[m["id"]] = at
+    return order
+
+
 def lesson_rows(module):
     """Every named lecture of a module as an importHubData `lessons` row (summaries and revisions after what they cover)."""
     import re as _re
@@ -138,20 +162,21 @@ def lesson_rows(module):
     out = []
     metas = lectures.all_lectures(module)
     by_id = {m["id"]: m for m in metas}
+    order_of = lesson_order(metas)
     for m in metas:
         base = by_id[m["covers"][0]] if m.get("covers") else m
         subject = (base.get("subject") or "").lower()
-        lessons = base.get("chapter_lessons") or [base["title"]]
-        order = (lessons.index(base["title"]) + 1) if base["title"] in lessons else len(lessons) + 1
+        order = order_of[m["id"]]
         url = (m.get("source") or {}).get("youtube")
         doctor = m.get("doctor")
         doctor = doctors_folder.ALIASES.get((doctor or "").lower(), doctor)
         out.append({"key": f"lecture:{m['id']}", "subject": subject,
                     "chapter": {"title": CHAPTERS.get(subject) or (base.get("chapter") or "").capitalize(), "order": 1},
-                    "name": m["title"], "order": order + (0.5 if m.get("kind") in ("summary", "revision") else 0),
+                    "name": m["title"], "order": order,
                     "kind": "lesson" if m.get("kind", "lecture") == "lecture" else m["kind"],
                     "doctorId": doctor if doctor and doctor.startswith("dr-") else None,
                     "videoUrl": _re.sub(r"\?si=.*$", "", url) if url else None,
+                    **({"oldData": True} if m.get("backup") else {}),  # the recording is the previous batch's: the site warns
                     "covers": [f"lecture:{c}" for c in m.get("covers") or []],
                     "ranges": [{"from": r["from"], "to": r["to"]} for r in m.get("ranges") or []]})
     return sorted(out, key=lambda r: (r["kind"] != "lesson", r["key"]))

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-test",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-c", "import page; page.PORT = 8771; page.serve()"],
+      "port": 8771
+    }
+  ]
+}

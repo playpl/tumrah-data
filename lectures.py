@@ -168,6 +168,18 @@ def set_ranges(meta, module_lines, pages, by):
         first = min(by_page[a], key=lambda ln: ln["n"])
         last = max(by_page[b], key=lambda ln: ln["n"])
         out.append({"from": first["id"], "to": last["id"], "pages": [a, b]})
+    return _place(meta, out, by)
+
+
+def set_line_ranges(meta, module_lines, spans, by):
+    """Ranges cut at exact lines: spans [(first index, last index)] in lines.jsonl order (placement.py cuts at
+    headings). Marked `cut`, so ledger.range_ids reads them line by line and two lessons can split one page."""
+    out = [{"from": module_lines[a]["id"], "to": module_lines[b]["id"],
+            "pages": [module_lines[a]["page"], module_lines[b]["page"]], "cut": True} for a, b in sorted(spans)]
+    return _place(meta, out, by)
+
+
+def _place(meta, out, by):
     meta.update(ranges=out, placed_by=by, pdf_pages=[out[0]["pages"][0], out[-1]["pages"][1]] if out else None)
     save(meta)
     for other in all_lectures(meta["module"]):  # mini lectures and revisions follow the pages of what they cover
@@ -189,16 +201,35 @@ def all_lectures(module=None):
     return [m for m in out if module is None or m["module"] == module]
 
 
-def add(lecture_id, module, title, kbps, file=None, url=None, lesson=None, pdf_pages=None, transcribe=True, doctor=None):
+BACKUP_FILES = ("raw.txt", "clean.txt", "fixes.jsonl", "parts.jsonl", "links.jsonl", "audio.ogg")
+
+
+def add(lecture_id, module, title, kbps, file=None, url=None, lesson=None, pdf_pages=None, transcribe=True, doctor=None,
+        backup=None):
     """Adds a recording (file or YouTube) to a lecture, registering the lecture first when the owner has not named it
-    yet, and prepares its audio or transcript. Returns the next flow to queue, or None."""
+    yet, and prepares its audio or transcript. Returns the next flow to queue, or None.
+
+    `backup` marks the recording as the previous batch's (backup.py: "use backup for lecture X until the new one is
+    provided"): meta["backup"] holds that dict and the site warns "old data". Adding any other recording to a lecture
+    that holds a backup replaces it: the old transcript and audio move to `old_backup_recording/` (they describe the old
+    batch's lecture) and the flag goes."""
     d = folder(lecture_id)
     d.mkdir(parents=True, exist_ok=True)
+    if backup is None and (d / "lecture.json").exists() and load(lecture_id).get("backup"):
+        import shutil
+        old = d / "old_backup_recording"
+        old.mkdir(exist_ok=True)
+        for name in BACKUP_FILES:
+            if (d / name).exists():
+                shutil.move(str(d / name), str(old / name))
     meta = load(lecture_id) if (d / "lecture.json").exists() else \
         {"id": lecture_id, "module": module, "title": title, "doctor": doctor, "kind": "lecture", "lesson": lesson,
          "ranges": [], "placed_by": None, "required": [], "doctor_questions": [], "pdf_pages": pdf_pages}
     meta.update({k: v for k, v in (("lesson", lesson), ("pdf_pages", pdf_pages), ("doctor", doctor)) if v},
                 transcribe=transcribe, source={"file": str(file)} if file else {"youtube": url}, duration_s=None)
+    meta.pop("backup", None)
+    if backup:
+        meta["backup"] = backup
     audio = Path(file) if file else None
     if url:
         raw, audio = youtube(url, d / "download")

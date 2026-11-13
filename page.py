@@ -1,7 +1,7 @@
 """The data admin page: http://127.0.0.1:8770 (py dm.py page). Local only; reads the live site through db.py and
 writes it only through the tumrah repo's importers.
 
-Screens: Progress, Handout (upload, split into lines), Questions (filter, tick, Hand over), Polls (counts, key
+Screens: Today (the owner's inbox: what is ready, the measured error, one-click decisions, spot checks), Progress, Handout (upload, split into lines), Questions (filter, tick, Hand over), Polls (counts, key
 conflicts for the owner), Lectures (add, Transcribe), Word fixes, Books (add with doctor, % aligned), Coverage, Voters,
 Lecture questions, Highlights, Gap map.
 """
@@ -17,9 +17,12 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import checks
+import control
+import decisions
 import highlights
 import lectures
 import queue_db
+import runners
 from flows.common import read_jsonl, write_jsonl
 
 ROOT = Path(__file__).resolve().parent
@@ -221,7 +224,8 @@ def add_file(lecture_id, into, name, content):
     return background(f"lecture-file {lecture_id}", file_into_lecture, lecture_id, into, path)
 
 
-def file_into_lecture(lecture_id, into, path):
+def file_into_lecture(lecture_id, into, path, only=None):
+    """Files a covered file's questions into a lecture's owner list; `only`: just these row numbers."""
     import cover
     done = run_cover(path)
     entry = cover.covered(path)
@@ -233,6 +237,8 @@ def file_into_lecture(lecture_id, into, path):
     rows_in = {(r.get("file"), r.get("n")) for n in ("required", "doctor_questions") for r in meta.get(n) or [] if r.get("file")}
     added = Counter()
     for i, r in enumerate(rows):
+        if only is not None and i not in only:
+            continue
         m = r.get("match")
         wk = prefix.get(m[5:]) if isinstance(m, str) and m.startswith("bank:") else None
         if (wk and wk in have) or (entry["sha"], i) in rows_in:
@@ -690,6 +696,11 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/doctors": lambda: doctors(self.get_reader()),
                 "/api/polls": polls_summary,
                 "/api/conflicts": conflicts,
+                "/api/today": lambda: decisions.today(a.get("module", "year2-cns"), 0 if a.get("fresh") else 600),
+                "/api/review": lambda: decisions.review_items(a.get("kind", "spot"), a.get("module", "year2-cns")),
+                "/api/control": control.look,
+                "/api/control/chat": lambda: control.chat(int(a.get("since", 0))),
+                "/api/control/log": lambda: control.run_log(a.get("id"), int(a.get("since", 0))),
             }
             if u.path in routes:
                 return self.reply(routes[u.path]())
@@ -714,6 +725,20 @@ class Handler(BaseHTTPRequestHandler):
         b = json.loads(self.rfile.read(size) or "{}")
         q = queue_db.Queue()
         try:
+            if self.path.startswith("/api/control/"):  # the Claude tab (control.py)
+                op = self.path.rsplit("/", 1)[1]
+                acts = {"run": lambda: control.run(b.get("key")), "stop-run": lambda: control.stop_run(b.get("id")),
+                        "ask": lambda: control.ask(b.get("text")), "stop": control.stop_claude, "new": control.new_chat,
+                        "board": lambda: control.board_op(b.get("op"), b.get("id"), b.get("text"), b.get("state"))}
+                return self.reply(acts[op]() if op in acts else {"error": "not found"})
+            if self.path == "/api/decide":  # one click on a Today card
+                r = decisions.answer(b["id"], int(b.get("choice", 0)), b.get("value"))
+                if r.get("run") == "ai":
+                    background("ai work", runners.run_ai)
+                    r = {"job": "ai work"}
+                return self.reply(r)
+            if self.path == "/api/review":
+                return self.reply(decisions.review_answer(b["kind"], b["src"], b.get("pick") or {}))
             if self.path == "/api/key":
                 return self.reply(decide_key(b["id"], b.get("key")))
             if self.path == "/api/bank":
@@ -766,5 +791,6 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def serve():
+    control.start()
     print(f"Data admin page: http://127.0.0.1:{PORT}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

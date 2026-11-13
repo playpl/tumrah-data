@@ -865,7 +865,8 @@ def check_mcq(rows, batch, lines=None, reference=None):
         seen.add((r["page"], r["n"]))
         per_page[r["page"]] = per_page.get(r["page"], 0) + 1
         opts = r["options"]
-        if not isinstance(r["question"], str) or len(r["question"].split()) < 2:
+        # A one-word lead-in that ends in a colon ("Dendrites:") is a real stem in Basel's book (owner's book, 2026-11-12).
+        if not isinstance(r["question"], str) or (len(r["question"].split()) < 2 and not r["question"].strip().endswith(":")):
             errors.append(f"{where}: question is empty")
         if not (isinstance(opts, list) and 2 <= len(opts) <= 6 and all(isinstance(o, str) and o.strip() for o in opts)):
             errors.append(f"{where}: options must be 2 to 6 non-empty strings")

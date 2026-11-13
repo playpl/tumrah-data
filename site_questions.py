@@ -20,6 +20,12 @@ SHORT = {"year1-musculoskeletal": "msk", "year2-cns": "cns"}
 NAMES = {"year1-musculoskeletal": "Musculoskeletal", "year2-cns": "Central Nervous System"}
 
 
+def sid_of(word_key):
+    """The site source_id of a question (the same as fast_lessons.sid_of): bank:, form: (Nagib's quiz) or mcq: (a doctor's MCQ book)."""
+    prefix = "form:" if word_key.startswith("nagibform:") else "mcq:" if word_key.startswith("mcqbook:") else "bank:"
+    return prefix + L.short(word_key)
+
+
 def build(module, bank):
     by_key = {q["word_key"]: q for q in bank}
     lessons, questions, skipped, seen = [], [], Counter(), set()
@@ -32,6 +38,24 @@ def build(module, bank):
         for listname in ("required", "doctor_questions"):
             for item in m.get(listname) or []:
                 q = by_key.get(item.get("word_key"))
+                if q is None and (item.get("row") or {}).get("key") is not None:
+                    # A question the owner's own source brought, not in the bank (Elsamahy's QuizBot test): it carries
+                    # the source's own key, so it goes in under a stable id of its file and row.
+                    row = item["row"]
+                    sid = "own:" + L.short(f"{item.get('file')}:{item.get('n')}")
+                    if not 2 <= len(row["options"]) <= 5 or not 0 <= row["key"] < len(row["options"])                             or any(not str(o).strip() for o in row["options"]):
+                        skipped["options_or_key"] += 1
+                    elif sid in seen:
+                        skipped["in_two_lectures"] += 1
+                    else:
+                        seen.add(sid)
+                        questions.append({
+                            "source_id": sid, "batch": "58", "lesson": key, "subject": subject,
+                            "doctorId": m["doctor"] if (m.get("doctor") or "").startswith("dr-") else None,
+                            "topic": m["title"], "stem": row["question"], "options": row["options"], "correct_index": row["key"],
+                            "explanation": None, "importance": 3, "repetition": 1, "past_exam": False, "source_url": None,
+                            "appearances": [], "_list": listname, "_lecture": m["id"]})
+                    continue
                 if q is None:
                     skipped["not_in_bank_no_key"] += 1
                     continue
@@ -47,7 +71,7 @@ def build(module, bank):
                 seen.add(q["word_key"])
                 votes, total = q.get("votes") or [], q.get("total") or 0
                 questions.append({
-                    "source_id": "bank:" + L.short(q["word_key"]), "batch": "58", "lesson": key, "subject": subject,
+                    "source_id": sid_of(q["word_key"]), "batch": "58", "lesson": key, "subject": subject,
                     "doctorId": m["doctor"] if (m.get("doctor") or "").startswith("dr-") else None,
                     "topic": m["title"], "stem": q["question"], "options": q["options"], "correct_index": q["key"],
                     "explanation": q.get("solution") or None, "importance": max(2, q.get("importance_score") or 1),

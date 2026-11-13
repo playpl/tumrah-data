@@ -87,6 +87,54 @@ def load_forms(questions_path, keys_path, links_path):
     return out
 
 
+NUMBER = re.compile(r"^\s*\d+\s*[.)]\s*")
+QUIZBOT_DOCTORS = {"elsamahy": "dr-abdullah-el-samahi-phys", "basel": "dr-basel-sherif-hist"}  # sources/quizbot/<folder>/
+
+
+def load_mcq_books(folder=ROOT / "modules"):
+    """Every doctor's MCQ book copied by the flow (modules/<m>/mcq/*.jsonl; owner 2026-11-12: new questions join the bank).
+    The key is the book's own (`key_from`); a book with no key gives none."""
+    out = []
+    for f in sorted(Path(folder).glob("*/mcq/*.jsonl")):
+        for q in read_jsonl(f):
+            if len(q.get("options") or []) < 2:
+                continue
+            out.append({"question": q["question"], "options": q["options"], "key": q.get("key"), "solution": None,
+                        "votes": [0] * len(q["options"]), "total": 0,
+                        "sightings": [{"source": "mcq_book", "book": q.get("book"), "page": q.get("page"), "chat": None,
+                                       "msg_id": None, "date": None, "header": None, "doctor": q.get("doctor"), "link": None}]})
+    return out
+
+
+def load_doctor_quizbot(src):
+    """The owner's own QuizBot tests played by play_quizzes.py into sources/quizbot/<doctor folder>/ (keys: QuizBot's flag)."""
+    out = []
+    for folder, doctor in QUIZBOT_DOCTORS.items():
+        for q in read_jsonl(Path(src) / "quizbot" / folder / "quizbot_questions.jsonl"):
+            options = [LABEL.sub("", o).strip() for o in q["options"]]
+            out.append({"question": POSITION.sub("", q["question"]).strip(), "options": options, "key": q.get("correct_index"),
+                        "solution": q.get("solution"), "votes": [0] * len(options), "total": 0,
+                        "sightings": [{"source": "quizbot", "quiz": q.get("param"), "chat": None, "msg_id": None, "date": None,
+                                       "header": None, "doctor": doctor, "link": None}]})
+    return out
+
+
+def load_inbox_forms(folder):
+    """Doctors' own Google Form quizzes read by `doctors_folder.chapter_quiz` (bank/inbox/*.jsonl): no key (forms show none),
+    so a duplicate of a keyed bank question only adds a sighting. Doctor stays empty here: the file name is not a doctor."""
+    out = []
+    for f in sorted(Path(folder).glob("*.jsonl")):
+        for q in read_jsonl(f):
+            if q.get("type") not in ("multiple_choice", "dropdown") or len(q.get("options") or []) < 2:
+                continue
+            options = [LABEL.sub("", o).strip() for o in q["options"]]
+            out.append({"question": NUMBER.sub("", q["question"]).strip(), "options": options, "key": None, "solution": None,
+                        "votes": [0] * len(options), "total": 0,
+                        "sightings": [{"source": "form", "form": q.get("link"), "chat": None, "msg_id": None, "date": None,
+                                       "header": None, "doctor": None, "link": None}]})
+    return out
+
+
 def merge(rows):
     """Group by word_key; map keys and votes by option text, since sources order options differently."""
     bank = {}
@@ -140,7 +188,7 @@ def build(out_dir=ROOT / "bank"):
     rows = load_polls(ROOT / "polls" / "ready" / "questions.jsonl") + \
         load_quizbot(src / "quizbot" / "quizbot_questions.jsonl", src / "quizbot" / "quizbot_links.jsonl") + \
         load_forms(src / "forms" / "forms_questions.jsonl", src / "forms" / "keys" / "form_keys.jsonl",
-                   src / "forms" / "forms_links.jsonl")
+                   src / "forms" / "forms_links.jsonl") +         load_mcq_books() + load_doctor_quizbot(src) + load_inbox_forms(out_dir / "inbox")
     decisions = out_dir / "key_decisions.json"
     bank = apply_decisions(merge(rows), json.loads(decisions.read_text(encoding="utf-8")) if decisions.exists() else {})
     out_dir.mkdir(exist_ok=True)
