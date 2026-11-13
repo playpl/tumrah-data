@@ -180,9 +180,7 @@ def load(i):
 
 
 def ascii_label(s):
-    """A label for printing: Arabic text is never shown (owner rule), only its length."""
-    if ARABIC.search(s or ""):
-        return f"[arabic text, {len(s)} chars]"
+    """A label for printing. Arabic is shown as it is (owner, 2026-11-13: Claude reads Arabic; it used to be hidden)."""
     return s or ""
 
 
