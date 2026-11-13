@@ -51,6 +51,43 @@ def connect(path=None):
     return db
 
 
+BACKUP_DIR = ROOT / "backups_ledger"      # full copies of ledger.db (ignored by git), newest KEEP kept
+OWNER_JSON = ROOT / "data_backup" / "ledger_owner.json"  # the owner's answers as text, tracked in git
+KEEP = 20
+
+
+def backup(db_path=None, backup_dir=None, owner_json=None, keep=KEEP):
+    """Safe copy of ledger.db (sqlite online backup) plus the owner's answers (gold, rules, answered decisions,
+    runner 'owner' links) as a small JSON that git tracks. Rewritten only when the answers changed."""
+    db_path, backup_dir, owner_json = Path(db_path or DB), Path(backup_dir or BACKUP_DIR), Path(owner_json or OWNER_JSON)
+    if not db_path.exists():
+        return None
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    out = backup_dir / time.strftime("ledger-%Y%m%d-%H%M%S.db")
+    src, dst = sqlite3.connect(db_path, timeout=30), sqlite3.connect(out)
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+    src.row_factory = sqlite3.Row
+    try:
+        owner = {
+            "gold": [dict(r) for r in src.execute("SELECT * FROM gold ORDER BY kind, src, runner")],
+            "rules": [dict(r) for r in src.execute("SELECT * FROM rules ORDER BY key")],
+            "decisions": [dict(r) for r in src.execute("SELECT * FROM decisions WHERE state != 'open' ORDER BY id")],
+            "links": [dict(r) for r in src.execute("SELECT * FROM links WHERE runner = 'owner' ORDER BY kind, src")],
+        }
+    finally:
+        src.close()
+    text = json.dumps(owner, ensure_ascii=False, indent=1, sort_keys=True)
+    owner_json.parent.mkdir(parents=True, exist_ok=True)
+    if not owner_json.exists() or owner_json.read_text(encoding="utf-8") != text:
+        owner_json.write_text(text, encoding="utf-8")
+    for old in sorted(backup_dir.glob("ledger-*.db"))[:-keep]:
+        old.unlink()
+    return out
+
+
 def put(db, module, kind, src, runner, lines, found=True, reason=None, scope=None, model=None, job=None, state=None):
     """One reader's link. A row whose lines did not change keeps its state (agreed, rejected...); new lines start again
     as proposed. The owner's rows are written only by the owner (runner 'owner')."""

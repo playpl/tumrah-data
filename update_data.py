@@ -134,6 +134,7 @@ def today_cards():
         cards = decisions.refresh(db=db)
     finally:
         db.close()
+    ledger.backup()
     return [f"ledger: {n}", f"{len(cards)} decisions wait on the Today screen (py dm.py page)"]
 
 
