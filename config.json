@@ -12,8 +12,8 @@
     "max_sentences_per_page": 4,
     "audit_every": 10
   },
-  "lanes": {"zero": ["piece", "transcribe"], "work": ["pointers_one", "mcq"], "personal": ["books"], "other": ["lecture_links", "place"]},
-  "slots": {"zero": 4, "work": 2, "personal": 4, "other": 4},
+  "lanes": {"zero": ["piece", "transcribe"], "work": ["mcq", "pointers_one"], "personal": ["books"], "other": ["lecture_links", "place"]},
+  "slots": {"zero": 6, "work": 4, "personal": 6, "other": 6},
   "poll_channels": {
     "1": [
       "ZAG_59_Polls"
