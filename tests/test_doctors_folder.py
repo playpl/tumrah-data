@@ -105,3 +105,16 @@ class NotesInBrackets(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class McqBookIds(unittest.TestCase):
+    """owner, 2026-11-14: Azony's "CNS MCQ ... (part 2).pdf" is a second set of questions, not a longer part 1."""
+
+    def test_a_second_mcq_part_keeps_its_own_id(self):
+        b = {"doctor_folder": "azony (auto)", "subject": "anatomy", "kind": "mcq"}
+        self.assertEqual(doctors_folder.book_id({**b, "file": "First part of MCQ file to be updated .pdf"}), "azony-anat-mcq")
+        self.assertEqual(doctors_folder.book_id({**b, "file": "CNS MCQ Dr Elazony(part 2).pdf"}), "azony-anat-mcq2")
+
+    def test_plain_books_are_unchanged(self):
+        b = {"doctor_folder": "zahran", "subject": "histology", "kind": "full", "file": "CNS part 4.pdf"}
+        self.assertEqual(doctors_folder.book_id(b), "zahran-hist-full")

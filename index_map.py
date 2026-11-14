@@ -35,9 +35,9 @@ TRANSCRIPT_REQUIRED = {"dr-ibrahim-el-azouni-anat", "dr-naguib-el-husseiny-phys"
 # Index lesson name (lowercase words) -> handout lecture (reference list) per subject. First match wins.
 LECTURE_RULES = {
     "anatomy": [("spinal cord", "L03"), ("mo ", "L05"), ("medulla", "L05"), ("pons", "L05"), ("midbrain", "L05"),
-                ("brain stem", "L05"), ("cranial nuclei", "L05"), ("cerebellum", "L07"), ("4th ventricle", "L08"),
+                ("brain stem", "L05"), ("brainstem", "L05"), ("cranial nuclei", "L05"), ("cerebellum", "L07"), ("4th ventricle", "L08"),
                 ("diencephalon", "L10"), ("thalamus", "L10"), ("3rd ventricle", "L11"), ("limbic", "L12"),
-                ("internal capsule", "L13"), ("white matter", "L13"), ("basal ganglion", "L13"),
+                ("internal capsule", "L13"), ("white matter", "L13"), ("basal ganglion", "L13"), ("basal ganglia", "L13"),
                 ("lateral ventricle", "L14"), ("csf", "L15"), ("arterial", "L16"), ("blood supply", "L16"),
                 ("scalp", "L37"), ("face", "L38"), ("mastication", "L39"), ("infratemporal", "L39"),
                 ("mandibular", "L41"), ("maxillary nerve", "L42"), ("maxillary n", "L42"), ("pterygopalatine", "L43"),
@@ -46,17 +46,18 @@ LECTURE_RULES = {
                 ("glossopharyngeal", "L50"), ("vagus", "L51"), ("accessory", "L52"), ("hypoglossal", "L53"),
                 ("eye", "L54"), ("ear", "L57"), ("facial", "L58"), ("vestibulocochlear", "L59")],
     "histology": [("neuron", "L01"), ("nerve", "L01"), ("ganglia", "L01"), ("ganglion", "L01"), ("glial", "L01"),
-                  ("neuroglia", "L01"), ("generation", "L01"), ("receptor", "L01"), ("synapse", "L01"),
-                  ("chapter 1 mixed", "L01"), ("meninges", "L02"), ("spinal cord", "L04"), ("medulla", "L06"),
+                  ("neuroglia", "L01"), ("neuroglial", "L01"), ("generation", "L01"), ("regeneration", "L01"),
+                  ("degeneration", "L01"), ("redegeneration", "L01"), ("receptor", "L01"), ("synapse", "L01"),
+                  ("chapter 1 mixed", "L01"), ("meninges", "L02"), ("barrier", "L02"), ("spinal cord", "L04"), ("medulla", "L06"),
                   ("pons", "L06"), ("midbrain", "L06"), ("brainstem", "L06"), ("cerebellum", "L09"),
                   ("cerebrum", "L17"), ("cortex", "L17"), ("eye", "L55"), ("ear", "L60"), ("corti", "L60")],
     "physiology": [("functional unit", "L18"), ("introduction to cns", "L18"), ("sensory receptor", "L19"),
-                   ("receptor", "L19"), ("sensory principles", "L19"), ("pain", "L20"), ("sensation & pain", "L20"),
+                   ("receptor", "L19"), ("sensory principles", "L19"), ("body temperature", "L29"), ("temperature regulation", "L29"), ("pain", "L20"), ("sensation & pain", "L20"),
                    ("touch", "L20"), ("temperature", "L20"), ("itch", "L20"), ("ascending", "L20"),
-                   ("sensory tract", "L20"), ("sensations", "L20"), ("disturbance", "L21"), ("distrubance", "L21"),
-                   ("synapse", "L22"), ("reflex", "L22"), ("stretch", "L23"), ("tone", "L23"),
+                   ("sensory tract", "L20"), ("sensations", "L20"), ("sensation", "L20"), ("disturbance", "L21"), ("distrubance", "L21"),
+                   ("synapse", "L22"), ("muscle reflex", "L23"), ("ms reflex", "L23"), ("reflex", "L22"), ("stretch", "L23"), ("tone", "L23"),
                    ("descending", "L24"), ("motor tract", "L24"), ("motor lesion", "L25"), ("spinal cord lesion", "L25"),
-                   ("cerebellum", "L26"), ("basal ganglion", "L27"), ("thalamus", "L28"), ("hypothalamus", "L29"),
+                   ("cerebellum", "L26"), ("basal lesion", "L27"), ("basal ganglion", "L27"), ("basal ganglia", "L27"), ("thalamus", "L28"), ("hypothalamus", "L29"),
                    ("limbic", "L30"), ("reticular", "L31"), ("arousal", "L31"), ("sleep", "L32"), ("eeg", "L33"),
                    ("cortex", "L34"), ("aphasia", "L35"), ("speech", "L35"), ("memory", "L36"), ("higher functions", "L36"),
                    ("vision", "L56"), ("retina", "L56"), ("cornea", "L56"), ("eye", "L56"), ("hearing", "L61"),
@@ -69,7 +70,8 @@ STRIP = re.compile(r"[^a-z0-9&,. ]+")
 def lecture_of(subject, name):
     s = " " + " ".join(STRIP.sub(" ", (name or "").lower()).split()) + " "
     for key, lec in LECTURE_RULES[subject]:
-        if key in s:
+        # whole words only (owner, 2026-11-14: "hypothalamus" matched "thalamus", "surface" matched "face"); a plural is fine
+        if re.search(r"(?<![a-z0-9])" + re.escape(key.strip()) + r"(?:s|es)?(?![a-z0-9])", s):
             return f"year2-cns:{lec}"
     return None
 

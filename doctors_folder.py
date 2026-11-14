@@ -293,6 +293,10 @@ def nice(title):
 def book_id(b):
     """mossafer-anat-1 (a partial book, the first one added), zahran-hist-full, elsamahy-phys-mcq."""
     suffix = {"partial": "1", "full": "full", "mcq": "mcq", "mcq_partial": "mcq"}[b.get("kind", "partial")]
+    # A second MCQ book that is another part, not a longer copy ("CNS MCQ Dr Elazony(part 2).pdf") keeps its own id.
+    part = re.search(r"part\s*(\d+)", Path(b.get("file") or "").stem.lower()) if suffix == "mcq" else None
+    if part and int(part.group(1)) > 1:
+        suffix += part.group(1)
     return f"{key_of(b['doctor_folder']).split()[-1]}-{b['subject'][:4].lower()}-{suffix}"
 
 
@@ -586,16 +590,16 @@ def import_all(q, site_doctors=(), kbps=16):
             elif link["kind"] == "telegram":
                 report.append(f"{lid}: telegram {link['url']} kept for later (needs a Telegram session)")
     for b in books:
-        if key_of(b["doctor_folder"]) in NO_ALIGN:
-            report.append(f"book {b['book']}: not aligned ({b['doctor_folder']}: picture-only books, owner 2026-11-09)")
-            continue
         if b["kind"] == "mcq_partial" and any(o["kind"] == "mcq" and (o["module"], o["subject"], o["doctor_folder"]) ==
                                               (b["module"], b["subject"], b["doctor_folder"]) for o in books):
             continue  # the full MCQ book is here: books_merge moves this one aside
         if b["kind"] in ("mcq", "mcq_partial"):  # a doctor's MCQ book: its questions are copied out, never aligned as a book
-            import mcq
+            import mcq  # (a NO_ALIGN doctor's MCQ book too: it has text, owner 2026-11-14 added Azony's part 2)
             added = mcq.queue_book(q, b["module"], b["book"], b["file"], b["doctor_id"] or b["doctor_folder"], b["subject"])
             report.append(f"mcq book {b['book']}: {added}")
+            continue
+        if key_of(b["doctor_folder"]) in NO_ALIGN:
+            report.append(f"book {b['book']}: not aligned ({b['doctor_folder']}: picture-only books, owner 2026-11-09)")
             continue
         jobs_file = ROOT / "modules" / b["module"] / "books" / f"{b['book']}.json"
         if b["kind"] == "partial" and not jobs_file.exists() and any(

@@ -160,20 +160,21 @@ def sync(module=MODULE, db=None):
     if qdb.exists():
         q = sqlite3.connect(qdb)
         jobs = q.execute("SELECT flow, key, payload, note FROM jobs WHERE status='passed' AND flow IN "
-                         "('pointers', 'books', 'lecture_links')").fetchall()
+                         "('pointers', 'pointers_one', 'books', 'lecture_links')").fetchall()
         q.close()
     link_note = {}
     for flow, key, payload, note in jobs:
         d = ROOT / "jobs" / flow / key
         p = json.loads(payload)
-        if flow == "pointers" and (d / "pointers.jsonl").exists() and p.get("module") == module:
+        if flow in ("pointers", "pointers_one") and (d / "pointers.jsonl").exists() and p.get("module") == module:
             wk = {b["qid"]: b.get("word_key") for b in p["batch"]}
             for r in read_jsonl(d / "pointers.jsonl"):
                 src = wk.get(r["question_id"])
                 if not src or r.get("reason") == "other_lecture":
                     continue  # "not in this lecture" says nothing about where it is
                 ids = [i for s in r.get("spans") or [] for i in s.get("line_ids") or []]
-                put(db, module, "question", src, _runner(note), ids, found=r["found"], reason=r.get("reason"),
+                runner = f"haiku-{p['reader']}" if flow == "pointers_one" else _runner(note)  # two reads = two readers
+                put(db, module, "question", src, runner, ids, found=r["found"], reason=r.get("reason"),
                     scope=f"lecture:{p.get('lecture')}" if p.get("lecture") else "module", job=key)
                 n["question ai"] += 1
         elif flow == "books" and (d / "aligned.jsonl").exists() and p.get("module") == module:

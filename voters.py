@@ -63,25 +63,42 @@ def apply_read(c, chat, mid, got, report):
               (json.dumps(got["votes"]), got["total"], now, chat, mid))
 
 
-async def refresh(c, connect, report):
-    for account, chats in plan(c).items():
-        client = await connect(account)
-        try:
-            ents = {d.entity.username: d.entity async for d in client.iter_dialogs()
-                    if getattr(d.entity, "username", None) in chats}
-            for chat, ids in chats.items():
-                if chat not in ents:
-                    report["skipped_not_member"] += len(ids)
+async def refresh_account(c, connect, account, chats, report):
+    """One account re-reads its polls. A FloodWait up to 1 hour is waited out; one batch that fails is counted."""
+    client = await connect(account)
+    client.flood_sleep_threshold = 3600  # read only: just wait
+    wanted = {cid: name for name, cid in engine.CHANNELS.items()}
+    try:
+        ents = {wanted[d.entity.id]: d.entity async for d in client.iter_dialogs() if d.entity.id in wanted}
+        for chat, ids in chats.items():
+            if chat not in ents:
+                report["skipped_not_member"] += len(ids)
+                continue
+            for i in range(0, len(ids), BATCH):
+                if engine.STOP.exists():
+                    return
+                try:
+                    messages = await client.get_messages(ents[chat], ids=ids[i:i + BATCH])
+                except Exception as e:  # noqa: BLE001 - keep the old counts for this batch
+                    report["batch_failed"] += len(ids[i:i + BATCH])
+                    report["last_error"] = f"{account}: {type(e).__name__}: {str(e)[:80]}"
                     continue
-                for i in range(0, len(ids), BATCH):
-                    for msg in await client.get_messages(ents[chat], ids=ids[i:i + BATCH]):
-                        if msg and hasattr(getattr(msg, "media", None), "poll"):
-                            apply_read(c, chat, msg.id, engine.read_results(msg.media.poll, msg.media.results), report)
-                        else:
-                            report["gone"] += 1
-                    await asyncio.sleep(1)
-        finally:
-            await client.disconnect()
+                for msg in messages:
+                    if msg and hasattr(getattr(msg, "media", None), "poll"):
+                        apply_read(c, chat, msg.id, engine.read_results(msg.media.poll, msg.media.results), report)
+                    else:
+                        report["gone"] += 1
+                report[f"done_{account}"] += len(messages)
+                await asyncio.sleep(1)
+    finally:
+        await client.disconnect()
+
+
+async def refresh(c, connect, report):
+    """Every account re-reads its own polls at the same time (owner, 2026-11-14: all accounts in parallel)."""
+    todo = plan(c)
+    report.update({f"todo_{a}": sum(map(len, chats.values())) for a, chats in todo.items()})
+    await asyncio.gather(*(refresh_account(c, connect, a, chats, report) for a, chats in todo.items()))
 
 
 def site_stats(bank_rows, site_index):

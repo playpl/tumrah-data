@@ -835,9 +835,9 @@ def pointer_groups(module, db):
         lab = labels.get(q["word_key"])
         if not lab or q["word_key"] in read or not clean_key(q):
             continue
-        lo, hi = lab.get("pages") or fast_lessons.LABEL_PAGES[lab["lecture_id"]]
-        if taught & set(range(lo, hi + 1)):
-            out.setdefault((lo, hi), []).append(q)
+        ranges = tuple(fast_lessons.label_ranges(lab))  # a title naming several lectures gives several ranges
+        if taught & {pg for lo, hi in ranges for pg in range(lo, hi + 1)}:
+            out.setdefault(ranges, []).append(q)
     return out
 
 
@@ -877,15 +877,16 @@ def run_pointer_call(db, module, pages, qs, labels, model, scope, tries=2):
     """One call: these questions against these pages. Passed answers go to the ledger (runner web). Returns how many."""
     import hashlib
     import ledger
-    lo, hi = pages
+    ranges = [tuple(pages)] if isinstance(pages[0], int) else [tuple(r) for r in pages]
+    keep = {pg for lo, hi in ranges for pg in range(lo, hi + 1)}
     tag = hashlib.md5(qs[0]["word_key"].encode()).hexdigest()[:8]
     d = ROOT / "jobs" / "gemini" / "pointers" / f"{scope.replace(':', '-')}-{tag}"
     d.mkdir(parents=True, exist_ok=True)
-    handout_subset(labels, range(lo, hi + 1), d / "handout_pages.txt")
-    by_label = {lab: ln for lab, ln in labels.items() if lo <= ln["page"] <= hi}
+    handout_subset(labels, sorted(keep), d / "handout_pages.txt")
+    by_label = {lab: ln for lab, ln in labels.items() if ln["page"] in keep}
     text = "\n\n".join(f"Q{i}. {q['question']}\n" + "\n".join(
         f"{' *' if j == q['key'] else '  '} {'ABCDE'[j]}. {o}" for j, o in enumerate(q["options"])) for i, q in enumerate(qs, 1))
-    (d / "prompt.txt").write_text(POINTER_PROMPT.format(pages=f"{lo}-{hi}", n=len(qs), questions=text), encoding="utf-8")
+    (d / "prompt.txt").write_text(POINTER_PROMPT.format(pages=", ".join(f"{lo}-{hi}" for lo, hi in ranges), n=len(qs), questions=text), encoding="utf-8")
     for t in range(1, tries + 1):
         answer, meta = ask(d / "prompt.txt", model, [d / "handout_pages.txt"], timeout=2400)
         if answer is None:
@@ -959,7 +960,7 @@ def pointers(args):
             if left[0] <= 0:
                 break
             left[0] -= 1
-            done += run_pointer_call(db, module, pg, qs, labels, args.model, f"{name}:{pg[0]}-{pg[1]}")
+            done += run_pointer_call(db, module, pg, qs, labels, args.model, f"{name}:{pg[0]}-{pg[1]}" if isinstance(pg[0], int) else f"{name}:" + "_".join(f"{a}-{b}" for a, b in pg))
     if not args.dry:
         log("pointers done:", done, "questions read;", dict(ledger.agree(db, module)))
         db.commit()

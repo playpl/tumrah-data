@@ -71,6 +71,16 @@ were picked by code as maybe belonging to it: some do not.
 """
 
 
+PAGES_SCOPE = """
+## Where to look
+These questions were posted under the title **{title}**, which names the handout pages {pages}.
+- Look for each question **only on those pages** (`python tools/page.py <first> <last>`). Use the `lecture_id` of the
+  reference.json lecture whose pages hold your lines.
+- When a question is not taught on those pages: `"found": false, "reason": "other_lecture"`. Do not search the rest
+  of the handout for it. A wrong pointer is worse than "other_lecture".
+"""
+
+
 class PointerFlow:
     lane = "pointers"
     timeout = 60
@@ -84,7 +94,13 @@ class PointerFlow:
             pages = lectures.page_ranges(meta)
             brief = BRIEF + LECTURE_SCOPE.format(title=meta["title"], lecture=meta["id"],
                                                  pages=", ".join(f"{a}-{b}" for a, b in pages))
+        if p.get("scope"):  # owner 2026-11-14: the poll's title names the handout lectures to search (titles.py)
+            sc = p["scope"]
+            brief = BRIEF + PAGES_SCOPE.format(title=sc["title"], pages=", ".join(f"{a}-{b}" for a, b in sc["ranges"]))
         common.build(job_dir, p["module"], p["batch"], "check_pointers", "out.jsonl", brief)
+        if p.get("scope"):
+            (job_dir / "inputs" / "reference.json").write_text(json.dumps(
+                {"lecture_scope": True, "lectures": p["scope"]["lectures"]}, ensure_ascii=False), encoding="utf-8")
         if p.get("lecture"):
             (job_dir / "inputs" / "reference.json").write_text(json.dumps(
                 {"lecture_scope": True, "lectures": [{"lecture_id": meta["id"], "title": meta["title"], "pdf_pages": pages}]},

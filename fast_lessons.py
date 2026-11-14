@@ -58,6 +58,24 @@ def lesson_lines(lines=None):
     return {lid: ids for lid, ids in ledger.lesson_ids(MODULE).items() if lid in site}
 
 
+def merge_ranges(ranges):
+    """[(first, last), ...] sorted, touching or overlapping ranges joined."""
+    out = []
+    for a, b in sorted(tuple(r) for r in ranges):
+        if out and a <= out[-1][1] + 1:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return out
+
+
+def label_ranges(lab):
+    """The handout pages a label says to search: its ranges (a title naming several lectures), its pages, or its lecture's."""
+    if lab.get("ranges"):
+        return [tuple(r) for r in lab["ranges"]]
+    return [tuple(lab.get("pages") or LABEL_PAGES[lab["lecture_id"]])]
+
+
 def labelled():
     """(bank, labels, index, n_bank): every question that has a place to be searched in. bank = the bank's rows, then
     the owner's quiz rows and the doctors' MCQ-book rows (after n_bank); labels = word_key -> {lecture_id | pages, by}."""
@@ -72,6 +90,19 @@ def labelled():
             labels[wk] = {**labels.get(wk, {}), "word_key": wk, "lecture_id": lec, "by": "index"}
         elif lec and wk in labels:
             del labels[wk]  # the index puts it in a lecture no named lesson teaches
+    # The poll's own title, all its lines (titles.py, owner 2026-11-14): beats the fleet's header label, which saw only
+    # the first line. A title with no subject of its own ("Eye") keeps the fleet's lecture when it is one it names.
+    tpath = ROOT / "sources" / "index" / "title_map.json"
+    for wk, t in (json.loads(tpath.read_text(encoding="utf-8")) if tpath.exists() else {}).items():
+        lecs = [x for x in t["lectures"] if x in LABEL_PAGES]
+        if not lecs or labels.get(wk, {}).get("by") == "index":
+            continue
+        old = labels.get(wk, {}).get("lecture_id")
+        if t["how"] != "title+index" and old in lecs:
+            lecs = [old]
+        labels[wk] = {**labels.get(wk, {}), "word_key": wk, "by": t["how"],
+                      "lecture_id": lecs[0] if len(lecs) == 1 else None, "lectures": lecs,
+                      "ranges": merge_ranges(LABEL_PAGES[x] for x in lecs)}
     bank = read_jsonl(ROOT / "bank" / "questions.jsonl")
     n_bank = len(bank)
     # Dr. Nagib's chapter quizzes (nagib_quizzes.py, keys from the forms' own score pages): the owner's Required set,
@@ -99,7 +130,9 @@ def labelled():
             bank.append({"word_key": wk, "question": r["question"], "options": r["options"], "key": r["key"], "sightings": [],
                          "source_url": None, "mcq_doctor": r["doctor"], "importance_score": 3})
             labels[wk] = {"word_key": wk, "lecture_id": None, "by": "mcq_book",
-                          "pages": (min(m["pdf_pages"][0] for m in mine), max(m["pdf_pages"][1] for m in mine))}
+                          "pages": (min(m["pdf_pages"][0] for m in mine), max(m["pdf_pages"][1] for m in mine)),
+                          # only the doctor's lessons' own pages, not every page between his first and last lesson
+                          "ranges": merge_ranges(r for m in mine for r in lectures.page_ranges(m))}
     return bank, labels, index, n_bank
 
 
@@ -151,9 +184,8 @@ def build():
             qw = Counter(words(q["question"]))
             for w in words(q["options"][q["key"]]):
                 qw[w] += 2  # the keyed answer is what the handout line must say
-            lo, hi = lab.get("pages") or LABEL_PAGES[lab["lecture_id"]]
             best = (0.0, 0, None, None)
-            for page in range(lo, hi + 1):
+            for page in (p for lo, hi in label_ranges(lab) for p in range(lo, hi + 1)):
                 pl = by_page.get(page, [])
                 for i, ln in enumerate(pl):
                     ctx = toks[ln["id"]] | (toks[pl[i - 1]["id"]] if i else set()) | (toks[pl[i + 1]["id"]] if i + 1 < len(pl) else set())

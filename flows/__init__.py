@@ -9,9 +9,10 @@ from flows.lecture import LectureLinkFlow, PieceFlow, TranscribeFlow
 from flows.mcq import MCQFlow
 from flows.place import PlaceFlow
 from flows.pointers import PointerFlow
+from flows.pointers_one import PointerOneFlow
 from flows.reference import ReferenceFlow
 
-REGISTRY = {"pointers": PointerFlow(), "books": BookFlow(), "transcribe": TranscribeFlow(), "piece": PieceFlow(), "place": PlaceFlow(), "mcq": MCQFlow(),
+REGISTRY = {"pointers": PointerFlow(), "pointers_one": PointerOneFlow(), "books": BookFlow(), "transcribe": TranscribeFlow(), "piece": PieceFlow(), "place": PlaceFlow(), "mcq": MCQFlow(),
             "lecture_links": LectureLinkFlow(), "cover": CoverFlow(),
             "reference": ReferenceFlow(), "labels": LabelFlow(),
             "highlights": HighlightFlow(), "hl_audit": AuditFlow()}
