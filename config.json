@@ -12,18 +12,8 @@
     "max_sentences_per_page": 4,
     "audit_every": 10
   },
-  "lanes": {
-    "zero": "piece",
-    "work": "pointers",
-    "personal": "books",
-    "other": "lecture_links"
-  },
-  "slots": {
-    "zero": 4,
-    "work": 4,
-    "personal": 4,
-    "other": 4
-  },
+  "lanes": {"zero": ["piece", "transcribe"], "work": ["pointers_one", "mcq"], "personal": ["books"], "other": ["lecture_links", "place"]},
+  "slots": {"zero": 4, "work": 2, "personal": 4, "other": 4},
   "poll_channels": {
     "1": [
       "ZAG_59_Polls"
@@ -45,7 +35,7 @@
   "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
   "db_name": "tumrah",
   "lecture_audio_kbps": 16,
-  "fleet": {"down": true, "since": "2026-11-12", "note": "Not reset yet: accounts in quota rest until about 11:35 (owner, 2026-11-12)"},
+  "fleet": {"down": false, "since": "2026-11-14", "note": "Up again (owner, 2026-11-14)"},
   "module_windows": {
     "year1-musculoskeletal": [
       {

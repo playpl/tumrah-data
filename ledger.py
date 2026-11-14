@@ -159,11 +159,11 @@ def sync(module=MODULE, db=None):
     jobs = []
     if qdb.exists():
         q = sqlite3.connect(qdb)
-        jobs = q.execute("SELECT flow, key, payload, note FROM jobs WHERE status='passed' AND flow IN "
+        jobs = q.execute("SELECT flow, key, payload, note, account FROM jobs WHERE status='passed' AND flow IN "
                          "('pointers', 'pointers_one', 'books', 'lecture_links')").fetchall()
         q.close()
     link_note = {}
-    for flow, key, payload, note in jobs:
+    for flow, key, payload, note, account in jobs:
         d = ROOT / "jobs" / flow / key
         p = json.loads(payload)
         if flow in ("pointers", "pointers_one") and (d / "pointers.jsonl").exists() and p.get("module") == module:
@@ -173,7 +173,8 @@ def sync(module=MODULE, db=None):
                 if not src or r.get("reason") == "other_lecture":
                     continue  # "not in this lecture" says nothing about where it is
                 ids = [i for s in r.get("spans") or [] for i in s.get("line_ids") or []]
-                runner = f"haiku-{p['reader']}" if flow == "pointers_one" else _runner(note)  # two reads = two readers
+                # two reads = two readers; a fleet slot sets the job's account, a Haiku subagent (haiku_run.py) does not
+                runner = (f"{'fleet' if account else 'haiku'}-{p['reader']}" if flow == "pointers_one" else _runner(note))
                 put(db, module, "question", src, runner, ids, found=r["found"], reason=r.get("reason"),
                     scope=f"lecture:{p.get('lecture')}" if p.get("lecture") else "module", job=key)
                 n["question ai"] += 1

@@ -64,9 +64,31 @@ def question_text(i, q):
     return f"Q{i}. {q['stem']}{case}\n{opts}"
 
 
+ORCHESTRATOR = """You are the orchestrator of {n} pointer jobs, one per folder:
+{folders}
+
+Start one subagent per folder, all at the same time, then wait until every one has finished. Do not read the folders
+yourself. Give each subagent this task, with its own folder path in place of FOLDER:
+
+"Never open, view or analyse any image or PDF page; work only from text. Your folder is FOLDER. Read FOLDER/read.txt
+from top to bottom (all of it) with read_file, follow its instructions and write FOLDER/answers.jsonl with write_file.
+Only after answers.jsonl is written, run `python "FOLDER/check.py"` (each run takes about 40 s); fix what it prints and
+run it again until it prints PASS. Never open check.py or any other file, and never touch another folder. Reply with
+PASS or with the last check message."
+
+When all subagents are done, reply with one line per folder: its name, then PASS or FAIL.
+"""
+
+
 class PointerOneFlow:
     lane = "pointers"
     timeout = 30
+    group = 4  # owner 2026-11-14: each account runs an orchestrator, and under it one subagent per job folder
+
+    def orchestrate(self, dirs):
+        """The orchestrator's prompt: one subagent per job folder, all at once."""
+        tasks = "\n".join(f"- {d}" for d in dirs)
+        return ORCHESTRATOR.format(n=len(dirs), folders=tasks)
 
     def prepare(self, job, job_dir: Path):
         p = job["payload"]
@@ -102,9 +124,12 @@ class PointerOneFlow:
             "print('\\n'.join(errors) if errors else 'PASS')\n", encoding="utf-8")
         (job_dir / "job.json").write_text(json.dumps({"key": job["key"], "payload": p}, ensure_ascii=False), encoding="utf-8")
         prompt = job_dir / "prompt.md"
-        prompt.write_text("Read read.txt in this folder from top to bottom (all of it), follow its instructions, write "
-                          "answers.jsonl in this folder, then run `python check.py` until it prints PASS. Do not use "
-                          "any other tool, script or search. Reply with the PASS line.\n", encoding="utf-8")
+        # owner 2026-11-14 "why so slow?": a command costs 30-40 s inside agy, and workers ran the check before writing
+        prompt.write_text("Read read.txt in this folder from top to bottom (all of it), follow its instructions and write "
+                          "answers.jsonl in this folder. Only after answers.jsonl is written, run `python check.py` "
+                          "(each run takes about 40 s); fix what it prints and run it again until it prints PASS. Never "
+                          "open check.py or any other file. Do not use any other tool, script or search. Reply with the "
+                          "PASS line.\n", encoding="utf-8")
         return prompt
 
     def check(self, job, job_dir: Path):

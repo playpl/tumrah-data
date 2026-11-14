@@ -85,6 +85,55 @@ class Dispatcher:
             q.add_jobs(flow_name, jobs)  # the next step of a chain (transcribe, then clean and link)
         return "passed"
 
+    def work_group(self, q, jobs, account):
+        """Several jobs of one flow in one fleet run: an orchestrator starts one subagent per job folder (the flow's
+        `orchestrate(dirs)` writes its prompt). Each job is then checked on its own, as in `work`."""
+        flow = self.flows[jobs[0]["flow"]]
+        dirs = []
+        for job in jobs:
+            d = self.jobs_root / job["flow"] / job["key"]
+            d.mkdir(parents=True, exist_ok=True)
+            flow.prepare(job, d)
+            dirs.append(d)
+        od = self.jobs_root / jobs[0]["flow"] / "_orchestrator" / f"{account}-{jobs[0]['key']}"
+        od.mkdir(parents=True, exist_ok=True)
+        prompt = od / "prompt.md"
+        prompt.write_text(flow.orchestrate(dirs), encoding="utf-8")
+        result = od / "result.json"
+        result.unlink(missing_ok=True)
+        cmd = self.fleet_cmd + ["run", "-a", account, "--cwd", str(od), "-f", str(prompt), "--out", str(result),
+                                "--timeout", str(getattr(flow, "timeout", 30))]
+        for d in dirs:
+            cmd += ["--add-dir", str(d)]
+        if getattr(flow, "model", None):
+            cmd += ["--model", flow.model]
+        run = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        (od / "fleet.log").write_text(run.stdout[-4000:] + run.stderr[-4000:], encoding="utf-8")
+        try:
+            r = json.loads(result.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            r = {"status": "ERROR", "error": (run.stderr or run.stdout).strip()[-300:]}
+        quota = r.get("status") != "SUCCESS" and (r.get("failure") == "quota" or cooling(self.fleet_state, account))
+        outcomes = []
+        for job, d in zip(jobs, dirs):
+            try:
+                errors = flow.check(job, d)  # a worker's PASS is never trusted; a dropped run may still have written
+            except Exception as e:  # noqa: BLE001 - no usable output
+                errors = [f"{type(e).__name__}: {e}"]
+            if errors and quota:
+                q.release(job["id"])
+                outcomes.append("released")
+            elif errors:
+                why = "" if r.get("status") == "SUCCESS" else f"fleet: {r.get('failure') or r.get('error') or r.get('status')}; "
+                q.finish(job["id"], "failed", (why + "; ".join(errors))[:500])
+                outcomes.append("failed")
+            else:
+                q.finish(job["id"], "passed")
+                for flow_name, nxt in (flow.then(job, d) if hasattr(flow, "then") else []):
+                    q.add_jobs(flow_name, nxt)
+                outcomes.append("passed")
+        return outcomes
+
     def slot(self, account, once):
         lane = self.lanes.get(account)
         q = queue_db.Queue(self.qpath)
@@ -102,7 +151,23 @@ class Dispatcher:
                         return
                     self.stop.wait(60)
                     continue
-                job = q.claim(lane, account)
+                # a lane is one flow or a list (owner 2026-11-14: one account per kind of work); its own flows first,
+                # then any queued flow, so no account sits idle
+                lanes = lane if isinstance(lane, list) else [lane]
+                job = next((j for j in (q.claim(name, account, only=True) for name in lanes) if j), None)                     or q.claim(lanes[0], account)
+                flow = self.flows.get(job["flow"]) if job else None
+                if job and getattr(flow, "group", 0) > 1:  # one orchestrator, one subagent per job folder
+                    group = [job] + [j for j in (q.claim(job["flow"], account, only=True)
+                                                 for _ in range(flow.group - 1)) if j]
+                    try:
+                        outcomes = self.work_group(q, group, account)
+                    except Exception as e:  # noqa: BLE001 - a broken group never kills its slot
+                        for j in group:
+                            q.finish(j["id"], "failed", f"dispatcher: {type(e).__name__}: {e}"[:500])
+                        outcomes = ["failed"] * len(group)
+                    with self._lock:
+                        self.stats.update(outcomes)
+                    continue
                 if job is None:
                     busy = sum(c.get("running", 0) for c in q.progress().values())
                     if once and not busy:
