@@ -1,32 +1,34 @@
-"""A doctor's lectures are filed in the handout chapter their pages fall in, never all in the subject's first chapter
-(owner, 2026-11-13: every Azony lecture showed under Spinal cord)."""
+"""A lesson's chapter is the item of the doctor's Telegram list it is posted under (owner, 2026-11-14: "chapters should be
+imported from the mother message"), never the handout lecture its pages fall in and never our own guess."""
 import unittest
 
 import dm
 
-CH = {"anatomy": [
-    {"id": "L03", "title": "Spinal cord", "handout_title": "Anatomy of the spinal cord", "order": 1, "pages": [49, 57]},
-    {"id": "L05", "title": "Anatomy of the brain stem nuclei", "handout_title": "Anatomy of the brain stem nuclei", "order": 2, "pages": [71, 76]},
-    {"id": "L08", "title": "Anatomy of the 4th ventricle", "handout_title": "Anatomy of the 4th ventricle", "order": 3, "pages": [99, 101]},
-]}
 
+class ListChapters(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.rows = {r["key"]: r for r in dm.lesson_rows("year2-cns")}
 
-class ChapterOf(unittest.TestCase):
-    def test_pages_decide(self):
-        row, how = dm.chapter_of({"title": "Medulla part 1", "ranges": [{"pages": [71, 73]}]}, "anatomy", CH)
-        self.assertEqual((row["id"], how), ("L05", "pages"))
+    def test_azony_parts_sit_in_their_list_item(self):
+        by = {}
+        for r in self.rows.values():
+            if r["doctorId"] == "dr-ibrahim-el-azouni-anat":
+                by.setdefault(r["chapter"]["title"], []).append(r["name"])
+        for title in ("Medulla", "Nuclei of medulla & Features of pons", "Nuclei of pons & midbrain & cerebellum", "4th ventricle"):
+            self.assertIn(title, by)
+            self.assertTrue(all(n.startswith(title) for n in by[title]), by[title])
 
-    def test_most_pages_win(self):
-        row, _ = dm.chapter_of({"title": "x", "ranges": [{"pages": [49, 50]}, {"pages": [71, 76]}]}, "anatomy", CH)
-        self.assertEqual(row["id"], "L05")
+    def test_one_order_per_chapter_title_and_no_two_titles_share_an_order(self):
+        seen = {}
+        for r in self.rows.values():
+            key = (r["subject"], r["chapter"]["order"])
+            self.assertEqual(seen.setdefault(key, r["chapter"]["title"]), r["chapter"]["title"], key)
 
-    def test_unplaced_lesson_matches_title(self):
-        row, how = dm.chapter_of({"title": "4th ventricle part 2", "ranges": []}, "anatomy", CH)
-        self.assertEqual((row["id"], how), ("L08", "title"))
-
-    def test_unknown_is_a_flagged_guess(self):
-        row, how = dm.chapter_of({"title": "Something else", "ranges": []}, "anatomy", CH)
-        self.assertEqual((row["id"], how), ("L03", "guess"))
+    def test_a_revision_or_mini_lecture_sits_with_what_it_covers(self):
+        for r in self.rows.values():
+            if r["covers"]:
+                self.assertEqual(r["chapter"], self.rows[r["covers"][0]]["chapter"], r["key"])
 
 
 if __name__ == "__main__":

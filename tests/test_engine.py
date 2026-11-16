@@ -270,14 +270,28 @@ class Ready(Base):
         self.assertEqual(row["sightings"][0]["header"], "Header")
         self.assertFalse(row["key_conflict"])
 
-    def test_postings_that_disagree_are_flagged(self):
+    def test_postings_that_disagree_take_the_newer_repost(self):
+        wk = engine.word_key("Q", ["Yes", "No"])
+        old, new = self.msg(2, "Q", ["Yes", "No"]), self.msg(7, "Q", ["No", "Yes"])
+        old["date"], new["date"] = "2026-01-01T10:00:00+00:00", "2026-03-01T10:00:00+00:00"
+        self.raw("Batch58ATM", [old])
+        self.raw("zagpolls58", [new])
+        self.save("Batch58ATM", 2, wk, 0, [1, 0])   # Yes
+        self.save("zagpolls58", 7, wk, 0, [0, 1])   # newer repost keys its option 0 = "No"
+        counts = self.build()
+        row = self.rows()[0]
+        self.assertEqual((row["key"], row["options"][row["key"]], row["key_conflict"], row["key_source"]),
+                         (1, "No", False, "newer_repost"))
+        self.assertEqual(counts["newer_repost"], 1)
+
+    def test_agreeing_reposts_keep_no_key_source(self):
         wk = engine.word_key("Q", ["Yes", "No"])
         self.raw("Batch58ATM", [self.msg(2, "Q", ["Yes", "No"])])
         self.raw("zagpolls58", [self.msg(7, "Q", ["Yes", "No"])])
         self.save("Batch58ATM", 2, wk, 0, [1, 0])
-        self.save("zagpolls58", 7, wk, 1, [0, 1])
+        self.save("zagpolls58", 7, wk, 0, [0, 1])
         self.build()
-        self.assertTrue(self.rows()[0]["key_conflict"])
+        self.assertNotIn("key_source", self.rows()[0])
 
     def test_no_key_goes_to_held_never_to_questions(self):
         wk = engine.word_key("Q", ["Yes", "No"])

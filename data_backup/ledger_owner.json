@@ -1,6 +1,171 @@
 {
  "decisions": [
   {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-amr-mesafer-anat. overlaps. Reading (lecture links): from \"3 Spinal cord\" to \"columns:\".",
+   "id": "bound:cns-002",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-002\", \"pages\": [[49, 52]], \"spans\": [[989, 1055]]}",
+   "state": "done",
+   "title": "cns-002 Spinal cord part 1: pages 49-52, the recording says 49-52"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-amr-mesafer-anat. overlaps. Reading (lecture links): from \"oblongata. Termination:\" to \"➢ Denticulata ligament:\".",
+   "id": "bound:cns-003",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-003\", \"pages\": [[50, 55]], \"spans\": [[997, 1123]]}",
+   "state": "done",
+   "title": "cns-003 Spinal cord part 2: pages 50-55, the recording says 50-55"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-abdullah-el-samahi-phys. overlaps. Reading (lecture links): from \"SENSORY RECEPTORS\" to \"Propertiesofreceptorpotential:\".",
+   "id": "bound:cns-005",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-005\", \"pages\": [[139, 141]], \"spans\": [[2700, 2764]]}",
+   "state": "done",
+   "title": "cns-005 Receptors part 1: pages 139-141, the recording says 139-141"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-ibrahim-el-azouni-anat. overlaps. Reading (lecture links): from \"3 Spinal cord\" to \"SPINAL NERVES\".",
+   "id": "bound:cns-008",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-008\", \"pages\": [[49, 53]], \"spans\": [[989, 1076]]}",
+   "state": "done",
+   "title": "cns-008 Spinal cord part 1: pages 49-53, the recording says 49-53"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-naguib-el-husseiny-phys. off-subject pages; overlaps; very wide. Reading (lecture links): from \"I. Central nervous system:\" to \"III. Specific centers:\".",
+   "id": "bound:cns-011",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-011\", \"pages\": [[41, 41], [49, 53], [58, 62], [71, 71], [97, 97], [132, 132], [136, 139], [147, 148], [200, 201], [247, 247]], \"spans\": [[837, 853], [989, 1076], [1167, 1283], [1376, 1387], [1936, 1941], [2606, 2609], [2672, 2725], [2932, 2951], [4177, 4203], [5379, 5384]]}",
+   "state": "done",
+   "title": "cns-011 CNS تأسيس 1: pages 41, 49-53, 58-62, 71, 97, 132, 136-139, 147-148, 200-201, 247, the recording says 41, 49-53, 58-62, 71, 97, 132, 136-139, 147-148, 200-201, 247"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-naguib-el-husseiny-phys. off-subject pages; overlaps; very wide. Reading (lecture links): from \"NEURON\" to \"THE REFLEX ACTION\".",
+   "id": "bound:cns-012",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-012\", \"pages\": [[11, 11], [13, 14], [20, 24], [27, 29], [136, 139], [140, 141], [175, 175]], \"spans\": [[217, 223], [277, 296], [413, 483], [545, 593], [2672, 2707], [2741, 2764], [3607, 3610]]}",
+   "state": "done",
+   "title": "cns-012 CNS تأسيس 2: pages 11, 13-14, 20-24, 27-29, 136-139, 140-141, 175, the recording says 11, 13-14, 20-24, 27-29, 136-139, 140-141, 175"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-naguib-el-husseiny-phys. overlaps. Reading (lecture links): from \"SENSORY RECEPTORS\" to \"N.B.:\".",
+   "id": "bound:cns-013",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-013\", \"pages\": [[139, 139], [140, 141], [144, 144]], \"spans\": [[2700, 2707], [2741, 2764], [2851, 2857]]}",
+   "state": "done",
+   "title": "cns-013 Sensory receptor part 1: pages 139, 140-141, 144, the recording says 139, 140-141, 144"
+  },
+  {
+   "answer": "[0, \"claude (owner 2026-11-14: take the decisions for me): use the reading\"]",
+   "at": 1794673368.9532697,
+   "detail": "dr-naguib-el-husseiny-phys. overlaps. Reading (lecture links): from \"Classification of receptors:\" to \"6. Sensorycoding:\".",
+   "id": "bound:cns-014",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-014\", \"pages\": [[139, 144]], \"spans\": [[2708, 2740], [2765, 2850]]}",
+   "state": "done",
+   "title": "cns-014 Sensory receptor part 2: pages 139-144, the recording says 139-140, 141-144"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-naguib-el-husseiny-phys. overlaps. Reading (lecture links): from \"PAIN SENSATION\" to \"2. Convergence -projection theory:\".",
+   "id": "bound:cns-015",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-015\", \"pages\": [[146, 151]], \"spans\": [[2873, 3019]]}",
+   "state": "done",
+   "title": "cns-015 Pain part 1: pages 146-151, the recording says 146-151"
+  },
+  {
+   "answer": "[0, \"claude (owner 2026-11-14: take the decisions for me): use the reading\"]",
+   "at": 1794673369.084529,
+   "detail": "dr-ahmed-ammar-hist. coarse; 10% of the recording lies outside it. Reading (lecture links): from \"Comparison between axon and dendrites:\" to \"Classification of nerve fibers according to myelination:\".",
+   "id": "bound:cns-017",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-017\", \"pages\": [[15, 22]], \"spans\": [[297, 461]]}",
+   "state": "done",
+   "title": "cns-017 Classification of neuron & Nerve fiber: pages 15-22, the recording says 14-22"
+  },
+  {
+   "answer": "[1, \"claude 2026-11-14: pages already follow the recording; the overlap is another doctor on the same pages (cns-085 kept 175-186: its reading runs the whole chapter)\"]",
+   "at": 1794674176.177549,
+   "detail": "dr-abdullah-el-samahi-phys. overlaps. Reading (lecture links): from \"PAIN SENSATION\" to \"Visceral pain is produced by:\".",
+   "id": "bound:cns-018",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-018\", \"pages\": [[146, 149]], \"spans\": [[2873, 2980]]}",
+   "state": "done",
+   "title": "cns-018 Pain part 1: pages 146-149, the recording says 146-149"
+  },
+  {
+   "answer": "[0, \"claude (owner 2026-11-14: take the decisions for me): use the reading\"]",
+   "at": 1794673369.3558674,
+   "detail": "dr-amr-mesafer-anat. shares a page; the recording covers 75% of it. Reading (lecture links): from \"BLOOD SUPPLY\" to \"3. Spinal branches of segmental arteries:\".",
+   "id": "bound:cns-021",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-021\", \"pages\": [[55, 57]], \"spans\": [[1124, 1166]]}",
+   "state": "done",
+   "title": "cns-021 Spinal cord 3: pages 55-57, the recording says 55-57"
+  },
+  {
+   "answer": "[0, \"claude (owner 2026-11-14: take the decisions for me): use the reading\"]",
+   "at": 1794673369.225915,
+   "detail": "dr-naguib-el-husseiny-phys. shares a page; the recording covers 39% of it. Reading (lecture links): from \"THE REFLEX ACTION\" to \"visceral spinal reflexes:\".",
+   "id": "bound:cns-085",
+   "kind": "bound",
+   "options": "[\"Use the reading\", \"Keep current pages\", \"Edit pages\"]",
+   "payload": "{\"lecture\": \"cns-085\", \"pages\": [[175, 186]], \"spans\": [[3607, 3633], [3803, 3884]]}",
+   "state": "done",
+   "title": "cns-085 Reflex action: pages 175-186, the recording says 175, 184-186"
+  },
+  {
+   "answer": null,
+   "at": 1794659958.262591,
+   "detail": "Two sources give different keys. Never settled by an AI: they stay off the site until you pick.",
+   "id": "keys",
+   "kind": "open",
+   "options": "[\"Open\", \"Keep held\"]",
+   "payload": "{\"tab\": \"Polls\"}",
+   "state": "gone",
+   "title": "128 answer-key conflicts"
+  },
+  {
+   "answer": null,
+   "at": 1794416078.6361427,
+   "detail": "Fleet: Not reset yet: accounts in quota rest until about 11:35 (owner, 2026-11-12). Web: the Google login is dead on every account: export the cookies again. Code steps still run; readings, pointers and alignment wait.",
+   "id": "runner",
+   "kind": "runner",
+   "options": "[\"Check again\"]",
+   "payload": "{}",
+   "state": "gone",
+   "title": "No AI can work now"
+  },
+  {
    "answer": null,
    "at": 1794342642.8132064,
    "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
@@ -43,9 +208,74 @@
    "payload": "{\"n\": 10, \"review\": \"spot\"}",
    "state": "gone",
    "title": "Spot check: 10 links, about 2 minutes"
+  },
+  {
+   "answer": null,
+   "at": 1794608861.2281055,
+   "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
+   "id": "spot:2026-11-14",
+   "kind": "review",
+   "options": "[\"Start\", \"Skip today\"]",
+   "payload": "{\"n\": 10, \"review\": \"spot\"}",
+   "state": "gone",
+   "title": "Spot check: 10 links, about 2 minutes"
+  },
+  {
+   "answer": null,
+   "at": 1794747575.603026,
+   "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
+   "id": "spot:2026-11-15",
+   "kind": "review",
+   "options": "[\"Start\", \"Skip today\"]",
+   "payload": "{\"n\": 10, \"review\": \"spot\"}",
+   "state": "gone",
+   "title": "Spot check: 10 links, about 2 minutes"
   }
  ],
  "gold": [],
- "links": [],
+ "links": [
+  {
+   "at": 1794652240.4697065,
+   "found": 1,
+   "job": null,
+   "kind": "lesson",
+   "lines": "[[\"year2-cns:d30dcde2:p11:l1\", \"year2-cns:d30dcde2:p13:l30\"]]",
+   "model": null,
+   "module": "year2-cns",
+   "reason": null,
+   "runner": "owner",
+   "scope": null,
+   "src": "cns-001",
+   "state": "owner"
+  },
+  {
+   "at": 1794652240.4711583,
+   "found": 1,
+   "job": null,
+   "kind": "lesson",
+   "lines": "[[\"year2-cns:d30dcde2:p14:f1\", \"year2-cns:d30dcde2:p17:l12\"]]",
+   "model": null,
+   "module": "year2-cns",
+   "reason": null,
+   "runner": "owner",
+   "scope": null,
+   "src": "cns-004",
+   "state": "owner"
+  },
+  {
+   "at": 1794652240.471187,
+   "found": 1,
+   "job": null,
+   "kind": "lesson",
+   "lines": "[[\"year2-cns:d30dcde2:p140:l16\", \"year2-cns:d30dcde2:p144:f1\"]]",
+   "model": null,
+   "module": "year2-cns",
+   "reason": null,
+   "runner": "owner",
+   "scope": null,
+   "src": "cns-006",
+   "state": "owner"
+  }
+ ],
  "rules": []
 }

@@ -130,45 +130,40 @@ def cmd_lecture(args):
 CHAPTERS = {"anatomy": "Spinal cord", "histology": "Nervous tissue", "physiology": "Sensations"}
 
 
-# The three chapters the site already has keep their names; they are these handout lectures (owner, 2026-11-08).
-LEGACY_CHAPTERS = {"year2-cns:L03": "Spinal cord", "year2-cns:L01": "Nervous tissue", "year2-cns:L20": "Sensations"}
-_STOP = {"of", "the", "and", "part", "anatomy", "physiology", "histology", "features", "general", "revision", "&"}
+def list_chapters(module):
+    """(lecture id -> chapter title, subject -> titles in order, doctor id -> its list items, subject -> {key: title}): the chapter is the item of the doctor's Telegram list (the
+    mother message) the lecture is posted under: "- Spinal cord" with its parts 1, 2, 3 (owner, 2026-11-14: chapters come from
+    the message, never from the handout or from our own guess). The same title in two doctors' lists is one chapter; order =
+    first appearance (doctors in folder order, items in list order)."""
+    import auto_doctors
+    import tg_lists
+    import doctors_folder
+    docs = [d for d in auto_doctors.auto_doctors() if d["module"] == module and d["auto"]]
+    lists = {d["auto"]: tg_lists.load(d["auto"]) for d in docs}
+    posts = {pid: p for l in lists.values() if l for pid, p in l["posts"].items()}
+    post_to_lecture = auto_doctors.known(module, posts)
+    of, order, seen, by_doctor = {}, {}, {}, {}
+    for d in docs:
+        lst = lists[d["auto"]]
+        for item in (lst or {}).get("sections", {}).get("lectures", []):
+            title = (item["title"] or "").strip()  # exactly as the message says (owner, 2026-11-14): no capitalizing, no fixing
+            subj = d["subject"].lower()
+            key = _re_words(title)
+            by_doctor.setdefault(d["doctor_id"], []).append((title, key))
+            seen.setdefault(subj, {})
+            if key not in seen[subj]:
+                seen[subj][key] = title
+                order.setdefault(subj, []).append(title)
+            for part in item["parts"]:
+                lid = post_to_lecture.get(part["post"]) if part["post"] is not None else None
+                if lid:
+                    of[lid] = seen[subj][key]
+    return of, order, by_doctor, seen
 
 
-def handout_chapters(module):
-    """{subject: [{"id", "title", "order", "pages": [a, b]}]}: a chapter is a handout lecture, in handout order per subject."""
-    import outline
-    out = {}
-    for ref in outline.reference(module):
-        rows = out.setdefault(ref["subject"].lower(), [])
-        rows.append({"id": ref["lecture_id"], "title": LEGACY_CHAPTERS.get(ref["lecture_id"], ref["title"]),
-                     "handout_title": ref["title"], "order": len(rows) + 1, "pages": ref["pdf_pages"]})
-    return out
-
-
-def chapter_of(meta, subject, chapters):
-    """(chapter row, how): the handout lecture the lesson's pages fall in (most pages; the earlier one on a tie). A lesson
-    not placed yet falls back to the chapter whose title shares the most words with its title, else the subject's first
-    chapter ('guess'). owner, 2026-11-13: a doctor's lectures are never all filed under the first chapter."""
-    import re as _re
-    rows = chapters.get(subject) or []
-    if not rows:
-        return None, "none"
-    pages = [r.get("pages") or [] for r in meta.get("ranges") or []]
-    best, score = None, 0
-    for row in rows:
-        n = sum(max(0, min(p[1], row["pages"][1]) - max(p[0], row["pages"][0]) + 1) for p in pages if len(p) == 2)
-        if n > score:
-            best, score = row, n
-    if best:
-        return best, "pages"
-    words = lambda s: {w for w in _re.findall(r"[a-z0-9]+", (s or "").lower()) if w not in _STOP}
-    mine = words(meta.get("title"))
-    for row in rows:
-        n = len(mine & words(row["handout_title"]))
-        if n > score:
-            best, score = row, n
-    return (best, "title") if best else (rows[0], "guess")
+def _re_words(title):
+    import re
+    return " ".join(re.findall(r"[a-z0-9]+", (title or "").lower()))
 
 
 def lesson_order(metas):
@@ -204,14 +199,31 @@ def lesson_rows(module):
     metas = lectures.all_lectures(module)
     by_id = {m["id"]: m for m in metas}
     order_of = lesson_order(metas)
-    chapters = handout_chapters(module)
-    for m in metas:
+    import auto_doctors
+    chap_of, chap_order, by_doctor, seen = list_chapters(module)
+    resolved = {}
+    for m in sorted(metas, key=lambda m: bool(m.get("covers"))):  # what a mini lecture or revision covers is filed first
         base = by_id[m["covers"][0]] if m.get("covers") else m
         subject = (base.get("subject") or "").lower()
         order = order_of[m["id"]]
-        chap, how = chapter_of(base, subject, chapters)
-        if how in ("guess", "none"):
-            print(f"  chapter guess: {m['id']} '{m['title']}' is not placed in the handout yet, filed under the first chapter")
+        title = (resolved.get(base["id"]) if base is not m else None) or chap_of.get(base["id"]) or chap_of.get(m["id"])
+        if not title:  # not matched by post: the doctor's list item that shares the most words with its title
+            all_words = lambda t: auto_doctors._words(t)
+            mine = all_words(m["title"]) | all_words(base["title"])
+            score = lambda t: (len({w for w in mine & all_words(t) if not w.isdigit()}), len({w for w in mine & all_words(t) if w.isdigit()}))
+            scored = sorted(((score(t), t) for t, _k in by_doctor.get(m.get("doctor"), [])), reverse=True)
+            if scored and scored[0][0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+                title = scored[0][1]
+        if not title:
+            title = CHAPTERS.get(subject) or (base.get("chapter") or "").capitalize()
+            print(f"  chapter: {m['id']} '{m['title']}' is in no Telegram list item, filed under '{title}' (the old chapter)")
+        order_list = chap_order.setdefault(subject, [])
+        titles = {_re_words(t): t for t in order_list}
+        title = titles.get(_re_words(title), title)
+        if title not in order_list:
+            order_list.append(title)
+        chap = {"title": title, "order": order_list.index(title) + 1}
+        resolved[m["id"]] = title
         url = (m.get("source") or {}).get("youtube")
         doctor = m.get("doctor")
         doctor = doctors_folder.ALIASES.get((doctor or "").lower(), doctor)

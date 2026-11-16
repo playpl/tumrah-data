@@ -5,8 +5,8 @@ duplicate means depends on where it repeats (owner, 2026-11-07):
 - across channels or reposts: one question; net votes add up and the repeat is forgotten (no importance);
 - across doctors: a real signal; `repetition_count` counts the doctors and `importance_score` rises with it.
 Every sighting is kept with its Telegram link for a later "open on Telegram" button. Keys come only from the source;
-two sources that key different options give `key_conflict`, never a chosen key; only the owner settles one
-(`apply_decisions`, from the admin page's Polls tab).
+two sources that key different options give `key_conflict`, never a chosen key; the owner settles one
+(`apply_decisions`, from the admin page's Polls tab) or the doctor's own files do (`apply_doctor_prior`).
 
 Row shape (every loader returns it): {question, options, key (index or None), solution, votes (list), total,
 sightings: [{source, chat, msg_id, date, header, doctor, link}]}.
@@ -80,7 +80,7 @@ def load_forms(questions_path, keys_path, links_path):
             continue
         k = keys.get((q["link"], str(q["item_id"])))
         out.append({"question": q["question"], "options": q["options"], "key": k["correct_index"] if k else None,
-                    "solution": None, "votes": [0] * len(q["options"]), "total": 0,
+                    "prior": True, "solution": None, "votes": [0] * len(q["options"]), "total": 0,
                     "sightings": [{"source": "form", "form": q["link"], "chat": s["chat"], "msg_id": s["msg_id"],
                                    "date": s.get("date"), "header": s.get("header"), "doctor": s.get("chat_doctor"),
                                    "link": telegram_link(s["chat"], s["msg_id"])} for s in posts.get(q["link"], [])]})
@@ -99,8 +99,8 @@ def load_mcq_books(folder=ROOT / "modules"):
         for q in read_jsonl(f):
             if len(q.get("options") or []) < 2:
                 continue
-            out.append({"question": q["question"], "options": q["options"], "key": q.get("key"), "solution": None,
-                        "votes": [0] * len(q["options"]), "total": 0,
+            out.append({"question": q["question"], "options": q["options"], "key": q.get("key"), "prior": True,
+                        "solution": None, "votes": [0] * len(q["options"]), "total": 0,
                         "sightings": [{"source": "mcq_book", "book": q.get("book"), "page": q.get("page"), "chat": None,
                                        "msg_id": None, "date": None, "header": None, "doctor": q.get("doctor"), "link": None}]})
     return out
@@ -113,7 +113,7 @@ def load_doctor_quizbot(src):
         for q in read_jsonl(Path(src) / "quizbot" / folder / "quizbot_questions.jsonl"):
             options = [LABEL.sub("", o).strip() for o in q["options"]]
             out.append({"question": POSITION.sub("", q["question"]).strip(), "options": options, "key": q.get("correct_index"),
-                        "solution": q.get("solution"), "votes": [0] * len(options), "total": 0,
+                        "prior": True, "solution": q.get("solution"), "votes": [0] * len(options), "total": 0,
                         "sightings": [{"source": "quizbot", "quiz": q.get("param"), "chat": None, "msg_id": None, "date": None,
                                        "header": None, "doctor": doctor, "link": None}]})
     return out
@@ -149,6 +149,8 @@ def merge(rows):
             key = mine[r["key"]]
             q["key_conflict"] = q["key_conflict"] or (q["key"] is not None and q["key"] != key)
             q["key"] = key if q["key"] is None else q["key"]
+            if r.get("prior"):
+                q.setdefault("_prior", set()).add(key)
         q["key_conflict"] = q["key_conflict"] or bool(r.get("key_conflict"))
         q["solution"] = q["solution"] or r.get("solution")
         for i, v in enumerate(r.get("votes") or []):
@@ -175,6 +177,18 @@ def apply_decisions(bank, decisions):
     return bank
 
 
+def apply_doctor_prior(bank):
+    """Doctor files first (owner, 2026-11-14): a conflict between sources is settled by the doctor's own key (his MCQ book,
+    his own QuizBot test, his Google form) when every doctor-file key for the question names the same option. Doctor files
+    that disagree among themselves leave it a conflict. `key_source` says "doctor_file"; the owner's own answer (applied
+    before this) is never overridden."""
+    for q in bank:
+        prior = q.pop("_prior", None)
+        if q["key_conflict"] and prior and len(prior) == 1:
+            q.update(key=next(iter(prior)), key_conflict=False, key_source="doctor_file")
+    return bank
+
+
 def counts(bank):
     return {"questions": len(bank), "keyed": sum(q["key"] is not None for q in bank),
             "key_conflicts": sum(q["key_conflict"] for q in bank),
@@ -190,7 +204,8 @@ def build(out_dir=ROOT / "bank"):
         load_forms(src / "forms" / "forms_questions.jsonl", src / "forms" / "keys" / "form_keys.jsonl",
                    src / "forms" / "forms_links.jsonl") +         load_mcq_books() + load_doctor_quizbot(src) + load_inbox_forms(out_dir / "inbox")
     decisions = out_dir / "key_decisions.json"
-    bank = apply_decisions(merge(rows), json.loads(decisions.read_text(encoding="utf-8")) if decisions.exists() else {})
+    bank = apply_doctor_prior(apply_decisions(merge(rows), json.loads(decisions.read_text(encoding="utf-8"))
+                                              if decisions.exists() else {}))
     out_dir.mkdir(exist_ok=True)
     with open(out_dir / "questions.jsonl", "w", encoding="utf-8") as f:
         for q in bank:

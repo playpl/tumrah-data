@@ -7,8 +7,8 @@ in RecordsBatch58ATM that the channel keeps editing. Reading it again finds the 
 Each lecture part of a list becomes one lecture: "<item> part N (Dr. <first name>)" (no "part" when the item has one
 part). A YouTube link is the recording (YouTube's transcript first); an audio or video post is downloaded to
 sources/records/<post>/ (a video over BIG_MB waits: the owner decides). A part is already ours when its post id, its
-YouTube id, or the size of its local file matches a lecture we have. PDFs the lists link are only reported (owner
-decides partial or full by the file name in the doctor's folder). Revisions become revision lectures covering the
+YouTube id, or the size of its local file matches a lecture we have. PDFs the lists link are only reported:
+the agent decides by hand (owner, 2026-11-14), never by code or by the title. Full books first. Revisions become revision lectures covering the
 doctor's lectures of the chapter. A doctor with no site doctor id is reported, not guessed (Cocci, 2026-11-10).
 Nothing here reads recordings, questions or Arabic text: counts, sizes and English titles only.
 """
@@ -167,8 +167,9 @@ def plan(lists=None):
                     continue
                 title = lecture_title(d, mini_title(item) if section == "minis" else item, n, count)
                 same = by_title.get(title.lower())
-                if section == "minis" and same and same.get("kind") != "summary":
-                    same = None  # a lecture of the same name ("Nerve fiber") is not its mini lecture
+                want = {"lectures": "lecture", "minis": "summary", "revisions": "revision"}[section]
+                if same and same.get("kind", "lecture") != want:
+                    same = None  # a lecture of the same name ("Nerve fiber", "Diencephalon") is not its mini lecture or revision
                 if same and not same.get("backup"):
                     row["have"] += 1
                     continue
@@ -179,6 +180,8 @@ def plan(lists=None):
         for item, n, count, part, post in parts_of(lst, "pdfs"):
             if post and post.get("size") not in sizes:
                 row["pdfs"].append({"title": item, "post": part["post"], "size": post.get("size")})
+        row["fixed"] = lst.get("fixed") or []
+        row["twice"] = tg_lists.twice_linked(lst)
         out.append(row)
     return out
 
@@ -190,6 +193,11 @@ def describe(rows):
         head = f"{d['key']} ({d['subject']}, {d['doctor_id'] or 'NO SITE DOCTOR'}): {r['have']} known, {len(r['new'])} new lecture(s), " \
                f"{len(r['minis'])} new mini lecture(s), {len(r['revisions'])} revision(s), {len(r['pdfs'])} PDF(s) not in the folder"
         lines.append(head)
+        for x in r.get("fixed", []):
+            lines.append(f"   link fixed by hand (sources/lists/link_fixes.json): {x}")
+        for x in r.get("twice", []):
+            lines.append(f"   BROKEN LINK in the list: {x}. Find the right post by its caption, add it to "
+                         f"sources/lists/link_fixes.json, run Update data again")
         for x in r["convert"]:
             lines.append(f"   {x['id']} '{x['item']}' is a mini lecture in the list, filed as a plain lecture: will be fixed")
         for x in r["new"] + r["minis"] + r["revisions"]:
@@ -213,6 +221,7 @@ def sync(q, dry=False, big_mb=BIG_MB):
     report += describe(rows)
     if dry:
         return report
+    report += finish_interrupted(q, lists, big_mb)
     for r in rows:
         d = r["doctor"]
         for x in r["convert"]:
@@ -220,6 +229,23 @@ def sync(q, dry=False, big_mb=BIG_MB):
         for kind, items in (("lecture", r["new"]), ("summary", r["minis"]), ("revision", r["revisions"])):
             for x in items:
                 report += make(q, d, x, kind, big_mb)
+    return report
+
+
+def finish_interrupted(q, lists, big_mb):
+    """A lecture made from a list post whose download was stopped (it has the post's link but no file yet) would count as
+    known forever: download it now. A big video that waits for the owner's word stays waiting."""
+    posts = {int(pid): p for l in lists.values() if l for pid, p in l["posts"].items()}
+    report = []
+    for mod in {d["module"] for d in auto_doctors()}:
+        for m in lectures.all_lectures(mod):
+            src = m.get("source") or {}
+            pid = tg_lists.message_id(src.get("telegram"))
+            post = posts.get(pid)
+            if not pid or src.get("file") or src.get("youtube") or not post or post.get("kind") not in ("audio", "video"):
+                continue
+            if (post.get("size") or 0) <= big_mb * 1e6:
+                report += [f"interrupted download finished: {x}" for x in download_waiting(q, m["id"])]
     return report
 
 

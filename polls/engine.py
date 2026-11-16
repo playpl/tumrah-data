@@ -160,7 +160,8 @@ def seed_old_keys(c):
 
 
 def build_ready(c, raw=RAW, ready=READY):
-    """questions.jsonl (a key from Telegram) and held.jsonl (no key): one row per distinct question, reposts merged."""
+    """questions.jsonl (a key from Telegram) and held.jsonl (no key): one row per distinct question, reposts merged.
+    Reposts that key different options: the newest repost's key wins (`key_source` "newer_repost"; owner 2026-11-14)."""
     ready.mkdir(parents=True, exist_ok=True)
     own = {}
     for r in c.execute("SELECT chat, msg_id, option, ts FROM own"):
@@ -197,6 +198,9 @@ def build_ready(c, raw=RAW, ready=READY):
                 q["key_conflict"] = q["key_conflict"] or (q["key"] is not None and q["key"] != key)
                 q["key"] = key if q["key"] is None else q["key"]
                 q["solution"] = q["solution"] or row["solution"]
+                stamp = (m.get("date") or "", mid)       # owner 2026-11-14: reposts that disagree, the newer one wins
+                if stamp >= q.get("_newest", ("", -1, 0))[:2]:
+                    q["_newest"] = (*stamp, key, row["solution"])
             if row["votes"]:
                 votes, total = net(json.loads(row["votes"]), row["total"], own.get((chat, mid), []), row["seen"])
                 for i, v in enumerate(votes):
@@ -207,6 +211,10 @@ def build_ready(c, raw=RAW, ready=READY):
     with open(ready / "questions.jsonl", "w", encoding="utf-8") as good, \
             open(ready / "held.jsonl", "w", encoding="utf-8") as held:
         for q in merged.values():
+            newest = q.pop("_newest", None)
+            if q["key_conflict"] and newest:
+                q.update(key=newest[2], solution=newest[3] or q["solution"], key_conflict=False, key_source="newer_repost")
+                counts["newer_repost"] = counts.get("newer_repost", 0) + 1
             keyed = q["key"] is not None
             (good if keyed else held).write(json.dumps(q, ensure_ascii=False) + "\n")
             counts["questions" if keyed else "held"] += 1

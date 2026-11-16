@@ -324,12 +324,46 @@ def mini_target(x, metas):
     return hit[0] if len(hit) == 1 else None
 
 
+def source_keys(module, sources):
+    """Keys that tie a folder lesson to its lecture whatever its title: each recording file path and YouTube video id.
+    Titles are rewritten from mother_lists.json ("Spinal cord 1" becomes "Spinal cord part 1"), so a title alone no
+    longer finds the lecture (2026-11-15: a dry run would have re-created 13 lectures)."""
+    out = set()
+    for s in sources:
+        if s.get("file"):
+            out.add((module, "file", str(Path(s["file"])).lower()))
+        url = s.get("url") or s.get("youtube")
+        m = re.search(r"(?:youtu\.be/|[?&]v=|/shorts/)([\w-]{11})", url or "")
+        if m:
+            out.add((module, "yt", m.group(1)))
+    return out
+
+
 def plan(site_doctors=()):
     """What import would do, lesson by lesson; nothing is changed."""
     import lectures
     ls, bs = scan(site_doctors)
     metas = lectures.all_lectures()
-    have = {(m["module"], m["title"].lower()): m["id"] for m in metas}
+    title_have = {(m["module"], m["title"].lower()): m["id"] for m in metas}
+    by_src = {}
+    for m in metas:
+        for k in source_keys(m["module"], [m.get("source") or {}]):
+            by_src.setdefault(k, set()).add(m["id"])
+
+    class _Have(dict):
+        """(module, title) -> lecture id; a folder lesson is first found by its recording (source_keys), then by title."""
+        def get(self, key, default=None):
+            return dict.get(self, key, title_have.get(key, default))
+
+    have = _Have()
+    for x in ls:
+        if x.get("title") is None:
+            continue
+        ids = set()
+        for k in source_keys(x["module"], [ln for ln in x.get("links") or [] if ln.get("kind") == "recording"]):
+            ids |= by_src.get(k, set())
+        if len(ids) == 1:
+            have[(x["module"], nice(x["title"]).lower())] = ids.pop()
     by_id = {m["id"]: m for m in metas}
     # The site doctor of a folder: the one its already named lessons carry (the site has no doctors table to match).
     folder_doctor = {}
@@ -398,6 +432,13 @@ def media_merge(module, rows):
 NO_ALIGN = {"azony"}
 
 CHAPTER_QUIZZES = "chapter_quizzes.json"  # modules/<module>/site/: {form url: report} of the chapter quizzes filed
+
+
+def chapter_quiz_filed(x):
+    """True when this chapter quiz's form is already in chapter_quizzes.json (import_all would only say "already filed")."""
+    done_f = ROOT / "modules" / x["module"] / "site" / CHAPTER_QUIZZES
+    done = json.loads(done_f.read_text(encoding="utf-8")) if done_f.exists() else {}
+    return x["links"][0]["url"] in done
 
 
 def chapter_quiz(x):

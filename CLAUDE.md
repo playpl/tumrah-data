@@ -3,7 +3,7 @@
 Adds all data to the website, linked through the handout. Design and plan live in the tumrah repo:
 `docs/superpowers/specs/2026-11-06-data-workflow-design.md`, `docs/superpowers/plans/2026-11-06-data-workflow.md`.
 
-Start here: `docs/handovers/HANDOVER_2026-11-14.md` (newest: poll titles scope pointers, Haiku reader A, site import 11-14), then `docs/handovers/HANDOVER_2026-11-12.md` (fleet in quota rest, uploads now start from Update data,
+Start here: `docs/handovers/HANDOVER_2026-11-14_EVENING.md` (site data rework, hand-written mother_lists.json, balanced questions), then `docs/handovers/HANDOVER_2026-11-14.md` (newest: poll titles scope pointers, Haiku reader A, site import 11-14), then `docs/handovers/HANDOVER_2026-11-12.md` (fleet in quota rest, uploads now start from Update data,
 open owner decisions: Cocci doctor id, Haiku, publishing), then `docs/handovers/HANDOVER_2026-11-10_LEDGER.md` (the ledger, checked placement and the Today screen; what is done
 and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web instead of the fleet, the lowest-error plan), then
 `docs/handovers/HANDOVER_2026-11-10.md`, then `docs/handovers/HANDOVER_2026-11-07.md`, then `docs/handovers/HANDOVER_2026-11-06.md` for the polls job.
@@ -15,8 +15,14 @@ and prints one report. Then tell the owner what changed, what waits (the fleet i
 only queue) and what needs a decision. Details: `update_data.py` docstring. Flags: `--dry`, `--no-telegram`.
 - ALWAYS IMPORT (owner, 2026-11-13): if anything needs importing (lecture, revision, quiz, book), run the real
   `py update_data.py` at once. Never wait for permission, never ask first. Always keep data updated.
-- Chapters (owner, 2026-11-13): a lesson's site chapter is the handout lecture its pages fall in (`dm.chapter_of`), never the
-  subject's first chapter. After Update data read the "chapter guess" lines and the chapter spread per doctor.
+- Chapters (owner, 2026-11-14; replaces the 2026-11-13 handout rule): a lesson's site chapter is the item of the doctor's Telegram
+  list (the "mother message") it is posted under ("- Spinal cord" with parts 1-3 = chapter "Spinal cord"). Since the evening
+  of 11-14 it is written BY HAND in `modules/year2-cns/site/mother_lists.json` (see MOTHER MESSAGES BY HAND below);
+  `dm.list_chapters` code matching is only a fallback for a lecture missing there. Never from the handout or a guess.
+  Mini lectures and revisions sit with what they cover.
+- Questions per lesson (2026-11-14): students see `Question.lesson` (one lesson per question). `fast_lessons.build` spreads a
+  shared question to the least loaded lesson. Every site import = lessons, importSfQuestions, importHubData pointers,
+  apply_tiers, then recomputeLessonExtras for ALL published CNS lessons. Held lectures (duplicates) stay drafts.
 - NEVER ASK (owner, 2026-11-13): never ask before fixing a problem or importing new data. Do it, then report. Only the
   production website and the owner's Today-screen answers stay off limits.
 - READ THE MESSAGES YOURSELF (owner, 2026-11-13): in every Update data, read each doctor's Telegram list message and its
@@ -26,6 +32,20 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
   with its number. `lesson_files.py` writes `modules/<m>/site/lesson_files.jsonl` (Update data runs it). The site has no
   place for them yet: the website agent must add one.
 - Never touch the website from it: importers write production. Publish only when the owner says so (dry run first).
+- MOTHER MESSAGES BY HAND (owner, 2026-11-14 evening, angry): from a doctor's Telegram list message you care ONLY about
+  lectures, mini lectures, revisions and their records. Never PDFs. Read the message yourself (`py tg_lists.py text <id>`),
+  then write by hand `modules/year2-cns/site/mother_lists.json`: per doctor, each list item = one chapter (in list order),
+  and under it its lectures (the item's parts), mini lectures and revisions. Not code matching, not guesses. `site_lessons.py`
+  takes chapter, name, kind, covers and order ONLY from that file; a lesson missing from it is reported. Update it by hand in
+  every Update data when a list changes (new lecture = new line under its item).
+- EXACT TO THE MOTHER MESSAGE (owner, 2026-11-15): after editing `mother_lists.json` run `py mother_check.py`; it must
+  print "exact" (chapters = the list's lecture items in order and words; every lecture/mini/revision post is in the file).
+  A doctor's wrong link (e.g. Azouny's Medulla Part 3 linked to 1708, really post 1709) is fixed by hand in
+  `sources/lists/link_fixes.json` (find the right post by its caption); Update data prints "BROKEN LINK" for a post an
+  item links twice. A sync that was stopped mid-download is finished by the next sync (`auto_doctors.finish_interrupted`).
+- List PDFs (owner, 2026-11-14, evening; replaces the morning rule): ONLY THE OWNER ADDS PDFs. Update data reports "PDF post N
+  ... not in the folder"; that is information only. Never download, open, compare, file or use a list PDF. Books are only what
+  the owner put in the doctors' folders.
 - Auto doctors: `auto_doctors.py` (`plan`, `sync`, `download <lecture>`). Telegram lists: `tg_lists.py`. A doctor with no
   site doctor id (Cocci) is reported, never guessed. Aliases live in `doctors_folder.ALIASES`.
 - Backup rule: "use backup for lecture X, doctor Y till new is provided" = `py backup.py use "<lecture>" --doctor <y>`. It takes

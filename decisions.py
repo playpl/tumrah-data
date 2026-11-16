@@ -82,15 +82,34 @@ def cards(module, db):
                         "detail": "Type the site doctor id (like dr-name-subj). Asked once: it becomes a rule for every "
                                   "later file. Until then this doctor's files stay held.",
                         "options": ["Set site doctor", "Keep held"], "payload": {"key": key, "input": "site doctor id"}})
-    cf = ROOT / "bank" / "counts.json"
-    kf = ROOT / "bank" / "key_decisions.json"
-    conflicts = (json.loads(cf.read_text(encoding="utf-8")).get("key_conflicts") or 0) if cf.exists() else 0
-    decided = len(json.loads(kf.read_text(encoding="utf-8"))) if kf.exists() else 0
-    if conflicts > decided:
-        out.append({"id": "keys", "kind": "open", "title": f"{conflicts - decided} answer-key conflicts",
+    open_keys = module_key_conflicts(module)
+    if open_keys:
+        out.append({"id": "keys", "kind": "open", "title": f"{open_keys} answer-key conflicts",
                     "detail": "Two sources give different keys. Never settled by an AI: they stay off the site until you pick.",
                     "options": ["Open", "Keep held"], "payload": {"tab": "Polls"}})
     return out
+
+
+def module_key_conflicts(module, bank=None, points=None, decisions=None):
+    """Undecided answer-key conflicts of this module only: bank questions with key_conflict whose word key is pointed
+    into the module's handout (site/fast_points.json). The bank holds every module; the owner works on CNS only and the
+    other modules' conflicts are not his to answer now (2026-11-10; the card counted all 131, none CNS, until 2026-11-15)."""
+    bank = Path(bank or ROOT / "bank" / "questions.jsonl")
+    points = Path(points or ROOT / "modules" / module / "site" / "fast_points.json")
+    decisions = Path(decisions or ROOT / "bank" / "key_decisions.json")
+    if not bank.exists() or not points.exists():
+        return 0
+    pointed = set(json.loads(points.read_text(encoding="utf-8")))
+    decided = set(json.loads(decisions.read_text(encoding="utf-8"))) if decisions.exists() else set()
+    n = 0
+    with open(bank, encoding="utf-8") as f:
+        for line in f:
+            if '"key_conflict": true' not in line:
+                continue
+            q = json.loads(line)
+            if q.get("key_conflict") and q["word_key"] in pointed and q["word_key"] not in decided:
+                n += 1
+    return n
 
 
 def refresh(module=ledger.MODULE, db=None):

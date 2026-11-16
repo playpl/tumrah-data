@@ -30,7 +30,7 @@ def build(module, bank):
     by_key = {q["word_key"]: q for q in bank}
     lessons, questions, skipped, seen = [], [], Counter(), set()
     for m in lectures.all_lectures(module):
-        if not m.get("lesson") or m.get("kind", "lecture") != "lecture":
+        if not m.get("lesson") or m.get("kind", "lecture") != "lecture" or m.get("hold"):  # held duplicates stay off the site
             continue
         subject = (m.get("subject") or "").lower()
         key = f"lecture:{m['id']}"

@@ -54,7 +54,7 @@ def lesson_lines(lines=None):
     """lecture id -> set of handout line ids inside its ranges, for the lectures that are lessons on the site
     (ledger.lesson_ids: a range cut at a heading is read line by line, an older one by whole pages)."""
     import ledger
-    site = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("lesson")}
+    site = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("lesson") and not m.get("hold")}  # held duplicates get no questions
     return {lid: ids for lid, ids in ledger.lesson_ids(MODULE).items() if lid in site}
 
 
@@ -163,7 +163,7 @@ def build():
     have = {q["source_id"] for q in base["questions"]}
     metas = {m["id"]: m for m in lectures.all_lectures(MODULE)}
     lesson_key = {lid: f"lecture:{lid}" for lid in in_lesson}
-    kept, points, stats = [], {}, Counter()
+    kept, pending, points, stats = [], [], {}, Counter()
     for q in bank:
         lab = labels.get(q["word_key"])
         if not lab:
@@ -223,6 +223,7 @@ def build():
             continue
         m = metas[homes[0]]
         votes, total = q.get("votes") or [], q.get("total") or 0
+        pending.append(homes)
         kept.append({
             "source_id": sid, "batch": "58", "lesson": lesson_key[homes[0]], "subject": (m.get("subject") or "").lower(),
             "doctorId": None, "topic": m["title"], "stem": q["question"], "options": q["options"], "correct_index": q["key"],
@@ -234,7 +235,17 @@ def build():
                              "source_id": f"{s.get('chat')}:{s.get('msg_id')}"} for s in q["sightings"][:30]],
             **({"stats": {"attempts": total, "correct": votes[q["key"]]}} if total and q["key"] < len(votes) else {}),
         })
-        stats["by_lesson:" + homes[0]] += 1
+    # The site files a question under ONE lesson (Question.lesson). "First lesson whose pages hold the line" gave one lesson
+    # 1,366 questions and another doctor's lesson on the same pages 2 (owner, 2026-11-14: "I can't stand that lesson having
+    # 500 questions while other having 2"). Each question now goes to the least loaded of its lessons (the owner's lists
+    # count first), ties to the narrowest lesson; the most constrained questions are placed first.
+    load = Counter(x["lesson"] for x in base["questions"])
+    for i in sorted(range(len(kept)), key=lambda i: (len(pending[i]), kept[i]["source_id"])):
+        h = min(pending[i], key=lambda h: (load[lesson_key[h]], len(in_lesson[h]), h))
+        m = metas[h]
+        kept[i].update({"lesson": lesson_key[h], "subject": (m.get("subject") or "").lower(), "topic": m["title"]})
+        load[lesson_key[h]] += 1
+        stats["by_lesson:" + h] += 1
     base["questions"].extend(kept)
     SITE.mkdir(parents=True, exist_ok=True)
     (SITE / "questions.json").write_text(json.dumps(base, ensure_ascii=False), encoding="utf-8")

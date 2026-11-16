@@ -3,15 +3,14 @@
 The data session never writes production. These three need the tumrah repo (`C:\Users\Ahmed\Desktop\tumrah`).
 Data files are in `C:\Users\Ahmed\Desktop\Tumrah projects\tumrah-data\modules\year2-cns\site\`.
 
-## 1. Wrong chapters on the site
-Every Dr. Azony lecture (and other auto-list lectures) shows under "Spinal cord". Cause was on the data side and is fixed
-(commit "fix: file each lesson in the handout chapter its pages fall in"): `lessons.jsonl` now gives each lesson
-`chapter {title, order}` = the handout lecture its pages fall in, per subject. Legacy names kept: Spinal cord, Nervous
-tissue, Sensations. Orders are per subject and have gaps.
-- Check `importHubData lessons --module year2-cns --file lessons.jsonl` creates the new chapters (title + order) and moves
-  existing lessons without duplicates or orphans (questions, ranges, links stay attached). Dry run, then `--apply`.
-- Verify on the site: Azony spreads over Spinal cord, brain stem nuclei, cerebellum, 4th ventricle.
-- 5 lessons are not placed yet and stay in the first chapter (cns-075, 092 to 095).
+## 1. Chapters come from the Telegram list (rewritten 2026-11-14, owner)
+Chapters are NOT handout lectures. Each lesson's `chapter {title, order}` in `lessons.jsonl` is the item of the doctor's Telegram
+list message it is posted under (Azony: Spinal cord, Medulla, Nuclei of medulla & Features of pons, Nuclei of pons & midbrain &
+cerebellum, 4th ventricle). Same title in two doctors' lists = one chapter; order = first appearance per subject.
+- `importHubData lessons` reports `chapters_to_create` (45 in the 11-14 dry run) and creates none: add chapter creation
+  (title + order) and moving existing lessons without duplicates or orphans (questions, ranges, links stay attached).
+  Dry run, then `--apply`. The legacy chapters (Spinal cord, Nervous tissue, Sensations) may end up empty.
+- 4 lessons fall back to the subject's old chapter when the list names no item for them.
 
 ## 2. Cocci has no site doctor
 Telegram list 1636 (Dr. Cocci, physiology) has one PDF ("Receptors tafreghat") and no lectures yet. The data side cannot

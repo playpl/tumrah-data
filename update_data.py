@@ -165,7 +165,8 @@ def main(argv):
     if dry:
         step(report, "folder import (what would change)", lambda: [
             f"{x['action']}: {x['title']} ({x['doctor_folder']})" for x in doctors_folder.plan()[0]
-            if not x["action"].startswith(("skip", "exists"))] or ["nothing new in the folder"])
+            if not x["action"].startswith(("skip", "exists"))
+            and not (x["action"] == "chapter quiz" and doctors_folder.chapter_quiz_filed(x))] or ["nothing new in the folder"])
     else:
         step(report, "folder import", lambda: [ln for ln in doctors_folder.import_all(q) if not noise(ln)])
         if nagib_forms_changed():

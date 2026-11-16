@@ -43,6 +43,23 @@ class TestMerge(unittest.TestCase):
         self.assertEqual((bank[0]["key"], bank[0]["key_conflict"], bank[0]["key_source"]), (1, False, "owner"))
         self.assertEqual((bank[1]["key"], "key_source" in bank[1]), (0, False))  # no conflict: the source key stays
 
+    def test_doctor_file_key_settles_a_conflict(self):
+        bank = merge.apply_doctor_prior(merge.merge([row("Q?", ["a", "b"], 0), dict(row("Q?", ["a", "b"], 1), prior=True)]))
+        self.assertEqual((bank[0]["key"], bank[0]["key_conflict"], bank[0]["key_source"]), (1, False, "doctor_file"))
+        self.assertNotIn("_prior", bank[0])
+
+    def test_doctor_files_that_disagree_leave_the_conflict(self):
+        bank = merge.apply_doctor_prior(merge.merge([row("Q?", ["a", "b"], 0), dict(row("Q?", ["a", "b"], 0), prior=True),
+                                                     dict(row("Q?", ["a", "b"], 1), prior=True)]))
+        self.assertTrue(bank[0]["key_conflict"])
+        self.assertNotIn("key_source", bank[0])
+
+    def test_doctor_file_never_overrides_the_owner(self):
+        bank = merge.merge([row("Q?", ["a", "b"], 0), dict(row("Q?", ["a", "b"], 1), prior=True)])
+        merge.apply_decisions(bank, {bank[0]["word_key"]: {"key": 0}})
+        merge.apply_doctor_prior(bank)
+        self.assertEqual((bank[0]["key"], bank[0]["key_source"]), (0, "owner"))
+
     def test_a_source_rows_own_conflict_survives(self):
         import json
         import tempfile

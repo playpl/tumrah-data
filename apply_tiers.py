@@ -17,7 +17,7 @@ DNS = os.environ.get("DNS_PRELOAD", "")
 def main(dry):
     env = {**os.environ, **({"NODE_OPTIONS": f"--require {DNS}"} if DNS else {})}
     for m in sorted(lectures.all_lectures("year2-cns"), key=lambda m: m["id"]):
-        if not m.get("lesson"):
+        if not m.get("lesson") or m.get("hold"):  # held duplicates are drafts on the site
             continue
         for kind in ("required", "doctor"):
             f = SITE / f"tier_{kind}_{m['id']}.jsonl"

@@ -117,6 +117,38 @@ def parse_post(msg):
             "youtube": sorted({u if u.startswith("http") else "https://" + u for u in yt}), "album": msg.grouped_id}
 
 
+LINK_FIXES = OUT / "link_fixes.json"
+
+
+def apply_link_fixes(list_id, d):
+    """The doctor's own wrong links, fixed by hand in sources/lists/link_fixes.json (owner, 2026-11-15: the site must be
+    exact to the mother message). A fix is {"item", "label", "linked", "post", "why"}: the part `label` of `item` links
+    post `linked`, but its post is `post` (read from the channel's captions). Applied only while the list still links the
+    wrong post; once the channel fixes its link the fix stops matching. Each applied fix is noted in d["fixed"]."""
+    fixes = json.loads(LINK_FIXES.read_text(encoding="utf-8")).get(str(list_id), []) if LINK_FIXES.exists() else []
+    d["fixed"] = []
+    for fx in fixes:
+        for sec in d["sections"].values():
+            for it in sec:
+                if it["title"].strip().lower() != fx["item"].strip().lower():
+                    continue
+                for part in it["parts"]:
+                    if part["label"].strip().lower() == fx["label"].strip().lower() and part["post"] == fx["linked"]:
+                        part.update(post=fx["post"], url=f"https://t.me/{CHANNEL}/{fx['post']}", fixed_from=fx["linked"])
+                        d["fixed"].append(f"{fx['item']} {fx['label']}: post {fx['linked']} -> {fx['post']}")
+    return d
+
+
+def twice_linked(d):
+    """["item: post N linked twice"] for every item that links one post under two labels (a broken link in the list)."""
+    out = []
+    for sec in d["sections"].values():
+        for it in sec:
+            posts = [p["post"] for p in it["parts"] if p["post"]]
+            out += [f"{it['title']}: post {x} linked twice" for x in sorted(set(posts)) if posts.count(x) > 1]
+    return out
+
+
 async def _fetch(ids, account="voter2"):
     sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
     from tg import connect
@@ -126,7 +158,7 @@ async def _fetch(ids, account="voter2"):
         ent = await client.get_entity(CHANNEL)
         lists = {m.id: m for m in await client.get_messages(ent, ids=list(ids)) if m is not None}
         for i, m in lists.items():
-            d = parse(m)
+            d = apply_link_fixes(i, parse(m))
             posts = {p["post"] for sec in d["sections"].values() for it in sec for p in it["parts"] if p["post"]}
             d["posts"] = {str(pm.id): parse_post(pm) for pm in await client.get_messages(ent, ids=sorted(posts)) if pm is not None}
             out[i] = d
@@ -228,6 +260,9 @@ if __name__ == "__main__":
             print(f"== {i} edited {d['edit_date']}\n{d['text']}\n-- posts")
             for k, p in d["posts"].items():
                 print(f"{k} {p['kind']} {p.get('size') or ''} {p.get('file_name') or ''} | {(p.get('caption') or '').strip()[:120]}".replace("\n", " "))
+    elif cmd == "download":  # post ids: the posts' files into sources/records/<post>/ (a list PDF the agent inspects by hand)
+        for k, v in download(ids).items():
+            print(k, v)
     elif cmd == "show":
         for i in ids:
             show(i)

@@ -24,7 +24,43 @@ MEDIA = {
 }
 
 
+def mother_lists():
+    """{lecture id: {chapter, chapter_order, name, kind, covers, order}} from the hand-written mother_lists.json (owner,
+    2026-11-14: chapters and lectures are read BY HAND from each doctor's Telegram list, never matched by code).
+    Chapter order per subject = first appearance (doctors in file order); lesson order per doctor = file order."""
+    f = SITE / "mother_lists.json"
+    if not f.exists():
+        return {}
+    out, chap_order = {}, {}
+    for d in json.loads(f.read_text(encoding="utf-8"))["doctors"]:
+        titles = chap_order.setdefault(d["subject"], [])
+        n = 0
+        for ch in d["chapters"]:
+            if ch["title"] not in titles:
+                titles.append(ch["title"])
+            for it in ch["items"]:
+                n += 1
+                out[it["id"]] = {"chapter": ch["title"], "chapter_order": titles.index(ch["title"]) + 1, "name": it["name"],
+                                 "kind": it.get("kind", "lesson"), "covers": it.get("covers") or [], "order": n,
+                                 "doctor": d["doctor"]}
+    return out
+
+
+def sync_meta(hand):
+    """lecture.json follows the hand file: title, kind and covers (a mini lecture's or revision's pages follow what it covers)."""
+    for lid, h in hand.items():
+        meta = lectures.load(lid)
+        kind = "lecture" if h["kind"] == "lesson" else h["kind"]
+        if (meta.get("title"), meta.get("kind", "lecture"), meta.get("covers") or []) != (h["name"], kind, h["covers"]):
+            meta.update(title=h["name"], kind=kind, covers=h["covers"])
+            lectures.save(meta)
+            if h["covers"]:
+                lectures.cover_ranges(meta)
+
+
 def write():
+    hand = mother_lists()
+    sync_meta(hand)
     held = {m["id"] for m in lectures.all_lectures(MODULE) if m.get("hold")}
     rows = []
     mf = SITE / "media.json"
@@ -37,6 +73,12 @@ def write():
         # A held lecture is not in the file, and the importer refuses a revision that covers a lesson that is not in it
         # (2026-11-12: cns-081 covered the held duplicate cns-016, whose twin cns-015 it covers as well).
         r["covers"] = [c for c in r.get("covers") or [] if c.split(":", 1)[-1] not in held]
+        h = hand.get(lid)
+        if h:
+            r.update(chapter={"title": h["chapter"], "order": h["chapter_order"]}, name=h["name"], kind=h["kind"],
+                     order=h["order"], covers=[f"lecture:{c}" for c in h["covers"]])
+        elif hand:
+            print(f"  NOT IN mother_lists.json: {lid} '{r['name']}' ({r.get('doctorId')}): add it by hand from the doctor's list")
         if lid in MEDIA:
             field, url = MEDIA[lid]
             r[field] = url
