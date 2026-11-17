@@ -86,6 +86,15 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
 - Driven from there: keep a TodoWrite list; tick board items with `py control.py board done <id>`; add follow-ups with
   `py control.py board add "text"`.
 
+## Mother agent inside Update data (2026-11-17)
+- Update data step "mother messages (agent, add only)" (`spine/tg/flow.py`, `py -m spine mother flow`): two fleet
+  readers re-read only the lists whose message changed; a lecture/mini/revision in their agreed map that
+  `mother_lists.json` lacks is ADDED under its chapter. Nothing in the hand file is edited or removed by code;
+  edits and deletions are only reported (the hold rule; the site's draft + undo is not built). `parity mother`
+  must stay exact (10 of 10 on 2026-11-17). Claude still reads every list message and checks the report.
+- `py -m spine parity p1` compares the spine's book links with the old aligned blocks (shadow files in
+  `modules/year2-cns/graph/compat/aligned/`). Website asks: `docs/spine/WEBSITE_ASKS.md`.
+
 ## Mother trees (owner, 2026-11-17)
 - Both years' doctor lists are in `spine/tg/trees.json` (the trees the owner pasted). Start: `docs/spine/HANDOVER.md`.
 - Year 2 "Old data" lists are FALLBACK only: never imported unless the owner names lecture and doctor
