@@ -157,5 +157,70 @@ class Upload(Base):
         self.assertEqual(machine.states("year1-test")[aud["id"]]["state"], "compressed")
 
 
+class Transcribe(Base):
+    def test_shift_and_join(self):
+        from spine.records import transcribe
+        self.assertEqual(transcribe.shift("[04:50] a\n", 3600), "[64:50] a\n")
+        raw = transcribe.join(["[00:00] one\n[02:30] two\n", "", "[00:10] three\n"])
+        self.assertEqual(raw, "[00:00] one\n[02:30] two\n[10:10] three\n")
+
+    def test_pieces_are_heard_once_and_joined(self):
+        from spine.records import transcribe
+        aud = self.recs[1]
+        f = machine.compressed_path(aud)
+        f.parent.mkdir(parents=True)
+        f.write_bytes(b"m4a")
+        machine.mark("year1-test", aud["id"], "compressed")
+        pdir = machine.record_dir(aud) / "pieces"
+        pdir.mkdir()
+        pieces = [pdir / "c00.ogg", pdir / "c01.ogg"]
+        for p in pieces:
+            p.write_bytes(b"ogg")
+        (pdir / "c00.txt").write_text("[00:00] heard before\n", encoding="utf-8")   # a stopped run's piece
+        asked = []
+
+        def ask(prompt, model, attach, timeout):
+            asked.append(attach[0].name)
+            return "word " * 3000, {"account": "x"}
+        import lectures
+        with mock.patch.object(transcribe, "cut", lambda r, a: pieces), mock.patch.object(lectures, "duration", lambda p: 300.0):
+            n = transcribe.run(self.recs, say=lambda s: None, ask=ask, via="gemini", workers=1)
+        self.assertEqual((n, asked), (1, ["c01.ogg"]))
+        raw = (machine.record_dir(aud) / "raw.txt").read_text(encoding="utf-8")
+        self.assertTrue(raw.startswith("[00:00] heard before\n[05:00] word"))
+        self.assertEqual(machine.states("year1-test")[aud["id"]]["transcript"], "gemini")
+
+    def test_the_fleet_writes_piece_txt_and_it_is_checked(self):
+        from spine.records import transcribe
+        p = self.tmp / "pieces" / "c00.ogg"
+        p.parent.mkdir()
+        p.write_bytes(b"ogg")
+        body = "\n".join(f"[{m:02d}:00] " + "kalam " * 120 for m in range(5)) + "\n"
+
+        def runner(cmd):
+            self.assertIn("lite", cmd)
+            (Path(cmd[cmd.index("--cwd") + 1]) / "piece.txt").write_text(body, encoding="utf-8")
+
+        def short(cmd):
+            (Path(cmd[cmd.index("--cwd") + 1]) / "piece.txt").write_text("[00:00] hi\n", encoding="utf-8")
+        import lectures
+        with mock.patch.object(lectures, "duration", lambda p: 300.0):
+            self.assertEqual(transcribe.hear_fleet(p, "zero", runner=runner, say=lambda s: None), body)
+            self.assertEqual(p.with_suffix(".txt").read_text(encoding="utf-8"), body)
+            p.with_suffix(".txt").unlink()
+            self.assertIsNone(transcribe.hear_fleet(p, "zero", runner=short, say=lambda s: None))
+        self.assertFalse(p.with_suffix(".txt").exists())
+
+    def test_a_condensed_answer_is_not_kept(self):
+        from spine.records import transcribe
+        p = self.tmp / "c00.ogg"
+        p.write_bytes(b"ogg")
+        import lectures
+        with mock.patch.object(lectures, "duration", lambda p: 300.0):
+            got = transcribe.hear(p, ask=lambda *a, **k: ("short summary", {}), say=lambda s: None)
+        self.assertIsNone(got)
+        self.assertFalse(p.with_suffix(".txt").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
