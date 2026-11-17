@@ -82,3 +82,14 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
   New chat), the owner's Board, and a beat number that shows the server is up.
 - Driven from there: keep a TodoWrite list; tick board items with `py control.py board done <id>`; add follow-ups with
   `py control.py board add "text"`.
+
+## Mother trees (owner, 2026-11-17)
+- Both years' doctor lists are in `spine/tg/trees.json` (the trees the owner pasted). Start: `docs/spine/HANDOVER.md`.
+- Year 2 "Old data" lists are FALLBACK only: never imported unless the owner names lecture and doctor
+  (`backup.py use`). A doctor's `old data.txt` only tells `backup.py` where the old list is.
+- Year 1 (channels `ZAG59_Anatomy`, `ZAG59_physio`, `ZAG59_Histo`, `ZAG59_bio`; 20 lists): ALL of it is old data
+  and all of it is to be imported; the website needs a note that says so. Lists: `py tg_lists.py fetch -c <channel>
+  <ids>` -> `sources/lists/<channel>/`; maps: `py -m spine mother run --year 1`. Never put a `ZAG59_*` link in
+  `doctors/`: the old flow reads only the number and would open a `RecordsBatch58ATM` post.
+- A lecture whose doctor has no site doctor id stays off the site (`site_lessons.py` prints "NO SITE DOCTOR").
+- One Telegram reader at a time: `tg_lists.py fetch` during Update data locks the session ("database is locked").

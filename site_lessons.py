@@ -69,6 +69,11 @@ def write():
         lid = r["key"].split(":", 1)[1]
         if lid in held:
             continue
+        if not r.get("doctorId"):
+            # A doctor with no site doctor id is reported, never guessed (2026-11-17: Dr. Khaled Aboelfadl's 12
+            # lectures). His lessons stay off the site until the owner sets the doctor ("Set site doctor" card).
+            print(f"  NO SITE DOCTOR: {lid} '{r['name']}' stays off the site until its doctor has a site id")
+            continue
         meta = lectures.load(lid)
         # A held lecture is not in the file, and the importer refuses a revision that covers a lesson that is not in it
         # (2026-11-12: cns-081 covered the held duplicate cns-016, whose twin cns-015 it covers as well).

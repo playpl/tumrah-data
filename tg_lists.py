@@ -22,6 +22,17 @@ CHANNEL = "RecordsBatch58ATM"
 LINK = re.compile(r"https?://t\.me/(?:c/(\d+)|([A-Za-z0-9_]+))/(\d+)")
 ARABIC = re.compile(r"[\u0600-\u06FF]")
 SECTIONS = (("mini", "minis"), ("pdf", "pdfs"), ("lecture", "lectures"), ("revision", "revisions"))  # "Mini Lectures" before "lecture"
+# The first-year lists (ZAG59_*, owner 2026-11-17): Arabic headers, "Books" / "Recs", bullets ". • ● _".
+# Questions, practical, notes and the doctor's channel link are "other": never a lecture.
+SECTIONS_Y1 = (("المذكرات", "pdfs"), ("books", "pdfs"),
+               ("الشرح", "lectures"), ("recs", "lectures"),
+               ("مراجع", "revisions"),
+               ("الأسئلة", "other"), ("العملي", "other"),
+               ("ملاحظات", "other"), ("channel link", "other"),
+               ("قهوة", "other"), ("الجمعة", "other"),
+               ("إسعاف", "other"))
+BULLETS = ("-", ".", "•", "●", "_")
+SUBHEAD = re.compile(r"(?i)chapter\b.*|\[.*\]|\U0001F53B.*\U0001F53B")
 
 
 def message_id(url):
@@ -34,7 +45,7 @@ def utf16_len(text):
     return len(text.encode("utf-16-le")) // 2
 
 
-def parse(msg):
+def parse(msg, channel=None):
     """{id, date, edit_date, title, text, sections: {pdfs|lectures|revisions: [item]}, media}: one list message.
 
     An item is {title, parts: [{label, url, post}]}. A line "- Spinal cord" starts an item and the lines under it
@@ -45,12 +56,14 @@ def parse(msg):
     for ln in text.split("\n"):
         lines.append((pos, ln))
         pos += utf16_len(ln) + 1
-    is_title = [l.strip().startswith("-") or bool(re.match(r"^\d+[.)]", l.strip())) for _, l in lines]
+    y1 = channel is not None and channel != CHANNEL
+    bullets = BULLETS if y1 else ("-",)
+    is_title = [l.strip().startswith(bullets) or bool(re.match(r"^\d+[.)]", l.strip())) for _, l in lines]
     plain = [i for i, (_, l) in enumerate(lines) if i > 0 and l.strip() and not is_title[i] and not l.strip().startswith(("➠", "➥"))]
     sec_at = []
     for i in plain:
         low = unicodedata.normalize("NFKC", lines[i][1]).lower()
-        for name, key in SECTIONS + (("notebook", "pdfs"),):
+        for name, key in SECTIONS + (SECTIONS_Y1 if y1 else ()) + (("notebook", "pdfs"),):
             if name in low and len(low) < 30:
                 sec_at.append((lines[i][0], key))
                 break  # one header, one section ("Mini Lectures" is not also "Lectures")
@@ -82,13 +95,25 @@ def parse(msg):
         if not is_title[owner]:
             owner = li
         url = re.sub(r"\?single$", "", url.strip())
-        part = {"label": label.strip(), "url": url, "post": message_id(url) if CHANNEL.lower() in url.lower() else None}
+        part = {"label": label.strip(), "url": url, "post": message_id(url) if f"/{(channel or CHANNEL).lower()}/" in url.lower() + "/" else None}
         if owner not in items:
             line = lines[owner][1].strip()
             title = re.sub(r"^(?:-\s*|\d+[.)]\s*)", "", line).strip() if is_title[owner] else label.strip()
+            if y1:
+                title = line.lstrip("".join(BULLETS) + " ").strip() or label.strip()
             items[owner] = {"title": title, "parts": []}
             sections[section].append(items[owner])
         items[owner]["parts"].append(part)
+    if y1:  # a sub-heading inside a section ("Chapter 1 (CHO)", a line between two red triangles) names its items' group
+        heads = {o for o, _ in sec_at}
+        for owner, it in items.items():
+            for j in range(owner - 1, -1, -1):
+                if lines[j][0] in heads:
+                    break
+                bare = lines[j][1].strip().lstrip("".join(BULLETS) + "# ").strip()
+                if j not in items and SUBHEAD.fullmatch(bare):
+                    it["group"] = bare.strip("🔻[] ").strip()
+                    break
     title = next((ln.strip() for _, ln in lines if ln.strip()), "")
     return {"id": msg.id, "date": msg.date.isoformat() if msg.date else None,
             "edit_date": msg.edit_date.isoformat() if msg.edit_date else None,
@@ -120,12 +145,13 @@ def parse_post(msg):
 LINK_FIXES = OUT / "link_fixes.json"
 
 
-def apply_link_fixes(list_id, d):
+def apply_link_fixes(list_id, d, channel=None):
     """The doctor's own wrong links, fixed by hand in sources/lists/link_fixes.json (owner, 2026-11-15: the site must be
     exact to the mother message). A fix is {"item", "label", "linked", "post", "why"}: the part `label` of `item` links
     post `linked`, but its post is `post` (read from the channel's captions). Applied only while the list still links the
     wrong post; once the channel fixes its link the fix stops matching. Each applied fix is noted in d["fixed"]."""
-    fixes = json.loads(LINK_FIXES.read_text(encoding="utf-8")).get(str(list_id), []) if LINK_FIXES.exists() else []
+    key = str(list_id) if (channel or CHANNEL) == CHANNEL else f"{channel}/{list_id}"
+    fixes = json.loads(LINK_FIXES.read_text(encoding="utf-8")).get(key, []) if LINK_FIXES.exists() else []
     d["fixed"] = []
     for fx in fixes:
         for sec in d["sections"].values():
@@ -134,7 +160,7 @@ def apply_link_fixes(list_id, d):
                     continue
                 for part in it["parts"]:
                     if part["label"].strip().lower() == fx["label"].strip().lower() and part["post"] == fx["linked"]:
-                        part.update(post=fx["post"], url=f"https://t.me/{CHANNEL}/{fx['post']}", fixed_from=fx["linked"])
+                        part.update(post=fx["post"], url=f"https://t.me/{channel or CHANNEL}/{fx['post']}", fixed_from=fx["linked"])
                         d["fixed"].append(f"{fx['item']} {fx['label']}: post {fx['linked']} -> {fx['post']}")
     return d
 
@@ -149,16 +175,17 @@ def twice_linked(d):
     return out
 
 
-async def _fetch(ids, account="voter2"):
+async def _fetch(ids, account="voter2", channel=None):
     sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
     from tg import connect
     client = await connect(account)
     out = {}
     try:
-        ent = await client.get_entity(CHANNEL)
+        ent = await client.get_entity(channel or CHANNEL)
         lists = {m.id: m for m in await client.get_messages(ent, ids=list(ids)) if m is not None}
         for i, m in lists.items():
-            d = apply_link_fixes(i, parse(m))
+            d = apply_link_fixes(i, parse(m, channel), channel)
+            d["channel"] = channel or CHANNEL
             posts = {p["post"] for sec in d["sections"].values() for it in sec for p in it["parts"] if p["post"]}
             d["posts"] = {str(pm.id): parse_post(pm) for pm in await client.get_messages(ent, ids=sorted(posts)) if pm is not None}
             out[i] = d
@@ -167,18 +194,25 @@ async def _fetch(ids, account="voter2"):
     return out
 
 
-def fetch_many(ids, save=True):
+def list_dir(channel=None):
+    """Where a channel's lists are saved: sources/lists/ for RecordsBatch58ATM (year 2), sources/lists/<channel>/ for
+    any other channel (year 1: ZAG59_Anatomy, ZAG59_physio, ZAG59_Histo, ZAG59_bio; their list numbers repeat)."""
+    return OUT if (channel or CHANNEL) == CHANNEL else OUT / channel
+
+
+def fetch_many(ids, save=True, channel=None):
     """{id: list}: each list message with the posts it links, saved under sources/lists/<id>.json. The previous copy goes
     to <id>.prev.json when the list's links changed."""
-    got = asyncio.run(_fetch(sorted(set(ids))))
-    OUT.mkdir(parents=True, exist_ok=True)
+    got = asyncio.run(_fetch(sorted(set(ids)), channel=channel))
+    out = list_dir(channel)
+    out.mkdir(parents=True, exist_ok=True)
     if save:
         for i, d in got.items():
-            f = OUT / f"{i}.json"
+            f = out / f"{i}.json"
             if f.exists():
                 old = json.loads(f.read_text(encoding="utf-8"))
                 if old.get("sections") != d["sections"]:
-                    (OUT / f"{i}.prev.json").write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
+                    (out / f"{i}.prev.json").write_text(json.dumps(old, ensure_ascii=False, indent=1), encoding="utf-8")
             f.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
     return got
 
@@ -207,8 +241,8 @@ def download(ids, out_dir=ROOT / "sources" / "records"):
     return asyncio.run(_download(sorted(set(ids)), out_dir)) if ids else {}
 
 
-def load(i):
-    f = OUT / f"{i}.json"
+def load(i, channel=None):
+    f = list_dir(channel) / f"{i}.json"
     return json.loads(f.read_text(encoding="utf-8")) if f.exists() else None
 
 
@@ -217,8 +251,8 @@ def ascii_label(s):
     return s or ""
 
 
-def show(i):
-    d = load(i)
+def show(i, channel=None):
+    d = load(i, channel)
     if not d:
         print(f"{i}: not fetched")
         return
@@ -250,13 +284,17 @@ def info(ids):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    cmd, ids = sys.argv[1], [int(x) for x in sys.argv[2:]]
+    cmd, args = sys.argv[1], sys.argv[2:]
+    channel = None                      # py tg_lists.py fetch -c ZAG59_Anatomy 39 40 41: another channel's lists
+    if args[:1] == ["-c"]:
+        channel, args = args[1], args[2:]
+    ids = [int(x) for x in args]
     if cmd == "fetch":
-        for i, d in fetch_many(ids).items():
+        for i, d in fetch_many(ids, channel=channel).items():
             print(f"saved {i}: {sum(len(it['parts']) for s in d['sections'].values() for it in s)} links, {len(d['posts'])} posts")
     elif cmd == "text":  # the list message exactly as the doctor's channel shows it, then each linked post's caption
         for i in ids:
-            d = load(i)
+            d = load(i, channel)
             print(f"== {i} edited {d['edit_date']}\n{d['text']}\n-- posts")
             for k, p in d["posts"].items():
                 print(f"{k} {p['kind']} {p.get('size') or ''} {p.get('file_name') or ''} | {(p.get('caption') or '').strip()[:120]}".replace("\n", " "))
@@ -265,4 +303,4 @@ if __name__ == "__main__":
             print(k, v)
     elif cmd == "show":
         for i in ids:
-            show(i)
+            show(i, channel)

@@ -8,11 +8,15 @@ from spine.tg import mother
 
 FLEET = Path(r"C:\Users\Ahmed\agy-fleet\fleet.py")
 ACCOUNT = {"A": ["zero", "work"], "B": ["personal", "other"]}       # two readers never share an account
-ALL_LISTS = [1632, 1630, 1631, 1675, 1562, 1635, 1657, 1637, 1638, 1636]
 
 
 def job_dir(lst, reader):
-    return ROOT / "jobs" / "sp_mother" / f"{lst['id']}-{mother.cache_key(lst)}-{reader}"
+    return ROOT / "jobs" / "sp_mother" / f"{mother.ref(lst).replace('/', '-')}-{mother.cache_key(lst)}-{reader}"
+
+
+def wanted(a):
+    """The list references of a command: the ones typed, else the mother trees (--year 1 or 2 for one of them)."""
+    return a.lists or mother.tree_lists(getattr(a, "year", None))
 
 
 def make_job(lst, reader):
@@ -35,8 +39,8 @@ def read_one(arg):
                         "--out", "result.json", "--timeout", "10"], capture_output=True, text=True, cwd=d)
         result = read_json(d / "result.json") or {}
     if result.get("status") != "SUCCESS":
-        return lst["id"], reader, None, f"no answer from the fleet ({result.get('failure') or result.get('status')})"
-    return lst["id"], reader, result.get("response") or "", ""
+        return mother.ref(lst), reader, None, f"no answer from the fleet ({result.get('failure') or result.get('status')})"
+    return mother.ref(lst), reader, result.get("response") or "", ""
 
 
 def settle(lst, answers):
@@ -73,22 +77,28 @@ def _job(a):
 
 
 def _run(a):
-    lists = [mother.load(i) for i in (a.lists or ALL_LISTS)]
-    todo = [l for l in lists if l and (a.again or not mother.cached(l["id"], mother.cache_key(l)))]
+    lists = [mother.load(i) for i in wanted(a)]
+    for i, l in zip(wanted(a), lists):
+        if not l:
+            print(f"{i}: not fetched (py tg_lists.py fetch)")
+        elif not mother.links(l):
+            print(f"{i}: the list has no link yet")
+    lists = [l for l in lists if l and mother.links(l)]
+    todo = [l for l in lists if a.again or not mother.cached(l, mother.cache_key(l))]
     for l in lists:
-        if l and l not in todo:
-            print(f"{l['id']}: unchanged since the cached map, no read")
+        if l not in todo:
+            print(f"{mother.ref(l)}: unchanged since the cached map, no read")
     with ThreadPoolExecutor(max_workers=12) as pool:
         got = list(pool.map(read_one, [(n, l, r) for n, l in enumerate(todo) for r in ("A", "B")]))
     bad = 0
     for lst in todo:
-        m, fixed, line = settle(lst, {r: text for i, r, text, why in got if i == lst["id"]})
+        m, fixed, line = settle(lst, {r: text for i, r, text, why in got if i == mother.ref(lst)})
         if m is not None:
             mother.save(lst, m, "fleetA+fleetB" + ("+fix" if fixed else ""), [mother.links(lst)[k - 1]["post"] for k in fixed])
-            print(f"{lst['id']}: {line}; map cached")
+            print(f"{mother.ref(lst)}: {line}; map cached")
         else:
             bad += 1
-            print(f"{lst['id']}: NOT cached. {line}")
+            print(f"{mother.ref(lst)}: NOT cached. {line}")
     return 1 if bad else 0
 
 
@@ -107,7 +117,7 @@ def _show(a):
 
 def _diff(a):
     """What the newest cached map changes against the one before it. Prints only; nothing is applied."""
-    for i in a.lists or ALL_LISTS:
+    for i in wanted(a):
         rows = mother.history(i)
         if not rows:
             print(f"{i}: no cached map")
@@ -127,21 +137,23 @@ def _diff(a):
 def register(sub):
     p = sub.add_parser("mother", help="the mother-message agent (shadow mode)").add_subparsers(dest="mother_cmd")
     r = p.add_parser("render", help="what a reader is shown")
-    r.add_argument("lists", nargs="+", type=int)
+    r.add_argument("lists", nargs="+")
     r.set_defaults(run=_render)
     j = p.add_parser("job", help="write a reader's fleet job folder; nothing is run")
-    j.add_argument("lists", nargs="+", type=int)
+    j.add_argument("lists", nargs="+")
     j.add_argument("-r", "--reader", default="A", choices=("A", "B"))
     j.set_defaults(run=_job)
     n = p.add_parser("run", help="two fleet readers per changed list; cache the map they agree on")
-    n.add_argument("lists", nargs="*", type=int)
+    n.add_argument("lists", nargs="*")
     n.add_argument("--again", action="store_true", help="read even when the message is unchanged")
+    n.add_argument("--year", type=int, choices=(1, 2), help="only this year's lists of the mother trees")
     n.set_defaults(run=_run)
     s = p.add_parser("show", help="the cached map")
-    s.add_argument("lists", nargs="+", type=int)
+    s.add_argument("lists", nargs="+")
     s.set_defaults(run=_show)
     d = p.add_parser("diff", help="what the newest map changes against the one before; prints only")
-    d.add_argument("lists", nargs="*", type=int)
+    d.add_argument("lists", nargs="*")
     d.add_argument("--dry", action="store_true", help="the default: nothing is ever applied here")
+    d.add_argument("--year", type=int, choices=(1, 2))
     d.add_argument("--show", type=int, default=12, help="changes printed per list")
     d.set_defaults(run=_diff)

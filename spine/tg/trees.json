@@ -1,0 +1,48 @@
+{
+ "_about": "The mother trees as the owner pasted them on 2026-11-17: every doctor's list message, per year and subject. `new` / `list` = the list that is imported. `old` = year 2 fallback data: never imported unless the owner names lecture and doctor (backup.py). Year 1: every list is old data and all of it is imported (the website needs a note that says so). `site` = the site doctor id when known; null = not on the site yet (reported, never guessed).",
+ "year2": {
+  "module": "year2-cns", "channel": "RecordsBatch58ATM",
+  "doctors": [
+   {"subject": "anatomy", "name": "Dr. Elazouny", "site": "dr-ibrahim-el-azouni-anat", "new": 1630, "old": 1205},
+   {"subject": "anatomy", "name": "Dr. Wagih Elhusseiny", "site": "dr-wajih-el-husseiny-anat", "new": 1631, "old": 1267},
+   {"subject": "anatomy", "name": "Dr. Amr Mosafer", "site": "dr-amr-mesafer-anat", "new": 1632, "old": 1335},
+   {"subject": "anatomy", "name": "Cocci", "site": null, "new": 1634, "old": null, "note": "empty list on 2026-11-17"},
+   {"subject": "anatomy", "name": "Dr. Ayman Khorshed", "site": null, "new": 1706, "old": null,
+    "note": "not a list: one post with a YouTube playlist (PLP_01I-VMD38), collected by a student. No importer reads a playlist yet."},
+   {"subject": "histology", "name": "Dr. Zahran", "site": "dr-mohamed-zahran-hist", "new": 1635, "old": 1598},
+   {"subject": "histology", "name": "Dr. Basel", "site": "dr-basel-sherif-hist", "new": null, "old": 1562,
+    "note": "only old data exists; imported as his list before the fallback rule (the owner's file name: 'all old data no new so get all now')"},
+   {"subject": "histology", "name": "Dr. Ammar", "site": "dr-ahmed-ammar-hist", "new": 1675, "old": 1538},
+   {"subject": "histology", "name": "Dr. Mahmoud Elhusseiny", "site": "dr-mahmoud-el-husseiny-hist", "new": 1657, "old": null},
+   {"subject": "physiology", "name": "Cocci", "site": null, "new": 1636, "old": null},
+   {"subject": "physiology", "name": "Dr. Abdullah Elsamahy", "site": "dr-abdullah-el-samahi-phys", "new": 1637, "old": 1373},
+   {"subject": "physiology", "name": "Dr. Nagib Elhusseiny", "site": "dr-naguib-el-husseiny-phys", "new": 1638, "old": 1457},
+   {"subject": "physiology", "name": "Dr. Khaled Aboelfadl", "site": null, "new": 1639, "old": null}
+  ]
+ },
+ "year1": {
+  "module": "year1-musculoskeletal", "all_old_data": true,
+  "doctors": [
+   {"subject": "anatomy", "name": "Dr. Elazouny", "site": null, "channel": "ZAG59_Anatomy", "list": 39},
+   {"subject": "anatomy", "name": "Dr. Wagih Elhusseiny", "site": null, "channel": "ZAG59_Anatomy", "list": 41},
+   {"subject": "anatomy", "name": "Dr. Amr Mosafer", "site": null, "channel": "ZAG59_Anatomy", "list": 40},
+   {"subject": "anatomy", "name": "Dr. Eslam Gamal", "site": null, "channel": "ZAG59_Anatomy", "list": 42},
+   {"subject": "anatomy", "name": "Dr. Mahmoud Hisham", "site": null, "channel": "ZAG59_Anatomy", "list": 43},
+   {"subject": "anatomy", "name": "Dr. Basel Hagag", "site": null, "channel": "ZAG59_Anatomy", "list": 44},
+   {"subject": "anatomy", "name": "Dr. Ahmed Hamada", "site": null, "channel": "ZAG59_Anatomy", "list": 45},
+   {"subject": "physiology", "name": "Dr. Abdullah Elsamahy", "site": null, "channel": "ZAG59_physio", "list": 54},
+   {"subject": "physiology", "name": "Dr. Nagib Elhusseiny", "site": null, "channel": "ZAG59_physio", "list": 55},
+   {"subject": "physiology", "name": "Cocci (Dr. Mohamed Ezzat)", "site": null, "channel": "ZAG59_physio", "list": 58},
+   {"subject": "physiology", "name": "Dr. Zain", "site": null, "channel": "ZAG59_physio", "list": 59},
+   {"subject": "histology", "name": "Dr. Ahmed Ammar", "site": null, "channel": "ZAG59_Histo", "list": 41},
+   {"subject": "histology", "name": "Dr. Zahran", "site": null, "channel": "ZAG59_Histo", "list": 43},
+   {"subject": "histology", "name": "Dr. Basel Sherif", "site": null, "channel": "ZAG59_Histo", "list": 40},
+   {"subject": "histology", "name": "Dr. Mahmoud Elhusseiny", "site": null, "channel": "ZAG59_Histo", "list": 42},
+   {"subject": "biochemistry", "name": "Dr. Ibrahim Elhusseiny", "site": null, "channel": "ZAG59_bio", "list": 29},
+   {"subject": "biochemistry", "name": "Dr. Mohamed Hisham", "site": null, "channel": "ZAG59_bio", "list": 30},
+   {"subject": "biochemistry", "name": "Dr. Elzaeem", "site": null, "channel": "ZAG59_bio", "list": 32},
+   {"subject": "biochemistry", "name": "Dr. Omar Abdelaziz", "site": null, "channel": "ZAG59_bio", "list": 33},
+   {"subject": "biochemistry", "name": "Dr. Mohamed Elkassar (list title: Dr. Ahmed Kassab)", "site": null, "channel": "ZAG59_bio", "list": 34}
+  ]
+ }
+}

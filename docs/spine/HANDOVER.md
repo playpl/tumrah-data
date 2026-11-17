@@ -75,17 +75,104 @@ The answer is `result.json["response"]`; tokens are in `result.json["usage"]`.
   lecture ids, `to_doctor` in the `mother_lists.json` shape, cache, diff, the mass-delete hold). It imports and
   `render(load(1632))` gives 2,738 characters and 18 links. NOT done: its CLI, tests, the fleet run, parity.
 
-## IN PROGRESS when this session ended: fleet reader A
+## Fleet readers A and B: finished (2026-11-17)
 
-The first run was slow only because the runner ran one fleet session per account (4 at a time, about 8
-minutes a job: 28 of 144 in an hour). Owner, 2026-11-17: "run on all the four accounts ... multiple sessions
-on every account ... just burn the limits, it's fine". The runner now takes `--per-account` (default 6).
-Readers A and B were restarted together, 6 sessions per account each (48 fleet sessions at once):
-`py -m spine p1 run year2-cns --reader A --per-account 6` (144 folders `jobs/sp_align/<book>/A-NNN/`) and
-`... --reader B --per-account 6` (146 folders `B-NNN`, windows shifted by 5). Logs: `jobs/sp_align/run_A.log`,
-`run_B.log`. Both are resumable: run the same command again (answered folders are skipped, votes are
-collected), then `py -m spine p1 accept year2-cns`. Run one runner per reader, never two for the same reader.
-The commands need the sandbox off (fleet sign-ins). An account that reports quota is rested for that run.
+Both ran to the end (144 and 146 job folders, 705 and 713 windows, 25 and 24 windows rejected by the parser).
+`py -m spine p1 accept year2-cns`: 7,154 book sentences: accepted 6,280, not in the handout or not content
+404, jump (flagged) 219, one reader only 157, readers disagree 46, one reader says no 35, no reader yet 13.
+`py -m spine p1 audit year2-cns` prints the audit lists per book; `--sample N` prints random accepted links
+with both sentences; `--list split-vote | one-reader | one-no | no-reader | jump | orphan-handout` prints one
+list with every reader's answer. Read by me: 126 random accepted links (18 per book, seed 7): 0 wrong.
+
+## Mother message agent: exact to the hand file (2026-11-17)
+
+`py -m spine mother run` (two fleet readers per list, different accounts) then `py -m spine parity mother`
+printed "9 of 9 doctors exact" against `modules/year2-cns/site/mother_lists.json` (before the lists changed
+again the same day, see below). What made it exact:
+- A reader gives only `role` and `covers` per link. Code sets chapter (the list item a lecture stands under,
+  or the sub-heading in a first-year list) and name (the item's words, part number added), ignores a post
+  the doctor linked twice (the owner is the link whose section fits the caption) and a link to a post that
+  does not exist, and maps a held duplicate lecture to its twin's id.
+- What a message does not say is fixed by hand in `sources/mother/fixes.json` (not tracked, like
+  `link_fixes.json`): Basel's "Nervous tissues" and "Mid Revision & MCQ" revisions, Elsamahy's
+  "Sensation & Ascending tracts..." revision. Applied over both readers' answers.
+- `mother render | job | run | show | diff`; `--year 1 | 2` takes the lists of `spine/tg/trees.json`.
+  A list reference is `1632` (year 2 channel) or `ZAG59_bio/29`. Maps are cached in
+  `sources/mother/<channel>/<list>/<sha>.json`; a changed message or a new `mother.VERSION` means a new read.
+- NOT done: `spine/tg/flow.py` (the dispatcher flow) and going from shadow to primary (the hand file is still
+  the one `site_lessons.py` reads).
+- Found while reading: Basel's post 1592 holds a second video (Brain meninges & barriers,
+  youtu.be/w64A973Tqe8) that is no lesson anywhere.
+
+## The mother trees (owner, 2026-11-17)
+
+The owner pasted both trees; they are in `spine/tg/trees.json` (tracked): year 2 (`RecordsBatch58ATM`, new and
+old list per doctor) and year 1 (20 lists in `ZAG59_Anatomy`, `ZAG59_physio`, `ZAG59_Histo`, `ZAG59_bio`).
+Owner's rules (also in memory): year 1 data is ALL old data and is imported; the website needs a note that
+says so (not done). Year 2 "Old data" lists are fallback only: never imported unless the owner names
+lecture and doctor (`backup.py`).
+- `tg_lists.py` takes a channel: `py tg_lists.py fetch -c ZAG59_Anatomy 39 40`, saved in
+  `sources/lists/<channel>/<id>.json` (the year 2 channel keeps `sources/lists/<id>.json`). For another channel
+  the parser reads the first-year format: Arabic headers, "Books" / "Recs", bullets `. • ● _`, and a
+  sub-heading ("Chapter 1 (CHO)", a line between two red triangles) becomes the items' `group`.
+- Year 2: new doctor folders `doctors/cns/physiology/khaled aboelfadl (auto)` (list 1639, 12 YouTube
+  lectures) and `doctors/cns/anatomy/cocci (auto)` (list 1634, empty), and `old data.txt` for Zahran (1598),
+  Ammar (1538), Elsamahy (1373), Nagib (1457). Dr. Ayman Khorshed (1706) is one post with a YouTube playlist:
+  no importer reads a playlist. Khaled Aboelfadl and Cocci have no site doctor.
+- Year 1 is NOT in `doctors/`: the old flow reads only the list number from a link (`doctors_folder.list_files`),
+  so a `ZAG59_*` link there would be read as a `RecordsBatch58ATM` post. Year 1 goes through the spine only.
+- Never run two Telegram readers at once (`tg_lists.py fetch` while Update data runs): the session file locks
+  and Update data prints "FAILED OperationalError: database is locked".
+
+## Year 1: what the 20 lists hold (read by two fleet readers each, 2026-11-17)
+
+`py -m spine mother run --year 1`: all 20 lists have an agreed map in `sources/mother/ZAG59_*/<list>/`
+(17 at once, 3 after hand fixes in `sources/mother/fixes.json`: Mahmoud Hisham's two practical videos are
+ignored; Elsamahy's two sympathetic revisions and Mohamed Hisham's CHO "tricks" and "written" videos are
+revisions of their chapter's lectures). A revision or mini lecture whose lecture is not in the list stands
+alone (its own chapter). Totals: 232 lectures, 22 mini lectures, 34 revisions; 7.5 GB of Telegram media and
+152 YouTube posts.
+
+| subject | doctor | list | lectures | minis | revisions | chapters | Telegram MB | YouTube |
+|---|---|---|---|---|---|---|---|---|
+| anatomy | Elazouny | ZAG59_Anatomy/39 | 2 | 0 | 0 | 1 | 821 | 0 |
+| anatomy | Wagih Elhusseiny | ZAG59_Anatomy/41 | 1 | 0 | 0 | 1 | 0 | 1 |
+| anatomy | Amr Mosafer | ZAG59_Anatomy/40 | 5 | 3 | 3 | 5 | 359 | 7 |
+| anatomy | Eslam Gamal | ZAG59_Anatomy/42 | 6 | 0 | 0 | 6 | 1441 | 1 |
+| anatomy | Mahmoud Hisham | ZAG59_Anatomy/43 | 4 | 0 | 0 | 4 | 0 | 4 |
+| anatomy | Basel Hagag | ZAG59_Anatomy/44 | 7 | 0 | 0 | 7 | 467 | 0 |
+| anatomy | Ahmed Hamada | ZAG59_Anatomy/45 | 1 | 0 | 0 | 1 | 0 | 1 |
+| physiology | Abdullah Elsamahy | ZAG59_physio/54 | 25 | 0 | 3 | 25 | 907 | 6 |
+| physiology | Nagib Elhusseiny | ZAG59_physio/55 | 20 | 0 | 6 | 17 | 402 | 9 |
+| physiology | Cocci (Mohamed Ezzat) | ZAG59_physio/58 | 26 | 0 | 0 | 26 | 0 | 26 |
+| physiology | Zain | ZAG59_physio/59 | 13 | 1 | 4 | 13 | 395 | 16 |
+| histology | Ahmed Ammar | ZAG59_Histo/41 | 4 | 0 | 2 | 4 | 96 | 5 |
+| histology | Zahran | ZAG59_Histo/43 | 8 | 4 | 0 | 2 | 222 | 6 |
+| histology | Basel Sherif | ZAG59_Histo/40 | 22 | 0 | 5 | 20 | 695 | 5 |
+| histology | Mahmoud Elhusseiny | ZAG59_Histo/42 | 20 | 3 | 0 | 3 | 310 | 7 |
+| biochemistry | Ibrahim Elhusseiny | ZAG59_bio/29 | 31 | 3 | 4 | 5 | 1128 | 11 |
+| biochemistry | Mohamed Hisham | ZAG59_bio/30 | 19 | 4 | 6 | 4 | 0 | 29 |
+| biochemistry | Elzaeem | ZAG59_bio/32 | 9 | 0 | 1 | 1 | 0 | 10 |
+| biochemistry | Omar Abdelaziz | ZAG59_bio/33 | 5 | 0 | 0 | 1 | 270 | 0 |
+| biochemistry | Mohamed Elkassar (list title "Ahmed kassab") | ZAG59_bio/34 | 4 | 4 | 0 | 1 | 0 | 8 |
+
+Not done for year 1 (in this order): (1) the records machine (Left to do, item 5) must take a channel, then
+download and transcribe these 288 records into a year 1 module; (2) there is no year 1 handout graph, so no
+lecture can be placed yet; (3) no year 1 doctor has a site doctor id in `trees.json` (`site: null`); (4) the
+"all first-year data is old data" note on the website.
+
+## Year 2 Update data of 2026-11-17 (after the trees)
+
+`py update_data.py` imported 17 lectures: cns-147 Diencephalon and cns-148 Cerebrum (Azouny), cns-149 Barriers
+(Zahran), cns-150 Stretch reflex (Elsamahy), cns-151 to cns-162 (Khaled Aboelfadl, 12 YouTube lectures),
+cns-163 Properties of reflex (Nagib). An earlier run the same day made cns-145 Internal capsule and cns-146
+Basal ganglia (revision) (Mosafer). The hand file `mother_lists.json` got the 7 lectures that have a site
+doctor (6 new chapters), added from the agent's maps by a script that only adds; `py -m spine parity mother`
+= 9 of 9 exact. `mother_check.py` prints one line that is the doctor's own link to a post that does not
+exist (Wagih, Basal ganglia revision, post 1848).
+`site_lessons.py write` now leaves a lecture with no site doctor out of `lessons.jsonl` and prints
+"NO SITE DOCTOR" (Khaled's 12 lessons would have been created on the site with no doctor).
+Elsamahy's "Pain revision" (post 1702) flipped between two reads (parts 1-2, then 1-3): fixed by hand.
 
 ## Shadow mode: what is live and what is not
 
@@ -93,15 +180,13 @@ Everything in `spine/` is in shadow mode. "Update data", the Today screen, the c
 `queue.db`, `lectures/`, the hand-written `mother_lists.json` and the website are untouched and work as before.
 `config.json` has no `"spine"` block yet (`spine.config()` supplies the defaults: p1, p2, mother = shadow).
 `CLAUDE.md` is unchanged: no rule has taken effect yet. The only new rule is in memory: no Claude sub-agents.
-Tests: `py -m unittest discover tests` = 309 tests, all pass (265 old + 44 `test_spine_*`).
+Tests: `py -m unittest discover tests` = 335 tests, all pass.
 
 ## Left to do (in order)
 
-1. Finish fleet reader A (above), then reader B: `p1 jobs year2-cns --reader B`, `p1 run ... --reader B`
-   (windows shifted by 5), `p1 accept`. Then look at what stays `readers disagree`, `one reader only`,
-   `jump (flagged)`.
-2. Phase 1 leftovers: `spine/align/audit.py` (orphan-book, orphan-handout, low-conf, split-vote, coverage; the
-   jump rule already lives in `engine.jumps`); the "0" retry with the whole lesson listed; a third reader
+1. Phase 1 open sentences (470): read `p1 audit --list ...` and settle `readers disagree` (46), `one reader
+   only` (157), `one reader says no` (35), `no reader yet` (13), `jump (flagged)` (219).
+2. Phase 1 leftovers: the "0" retry with the whole lesson listed; a third reader
    (Gemini web) for split votes; Claude Haiku only for what stays flagged, under
    `spine.config()["claude_budget_tokens"]` (ask the owner with a token estimate first); `spine/compat.py`
    (`aligned_blocks(book)` in the legacy block shape, `ledger_mirror()`); `spine/parity/p1.py`; a 200-link
@@ -115,14 +200,10 @@ Tests: `py -m unittest discover tests` = 309 tests, all pass (265 old + 44 `test
    rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
    and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
    and `engine.seed_old_keys` read `polls/channels.json`. `registry.plan()` already gives the verdict per question.
-4. Mother message, second half: `spine/tg/cli.py` (`mother render | job | run | diff`), `spine/tg/flow.py`
-   (`MotherFlow`), `tests/test_spine_mother.py` (`PdfNeverLecture`, `DiffAddEditDelete`, `MassDeleteHeld`),
-   `spine/parity/mother.py` (compare `to_doctor()` of the cached map with the hand file per doctor; exit 0
-   only when all nine are exact). Run two fleet readers per list (1632, 1630, 1631, 1675, 1562, 1635, 1657,
-   1637, 1638, 1636) and cache the agreed map with `mother.save`. Known gap: `sources/lists/<id>.json` keeps no
-   entity offsets, so `render` shows the message text plus a link table built from the `tg_lists.parse`
-   sections. A list item with no link yet (hand file `post: null`) is kept as a link with no post.
-5. Records: `spine/records/upload.py` (state machine seen -> lesson_upserted | downloading -> uploaded,
+4. Mother message, what is left: `spine/tg/flow.py` (`MotherFlow`, so the dispatcher runs the readers when a
+   list changes) and the switch from shadow to primary (`site_lessons.py` reads the agent's map, the hand file
+   stops). Khaled Aboelfadl (list 1639) needs a site doctor before his 12 lessons can go to the site.
+5. Records (year 1 waits on this; it must take a channel, see "Year 1" above): `spine/records/upload.py` (state machine seen -> lesson_upserted | downloading -> uploaded,
    transcribing in parallel; plan only until `auto_publish_records`), `transcribe.py` (`plan_chunks`), tests.
 6. Phase 2 segmentation: `spine/seg/prior.py`, `segment.py`, `flow.py` (transcript paragraphs -> the doctor's
    book sentences, strictly forward), `seg audit`, `parity p2`. Needs Phase 1 edges to reach the handout.

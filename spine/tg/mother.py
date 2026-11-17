@@ -20,7 +20,8 @@ from spine import ROOT, now, read_json, write_json
 
 CHANNEL = "RecordsBatch58ATM"
 LISTS = ROOT / "sources" / "lists"
-CACHE = ROOT / "sources" / "mother" / CHANNEL
+CACHE = ROOT / "sources" / "mother"
+TREES = ROOT / "spine" / "tg" / "trees.json"
 FIXES = ROOT / "sources" / "mother" / "fixes.json"
 ROLES = ("lecture", "mini", "revision", "ignore")
 NOT_A_RECORD = ("pdf", "file", "photo", "image", "text", None)
@@ -51,13 +52,47 @@ Example: {{"link": 12, "role": "revision", "covers": [5, 6, 7]}}
 """
 
 
-def load(list_id):
-    return read_json(LISTS / f"{list_id}.json")
+def ref_of(x):
+    """(channel, list id) of a list reference: 1632 or "1632" is the year 2 channel, "ZAG59_bio/29" names its own."""
+    if isinstance(x, dict):
+        return x.get("channel") or CHANNEL, int(x["id"])
+    channel, _, n = str(x).rpartition("/")
+    return channel or CHANNEL, int(n)
+
+
+def ref(lst):
+    """How a list is written in commands and reports: 1632, or ZAG59_bio/29 for another channel."""
+    channel, n = ref_of(lst)
+    return str(n) if channel == CHANNEL else f"{channel}/{n}"
+
+
+def load(x):
+    channel, n = ref_of(x)
+    lst = read_json((LISTS if channel == CHANNEL else LISTS / channel) / f"{n}.json")
+    if lst:
+        lst["channel"] = channel
+    return lst
+
+
+def tree_lists(year=None):
+    """The list references of the mother trees (spine/tg/trees.json): what is imported, never a year 2 fallback list
+    (except Dr. Basel's, whose only list is old data)."""
+    trees, out = read_json(TREES), []
+    for key in ("year2", "year1"):
+        if year and key != f"year{year}":
+            continue
+        for d in trees[key]["doctors"]:
+            n = d.get("list") or d.get("new") or (d.get("old") if d.get("site") else None)
+            if n:
+                out.append(n if key == "year2" else f"{d['channel']}/{n}")
+    return out
 
 
 def links(lst):
     """Every link of the message, section by section in the order tg_lists.parse kept:
-    [{k, section, item, label, post, kind, size, caption, wrong, missing}].
+    [{k, section, item, group, label, post, kind, size, caption, wrong, missing}].
+
+    `group` = the sub-heading the item stands under in a first-year list ("Chapter 1 (CHO)", "CELL"), else None.
 
     A list item with no link at all (the doctor has not posted it yet) is kept with post None.
     `missing` = the link names a post the channel does not have (the doctor's link to nothing).
@@ -70,8 +105,10 @@ def links(lst):
             for p in (it.get("parts") or [{"label": it["title"], "post": None}]):
                 post = lst["posts"].get(str(p.get("post"))) or {}
                 out.append({"k": len(out) + 1, "section": section, "item": " ".join(it["title"].split()),
+                            "group": it.get("group"),
                             "label": " ".join((p.get("label") or "").split()).lstrip("-•–— "), "post": p.get("post"),
-                            "kind": post.get("kind"), "size": post.get("size"),
+                            "kind": post.get("kind") or ("youtube" if not p.get("post") and "youtu" in (p.get("url") or "") else None),
+                            "url": None if p.get("post") else p.get("url"), "size": post.get("size"),
                             "caption": " ".join((post.get("caption") or "").split())[:160], "wrong": None,
                             "missing": bool(p.get("post")) and str(p.get("post")) not in lst["posts"]})
     by_post = {}
@@ -97,9 +134,12 @@ def render(lst):
     for l in links(lst):
         size = f" {l['size'] / 1e6:.1f}MB" if l["size"] else ""
         what = f"post {l['post']} {l['kind'] or 'unknown'}{size}" if l["post"] else "no post yet"
+        if not l["post"] and l["kind"] == "youtube":
+            what = f"a YouTube link with no channel post ({l['url']})"
         if l["missing"]:
             what = f"post {l['post']} MISSING POST (the channel has no such post)"
-        lines.append(f"[{l['k']}] {SECTION.get(l['section'], l['section'])}: under \"{l['item']}\" label \"{l['label']}\" -> {what}"
+        where = SECTION.get(l["section"], l["section"]) + (f" / {l['group']}" if l["group"] else "")
+        lines.append(f"[{l['k']}] {where}: under \"{l['item']}\" label \"{l['label']}\" -> {what}"
                      + (f" caption \"{l['caption']}\"" if l["caption"] else "")
                      + (f" WRONG LINK (this post belongs to link {l['wrong']})" if l["wrong"] else ""))
     return "\n".join(lines)
@@ -144,12 +184,21 @@ def finish(m, lst):
     for k, v in m.items():
         if k in ls and (ls[k]["wrong"] or ls[k]["missing"]):
             v["role"], v["covers"] = "ignore", []
+    first = {}                                 # the first label of each list item ("Lect1" of "Lect1 -> mini")
+    for l in ls.values():
+        first.setdefault((l["section"], l["group"], l["item"]), l["label"])
     for k, v in m.items():
-        l = ls.get(k) or {"item": "", "label": ""}
+        l = ls.get(k) or {"item": "", "label": "", "group": None, "section": ""}
         part = re.fullmatch(r"(?i)part\s*(\d+)", l["label"])
         name = f"{l['item']} part {part.group(1)}" if part else (l["label"] or l["item"])
+        lead = first.get((l["section"], l["group"], l["item"]), l["label"])
+        if not part and lead != l["label"] and lead in l["item"]:
+            name = f"{lead} {l['label']}"          # the second link of "Lect1 -> mini" is "Lect1 mini"
+        if l["group"] and re.match(r"(?i)(lect(ure)?|lec)\s*\d", name):
+            inside = re.search(r"\(([^)]+)\)", l["group"])   # "Chapter 1 (CHO)" + "Lect1" = "CHO Lect1"
+            name = f"{(inside.group(1) if inside else l['group']).strip()} {name}"
         v["name"] = name[:1].upper() + name[1:]
-        v["chapter"] = l["item"] if v["role"] == "lecture" else ""
+        v["chapter"] = (l["group"] or l["item"]) if v["role"] == "lecture" else ""
     lectures = {_key(v["name"]) for v in m.values() if v["role"] == "lecture"}
     for k, v in m.items():
         if v["role"] not in ("mini", "revision"):
@@ -157,6 +206,8 @@ def finish(m, lst):
         covered = [c for c in v["covers"] if c in m and m[c]["role"] == "lecture"]
         if covered:
             v["chapter"] = m[max(covered) if v["role"] == "revision" else covered[0]]["chapter"]
+        elif k in ls:
+            v["chapter"] = ls[k]["group"] or ls[k]["item"]      # it covers no lecture of this list: its own chapter
         if v["role"] == "mini" and "mini" not in v["name"].lower() \
                 and (_key(v["name"]) in lectures or re.search(r"(?i)\bpart\s*\d", v["name"])):
             v["name"] += " (mini lecture)"
@@ -180,7 +231,8 @@ def validate(m, lst):
             errors.append(f"link {k}: a {ls[k]['kind'] or 'missing'} post cannot be a {v['role']}")
         if v["role"] != "ignore" and names.setdefault(_key(v["name"]), k) != k:
             errors.append(f"link {k}: the name {v['name']!r} is used twice")
-        want = {"lecture": (0, 0), "ignore": (0, 0), "mini": (1, 1), "revision": (1, 99)}.get(v["role"], (0, 99))
+        # a mini or revision may stand alone: a first-year list has revisions of lectures the list does not hold
+        want = {"lecture": (0, 0), "ignore": (0, 0), "mini": (0, 1), "revision": (0, 99)}.get(v["role"], (0, 99))
         if not want[0] <= len(v["covers"]) <= want[1]:
             errors.append(f"link {k}: a {v['role']} covers {len(v['covers'])} lectures")
         if any(c not in lectures for c in v["covers"]):
@@ -203,7 +255,7 @@ def fixes(lst):
     revises), the same way sources/lists/link_fixes.json is for a doctor's wrong link."""
     ls = links(lst)
     out = {}
-    for f in (read_json(FIXES) or {}).get(str(lst["id"])) or []:
+    for f in (read_json(FIXES) or {}).get(ref(lst)) or []:
         k = next((l["k"] for l in ls if l["post"] == f["post"] and not l["wrong"]), None)
         if k is None:
             continue
@@ -266,8 +318,10 @@ def to_doctor(lst, m, doctor, subject, index):
             chapters.setdefault(m[k]["chapter"], {"lecture": [], "mini": [], "revision": []})["lecture"].append(k)
     for k in sorted(m):
         v = m[k]
-        if v["role"] in ("mini", "revision") and v["chapter"] in chapters:
-            chapters[v["chapter"]][v["role"]].append(k)
+        if v["role"] in ("mini", "revision") and v["chapter"]:
+            if v["chapter"] not in chapters:                   # a stand-alone mini or revision: a chapter of its own
+                order.append(v["chapter"])
+            chapters.setdefault(v["chapter"], {"lecture": [], "mini": [], "revision": []})[v["role"]].append(k)
     out = []
     for title in order:
         items = []
@@ -284,9 +338,14 @@ def to_doctor(lst, m, doctor, subject, index):
 
 
 # --- cache and diff ---------------------------------------------------------------------------------------------
+def cache_dir(x):
+    channel, n = ref_of(x)
+    return CACHE / channel / str(n)
+
+
 def history(list_id):
     """Every cached map of a list, oldest first."""
-    rows = [read_json(f) for f in (CACHE / str(list_id)).glob("*.json")]
+    rows = [read_json(f) for f in cache_dir(list_id).glob("*.json")]
     return sorted(rows, key=lambda r: r["at"])
 
 
@@ -300,7 +359,7 @@ def save(lst, m, by, fixed=()):
     row = {"list": lst["id"], "sha": cache_key(lst), "version": VERSION, "at": now(), "edit_date": lst.get("edit_date"),
            "map": {str(k): v for k, v in sorted(m.items())}, "posts": {str(l["k"]): l["post"] for l in links(lst)},
            "by": by, "fixed": list(fixed)}
-    write_json(CACHE / str(lst["id"]) / f"{row['sha']}.json", row)
+    write_json(cache_dir(lst) / f"{row['sha']}.json", row)
     return row
 
 
