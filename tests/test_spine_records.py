@@ -157,6 +157,57 @@ class Upload(Base):
         self.assertEqual(machine.states("year1-test")[aud["id"]]["state"], "compressed")
 
 
+class Priority(unittest.TestCase):
+    def test_first_lessons_of_every_subject_come_first(self):
+        recs = [{"id": f"{s}{i}", "subject": s, "rank": i, "doctor_order": d}
+                for d, s in enumerate(("histology", "anatomy", "biochemistry")) for i in range(3)]
+        order = [r["id"] for r in machine.priority(recs)]
+        self.assertEqual(order[:3], ["anatomy0", "histology0", "biochemistry0"])
+        self.assertEqual(order[3:6], ["anatomy1", "histology1", "biochemistry1"])
+
+
+class Site(Base):
+    def rows(self, site="dr-x-hist", subject="histology"):
+        from spine.records import flow
+        for r in self.recs:
+            r.update(site=site, subject=subject)
+        return flow.site_rows(self.recs, machine.states("year1-test"))
+
+    def test_no_site_doctor_means_no_lesson(self):
+        rows, out = self.rows(site=None)
+        self.assertEqual(rows, [])
+        self.assertIn("no site doctor id", out[0])
+
+    def test_a_subject_the_module_lacks_is_left_out(self):
+        rows, out = self.rows(subject="biochemistry")
+        self.assertEqual(rows, [])
+        self.assertIn("biochemistry", out[0])
+
+    def test_old_data_lessons_with_their_recordings(self):
+        machine.mark("year1-test", "y1-bio-40", "uploaded", key="lectures/year1-test/y1-bio-40/recording.48k.m4a")
+        rows, out = self.rows()
+        by = {r["key"]: r for r in rows}
+        self.assertEqual(set(by), {"lecture:y1-bio-38", "lecture:y1-bio-40"})          # the revision is not uploaded
+        self.assertEqual(by["lecture:y1-bio-38"]["videoUrl"], "https://youtu.be/AbCdEfGhIjK")
+        self.assertEqual(by["lecture:y1-bio-40"]["audioUrl"], "r2:lectures/year1-test/y1-bio-40/recording.48k.m4a")
+        self.assertTrue(all(r["oldData"] and r["kind"] == "lesson" and r["ranges"] == [] for r in rows))
+        self.assertEqual([r["order"] for r in rows], [1, 2])
+        self.assertIn("not uploaded", out[0])
+
+    def test_a_revision_covers_only_lessons_in_the_file(self):
+        machine.mark("year1-test", "y1-bio-41", "uploaded")
+        rows, _ = self.rows()
+        rev = next(r for r in rows if r["kind"] == "revision")
+        self.assertEqual(rev["covers"], ["lecture:y1-bio-38"])
+
+    def test_update_dry_only_reports(self):
+        from spine.records import flow
+        with mock.patch.object(machine, "download", side_effect=AssertionError("downloaded in a dry run")), \
+                mock.patch.object(flow, "start_finish", side_effect=AssertionError("started in a dry run")):
+            out = flow.update(dry=True)
+        self.assertTrue(out[-2].startswith("year 1: 3 records"))
+
+
 class Transcribe(Base):
     def test_shift_and_join(self):
         from spine.records import transcribe

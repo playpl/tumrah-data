@@ -85,8 +85,22 @@ def plan(year=1, doctor=None, problems=None):
         if row["sha"] != mother.cache_key(lst):
             problems.append(f"{ref} {d['name']}: the list changed since its map (py -m spine mother run --year {year})")
             continue
-        out += records_of(year, module, d, lst, row)
+        for i, r in enumerate(records_of(year, module, d, lst, row)):
+            r["rank"], r["doctor_order"] = i, doctors.index(d)
+            out.append(r)
     return out
+
+
+SUBJECTS = ("anatomy", "physiology", "histology", "biochemistry")
+
+
+def priority(recs):
+    """First lessons of every subject first (owner, 2026-11-17): every doctor's 1st record, then every 2nd, ...;
+    within one rank the subjects in SUBJECTS order, then the tree's doctor order."""
+    def key(r):
+        subj = SUBJECTS.index(r["subject"]) if r["subject"] in SUBJECTS else len(SUBJECTS)
+        return r.get("rank", 0), subj, r.get("doctor_order", 0)
+    return sorted(recs, key=key)
 
 
 def matches(d, ref, word):
@@ -216,7 +230,7 @@ def lock():
     except (OSError, ValueError):
         pid = None
     if pid and upload_media.alive(pid):
-        raise SystemExit(f"another Telegram reader of the records machine is alive (pid {pid})")
+        raise RuntimeError(f"another Telegram reader of the records machine is alive (pid {pid})")
     LOCK.write_text(str(__import__("os").getpid()))
 
 
@@ -229,42 +243,43 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT):
     from tg import connect
     client = await connect(account)
     done = []
+    ents = {}
     try:
-        for channel in dict.fromkeys(r["channel"] for r in recs):
-            ent = await client.get_entity(channel)
-            mine = [r for r in recs if r["channel"] == channel]
-            for rec in mine:
-                if budget.spent:
-                    return done
-                m = await client.get_messages(ent, ids=rec["post"])
-                if m is None or not m.media or not m.file:
-                    say(f"  {rec['id']}: post {rec['post']} has no file")
-                    continue
-                d = source_dir(rec)
-                d.mkdir(parents=True, exist_ok=True)
-                name = safe_name(m.file.name or f"{rec['post']}{m.file.ext or ''}")
-                final, part = d / name, d / (name + ".partial")
-                total = m.file.size
-                if not (final.exists() and final.stat().st_size == total):
-                    before = part.stat().st_size if part.exists() else 0
-                    t0 = time.time()
+        for rec in recs:                                # in the order given: priority() puts first lessons first
+            if budget.spent:
+                return done
+            if rec["channel"] not in ents:
+                ents[rec["channel"]] = await client.get_entity(rec["channel"])
+            ent = ents[rec["channel"]]
+            m = await client.get_messages(ent, ids=rec["post"])
+            if m is None or not m.media or not m.file:
+                say(f"  {rec['id']}: post {rec['post']} has no file")
+                continue
+            d = source_dir(rec)
+            d.mkdir(parents=True, exist_ok=True)
+            name = safe_name(m.file.name or f"{rec['post']}{m.file.ext or ''}")
+            final, part = d / name, d / (name + ".partial")
+            total = m.file.size
+            if not (final.exists() and final.stat().st_size == total):
+                before = part.stat().st_size if part.exists() else 0
+                t0 = time.time()
 
-                    def stream(off, m=m):
-                        return client.iter_download(m.media, offset=off, request_size=CHUNK, file_size=total)
-                    try:
-                        whole = await fetch_into(part, total, stream, budget)
-                    except Exception as e:     # an expired file reference, a dropped link: the next run resumes
-                        say(f"  {rec['id']}: stopped at {part_mb(part)} of {total / 1e6:.0f} MB ({type(e).__name__}: {str(e)[:80]})")
-                        continue
-                    got = (part.stat().st_size - before) / 1e6
-                    rate = got / max(time.time() - t0, 1)
-                    if not whole:
-                        say(f"  {rec['id']}: {part_mb(part)} of {total / 1e6:.0f} MB so far ({rate * 1000:.0f} KB/s); batch limit reached")
-                        return done
-                    part.replace(final)
-                    say(f"  {rec['id']}: downloaded {total / 1e6:.1f} MB ({rate * 1000:.0f} KB/s)")
-                mark(rec["module"], rec["id"], "downloaded", file=str(final.relative_to(ROOT)), size=total)
-                done.append(rec["id"])
+                def stream(off, m=m):
+                    return client.iter_download(m.media, offset=off, request_size=CHUNK, file_size=total)
+                try:
+                    whole = await fetch_into(part, total, stream, budget)
+                except Exception as e:     # an expired file reference, a dropped link: the next run resumes
+                    say(f"  {rec['id']}: stopped at {part_mb(part)} of {total / 1e6:.0f} MB ({type(e).__name__}: {str(e)[:80]})")
+                    continue
+                got = (part.stat().st_size - before) / 1e6
+                rate = got / max(time.time() - t0, 1)
+                if not whole:
+                    say(f"  {rec['id']}: {part_mb(part)} of {total / 1e6:.0f} MB so far ({rate * 1000:.0f} KB/s); batch limit reached")
+                    return done
+                part.replace(final)
+                say(f"  {rec['id']}: downloaded {total / 1e6:.1f} MB ({rate * 1000:.0f} KB/s)")
+            mark(rec["module"], rec["id"], "downloaded", file=str(final.relative_to(ROOT)), size=total)
+            done.append(rec["id"])
     finally:
         await client.disconnect()
     return done
@@ -331,7 +346,7 @@ def download(recs, budget=None, youtube_audio_too=False, say=print):
                 say(f"  {r['id']}: YouTube audio failed")
         else:
             say(f"  {r['id']}: no YouTube captions (audio waits for --youtube-audio)")
-    tg = [r for r in recs if r["source"] == "telegram" and not reached(st, r["id"], "downloaded")]
+    tg = [r for r in priority(recs) if r["source"] == "telegram" and not reached(st, r["id"], "downloaded")]
     if not tg or budget.spent:
         return
     lock()
@@ -339,7 +354,7 @@ def download(recs, budget=None, youtube_audio_too=False, say=print):
         asyncio.run(_download_telegram(tg, budget, say))
     except Exception as e:
         if "database is locked" in str(e):
-            raise SystemExit("Telegram session is in use (Update data or tg_lists.py fetch is running): run again after it")
+            raise RuntimeError("Telegram session is in use (Update data or tg_lists.py fetch is running): run again after it")
         raise
     finally:
         unlock()
@@ -349,7 +364,7 @@ def compress(recs, say=print):
     import lectures
     import upload_media
     st = states(recs[0]["module"]) if recs else {}
-    for r in recs:
+    for r in priority(recs):
         if r["source"] != "telegram" or not reached(st, r["id"], "downloaded") or reached(st, r["id"], "compressed"):
             continue
         src = original(r)
@@ -389,7 +404,7 @@ def send(file, key):
 
 def upload(recs, limit=None, say=print, sender=send):
     st = states(recs[0]["module"]) if recs else {}
-    todo = [r for r in recs if r["source"] == "telegram" and reached(st, r["id"], "compressed")
+    todo = [r for r in priority(recs) if r["source"] == "telegram" and reached(st, r["id"], "compressed")
             and not reached(st, r["id"], "uploaded")]
     for r in todo[:limit]:
         f = check_uploadable(compressed_path(r))

@@ -1,0 +1,165 @@
+"""The year 1 records inside the two owner commands (owner, 2026-11-17: "merge importation with py update_data.py,
+py site_import.py").
+
+`py update_data.py` -> `update()`: one download batch from Telegram (YouTube captions, then recordings, first lessons
+of every subject first; `spine.config()["records_batch_mb"]` MB, default 400), then `py -m spine records finish` in
+a detached background run (compress, upload, transcribe on the fleet; log logs/records_y1.log; one at a time).
+
+`py site_import.py` -> `write_site()` then the lessons importer for year1-musculoskeletal: one lesson per record whose
+doctor has a site doctor id (spine/tg/trees.json `site`) and whose recording is on the site (uploaded, or YouTube).
+Every year 1 lesson carries `oldData` (owner: all first-year data is old data; the lesson page says so).
+A doctor with no site id, a subject the module has no curriculum for, a record not uploaded yet: reported, left out.
+"""
+import json
+import re
+import subprocess
+from pathlib import Path
+
+from spine import ROOT, config, module_dir, read_json
+from spine.records import machine
+
+LOG = ROOT / "logs" / "records_y1.log"
+BG_LOCK = machine.SOURCES / "finish.lock"
+# Curriculum modules of year1-musculoskeletal on the site (tumrah backend doctorRoster: "Musculoskeletal and CNS teach
+# no biochemistry"). Biochemistry lessons wait until the website session adds the subject to the module.
+SITE_SUBJECTS = {"anatomy", "histology", "physiology"}
+KIND = {"lecture": "lesson", "mini": "summary", "revision": "revision"}
+
+
+def bg_running():
+    import upload_media
+    try:
+        pid = int(BG_LOCK.read_text().strip())
+    except (OSError, ValueError):
+        return None
+    return pid if upload_media.alive(pid) else None
+
+
+def start_finish(via="fleet"):
+    if (pid := bg_running()):
+        return f"year 1 compress/upload/transcribe already running (pid {pid})"
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+    log = open(LOG, "a", encoding="utf-8")
+    proc = subprocess.Popen(["py", "-m", "spine", "records", "finish", "--via", via], cwd=ROOT, stdout=log,
+                            stderr=subprocess.STDOUT, env={**__import__("os").environ, "PYTHONIOENCODING": "utf-8"},
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0))
+    BG_LOCK.parent.mkdir(parents=True, exist_ok=True)
+    BG_LOCK.write_text(str(proc.pid))
+    return f"year 1 compress, upload and transcription started in the background (log: {LOG.relative_to(ROOT)})"
+
+
+def summary(recs):
+    st = machine.states(recs[0]["module"]) if recs else {}
+    tg = [r for r in recs if r["source"] == "telegram"]
+    yt = [r for r in recs if r["source"] == "youtube"]
+    n = {s: sum(machine.reached(st, r["id"], s) for r in tg) for s in ("downloaded", "compressed", "uploaded")}
+    heard = sum(bool((st.get(r["id"]) or {}).get("transcript")) for r in recs)
+    left_mb = sum((r["size"] or 0) - machine.partial_size(r) for r in tg if not machine.reached(st, r["id"], "downloaded")) / 1e6
+    return [f"year 1: {len(recs)} records; Telegram {len(tg)}: downloaded {n['downloaded']}, compressed {n['compressed']},"
+            f" uploaded {n['uploaded']}; YouTube {len(yt)}: captions {sum(machine.reached(st, r['id'], 'downloaded') for r in yt)};"
+            f" transcripts {heard}", f"year 1: {left_mb:.0f} MB still to download from Telegram"]
+
+
+def update(dry=False, telegram=True, background=True):
+    """Update data's year 1 step. Returns report lines."""
+    problems, out = [], []
+    recs = machine.plan(1, problems=problems)
+    out += [f"SKIPPED {p}" for p in problems]
+    if not recs:
+        return out + ["year 1: no records (run `py -m spine mother run --year 1`)"]
+    if not dry and telegram:
+        budget = machine.Budget(config().get("records_batch_mb", 400))
+        got = []
+        machine.download(recs, budget, say=got.append)
+        out += [ln.strip() for ln in got if "downloaded" in ln or "so far" in ln or "stopped" in ln or "no file" in ln]
+        out += [f"year 1 YouTube captions: {sum('YouTube captions' in ln for ln in got)} new"]
+    if not dry and background:
+        out.append(start_finish())
+    return out + summary(recs)
+
+
+# --- the site ---------------------------------------------------------------------------------------------------
+def youtube_url(url):
+    vid = machine.yt_id(url)
+    return f"https://youtu.be/{vid}" if vid else url
+
+
+def site_rows(recs, st):
+    """(rows for importHubData lessons, report lines). Chapters and order follow the doctor's list."""
+    keep, out, why = [], [], {}
+    for r in recs:
+        row = st.get(r["id"]) or {}
+        if not r.get("site"):
+            why.setdefault("no site doctor id", set()).add(r["doctor"])
+            continue
+        if r["subject"] not in SITE_SUBJECTS:
+            why.setdefault(f"no {r['module']} curriculum for {r['subject']} on the site", set()).add(r["doctor"])
+            continue
+        if r["source"] == "telegram" and row.get("state") != "uploaded":
+            why.setdefault("recording not uploaded yet", set()).add(r["id"])
+            continue
+        if r["source"] == "youtube" and not r.get("youtube"):
+            continue
+        if r["source"] is None:
+            why.setdefault("no recording in the post", set()).add(r["id"])
+            continue
+        keep.append(r)
+    keys = {f"lecture:{r['id']}" for r in keep}
+    chapters, order = {}, {}
+    rows = []
+    for r in sorted(keep, key=lambda r: (r["doctor_order"], r["rank"])):
+        ck = (r["doctor"], r["chapter"])
+        chapters.setdefault(r["doctor"], {})
+        if r["chapter"] not in chapters[r["doctor"]]:
+            chapters[r["doctor"]][r["chapter"]] = len(chapters[r["doctor"]]) + 1
+        order[ck] = order.get(ck, 0) + 1
+        covers = [f"lecture:{c}" for c in r["covers"] if f"lecture:{c}" in keys]
+        kind = KIND[r["role"]]
+        if kind == "summary" and len(covers) != 1:
+            why.setdefault("mini lecture whose lecture is not on the site yet", set()).add(r["id"])
+            continue
+        row = {"key": f"lecture:{r['id']}", "subject": r["subject"],
+               "chapter": {"title": r["chapter"] or r["name"], "order": chapters[r["doctor"]][r["chapter"]]},
+               "name": r["name"], "order": order[ck], "kind": kind, "doctorId": r["site"], "covers": covers if kind != "lesson" else [],
+               "oldData": True, "ranges": []}
+        if r["source"] == "youtube":
+            row["videoUrl"] = youtube_url(r["youtube"])
+        else:
+            row["audioUrl"] = "r2:" + row_key(st, r)
+        rows.append(row)
+    for reason, items in why.items():
+        out.append(f"year 1 left out ({reason}): {len(items)}" + (f": {', '.join(sorted(items))[:300]}" if len(items) <= 25 else ""))
+    return rows, out
+
+
+def row_key(st, r):
+    return (st.get(r["id"]) or {}).get("key") or machine.upload_key(r)
+
+
+def site_file(module="year1-musculoskeletal"):
+    return module_dir(module) / "site" / "lessons.jsonl"
+
+
+def write_site():
+    """Writes modules/year1-musculoskeletal/site/lessons.jsonl. Returns (number of rows, report lines)."""
+    recs = machine.plan(1)
+    if not recs:
+        return 0, ["year 1: no records"]
+    rows, out = site_rows(recs, machine.states(recs[0]["module"]))
+    f = site_file(recs[0]["module"])
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
+    return len(rows), [f"year 1: {len(rows)} lessons of {len(recs)} records -> {f.relative_to(ROOT)}"] + out
+
+
+def save_ids(result_line, module="year1-musculoskeletal"):
+    """The importer's result (last output line, JSON): each lesson id into the state log (`lesson`)."""
+    res = json.loads(result_line)
+    st = machine.states(module)
+    n = 0
+    for key, lesson in (res.get("lessons") or {}).items():
+        rid = key.split(":", 1)[1]
+        if lesson and (st.get(rid) or {}).get("lesson") != lesson:
+            machine.mark(module, rid, lesson=lesson)
+            n += 1
+    return n

@@ -1,4 +1,4 @@
-"""The whole site import of year2-cns in one command (owner, 2026-11-16: "always push"; 2026-11-17: one command).
+"""The whole site import (year2-cns, then the year 1 records) in one command (owner, 2026-11-16: "always push"; 2026-11-17: one command).
 
     py site_import.py           the real import: writes the production website
     py site_import.py --dry     only the lesson dry run: what would be created or changed; writes nothing
@@ -10,6 +10,10 @@ Steps, in order (each prints one line; the first failure stops the run):
   4 pointers      fast_lessons.py pointers, importHubData pointers
   5 tiers         tiers.py, apply_tiers.py
   6 extras        recomputeLessonExtras for every published CNS lesson
+  7 year 1        modules/year1-musculoskeletal/site/lessons.jsonl from the records (spine/records/flow.py), then
+                  hub_import_lessons.py --module year1-musculoskeletal; lesson ids back into the records state.
+                  Every year 1 lesson is `oldData`. Records whose doctor has no site id (trees.json `site`), whose
+                  subject the module lacks on the site, or whose recording is not uploaded yet are reported, left out.
 
 Run `py update_data.py` first: it imports the new lectures and starts the upload of the new recordings
 (compressed to AAC mono 48 kbps before upload). Lessons whose doctor has no site id are left out.
@@ -51,6 +55,20 @@ def run(cmd, cwd=ROOT, env=None, keep=None):
     return out
 
 
+def year1(env, dry):
+    """Step 7: the year 1 records as old-data lessons (only those with a site doctor and a recording on the site)."""
+    from spine.records import flow
+    n, lines = flow.write_site()
+    for l in lines:
+        print("   " + l[:300], flush=True)
+    if not n:
+        print("   year 1: nothing to import yet")
+        return
+    out = run(["py", "hub_import_lessons.py", "--module", "year1-musculoskeletal"] + ([] if dry else ["--apply"]), env=env)
+    if not dry:
+        print(f"   year 1: {flow.save_ids([l for l in out.splitlines() if l.strip()][-1])} lesson ids saved")
+
+
 def main(argv):
     dry = "--dry" in argv
     env = node_env()
@@ -59,6 +77,8 @@ def main(argv):
     if dry:
         print("== 2 lessons (dry run, nothing is written)", flush=True)
         run(["py", "hub_import_lessons.py"], env=env)
+        print("== 7 year 1 (dry run)", flush=True)
+        year1(env, dry=True)
         return
     run(["py", "fast_lessons.py", "build"], keep=["in_two_lectures", "not_in_bank_no_key"])
     print("== 2 lessons", flush=True)
@@ -85,6 +105,8 @@ def main(argv):
     ids = [str(l["_id"]) for l in db.Reader.live()._db.lessons.find({"moduleName": MODULE_NAME, "status": "published"}, {"_id": 1})]
     out = run(TSX + ["src/scripts/recomputeLessonExtras.ts"] + ids, cwd=BACKEND, env=env, keep=["\x00"])
     print(f"   {len([l for l in out.splitlines() if l.strip()])} lessons recomputed (of {len(ids)} published)")
+    print("== 7 year 1", flush=True)
+    year1(env, dry=False)
     print("== done")
 
 

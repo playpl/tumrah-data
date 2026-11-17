@@ -47,7 +47,7 @@ def audio_of(rec, st):
 
 
 def todo(recs, st):
-    return [r for r in recs if not (st.get(r["id"]) or {}).get("transcript") and audio_of(r, st)]
+    return [r for r in machine.priority(recs) if not (st.get(r["id"]) or {}).get("transcript") and audio_of(r, st)]
 
 
 def shift(text, offset):

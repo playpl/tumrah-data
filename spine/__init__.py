@@ -83,7 +83,7 @@ def write_json(path, data):
 def config():
     """config.json "spine" block with the defaults filled in. Every phase starts in shadow mode."""
     cfg = (read_json(ROOT / "config.json", {}) or {}).get("spine", {})
-    return {"p1": "shadow", "p2": "shadow", "mother": "shadow", "claude_budget_tokens": 300000,
+    return {"p1": "shadow", "p2": "shadow", "mother": "shadow", "claude_budget_tokens": 300000, "records_batch_mb": 400,
             "auto_publish_records": False, **cfg}
 
 

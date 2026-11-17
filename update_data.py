@@ -16,6 +16,9 @@ What it does, in order (each step on its own: one failing step never stops the o
  6. site files: `dm.py site` rewrites modules/<m>/site/lessons.jsonl (old-data flags included).
     Uploads (owner, 2026-11-12, "make it automatic"): every recording not yet uploaded is sent to the site's private storage
     by upload_media.py in a detached background run (not in --dry; --no-upload skips it); it rewrites the site files when done.
+ 6b. year 1 records (spine/records/flow.py, owner 2026-11-17): one Telegram batch (`spine.config()["records_batch_mb"]`,
+    first lessons of every subject first), then compress, upload and fleet transcription in a detached background run
+    (logs/records_y1.log). Year 1 is old data and lives in modules/year1-musculoskeletal/records/, never in lectures/.
  7. the ledger and the owner's cards (not in --dry): ledger.sync, decisions.refresh; "N decisions wait on the Today screen".
  8. the report: what changed, what waits (the fleet is down: transcribe, place, align, MCQ copy), what needs the owner.
 The website itself is NOT touched here: importers write production (dry run first, `--apply` writes an undo file).
@@ -102,6 +105,12 @@ def waiting_telegram(q, dry):
     return out
 
 
+def year1(dry, tele, upload):
+    """Year 1 records: a download batch (Telegram), then compress/upload/transcribe in the background."""
+    from spine.records import flow
+    return flow.update(dry=dry, telegram=tele, background=upload and not dry)
+
+
 def site_files():
     res = subprocess.run(["py", str(ROOT / "site_lessons.py"), "write"], capture_output=True, text=True, cwd=ROOT, encoding="utf-8")
     out = [ln for ln in res.stdout.splitlines() if "lessons" in ln] or [res.stderr.strip()[-200:]]
@@ -177,6 +186,7 @@ def main(argv):
         if upload:
             import upload_media
             step(report, "uploads", upload_media.start_background)
+    step(report, "year 1 records", lambda: year1(dry, tele, upload))
     step(report, "state", lambda: state(q))
     if not dry:
         step(report, "ledger and decisions", today_cards)

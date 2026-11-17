@@ -27,20 +27,10 @@ def cmd_status(args):
         print(line)
 
 
-def per_doctor(args, step):
-    """A step runs doctor by doctor, so a report follows each doctor."""
-    recs = _recs(args)
-    for (doc, ref), rs in machine.by_doctor(recs).items():
-        print(f"{doc} ({ref})")
-        step(rs)
-
-
 def cmd_download(args):
     budget = machine.Budget(args.max_mb)
     recs = _recs(args)
-    for (doc, ref), rs in machine.by_doctor(recs).items():
-        print(f"{doc} ({ref})")
-        machine.download(rs, budget, args.youtube_audio)   # YouTube captions (a few KB) run even when the MB limit is spent
+    machine.download(recs, budget, args.youtube_audio)      # first lessons of every subject first (machine.priority)
     if budget.spent:
         print(f"batch limit of {args.max_mb:.0f} MB reached")
     for line in machine.status_lines(recs):
@@ -48,15 +38,23 @@ def cmd_download(args):
 
 
 def cmd_compress(args):
-    per_doctor(args, machine.compress)
+    machine.compress(_recs(args))
 
 
 def cmd_upload(args):
-    left = [args.limit]
+    machine.upload(_recs(args), args.limit)
 
-    def step(rs):
-        machine.upload(rs, left[0])
-    per_doctor(args, step)
+
+def cmd_finish(args):
+    """What needs no Telegram: compress, upload, transcribe (update_data.py starts this in the background)."""
+    from spine.records import transcribe
+    recs = _recs(args)
+    machine.compress(recs)
+    machine.upload(recs)
+    n = transcribe.run(recs, via=args.via)
+    print(f"{n} pieces heard")
+    for line in machine.status_lines(recs):
+        print(line)
 
 
 def cmd_transcribe(args):
@@ -85,7 +83,8 @@ def register(sub):
                           ("compress", cmd_compress, "AAC mono 48 kbps of every downloaded Telegram record"),
                           ("upload", cmd_upload, "compressed recordings to the site's storage"),
                           ("transcribe", cmd_transcribe, "5-minute pieces heard by Gemini web (Flash-Lite)"),
-                          ("run", cmd_run, "download, compress, upload")):
+                          ("run", cmd_run, "download, compress, upload"),
+                          ("finish", cmd_finish, "compress, upload, transcribe (no Telegram)")):
         q = rs.add_parser(name, help=hlp)
         q.add_argument("--year", type=int, default=1)
         q.add_argument("--doctor", help="part of a doctor's name, or a list (ZAG59_bio/29)")
@@ -95,7 +94,9 @@ def register(sub):
             q.add_argument("--max-mb", type=float, default=300, help="MB one run may fetch from Telegram (default 300)")
             q.add_argument("--youtube-audio", action="store_true", help="audio of YouTube posts with no captions")
         if name in ("upload", "run"):
-            q.add_argument("--limit", type=int, help="at most N uploads per doctor")
+            q.add_argument("--limit", type=int, help="at most N uploads")
+        if name == "finish":
+            q.add_argument("--via", choices=("fleet", "browser"), default="fleet")
         if name == "transcribe":
             q.add_argument("--limit", type=int, help="at most N pieces this run")
             q.add_argument("--workers", type=int, default=4, help="unused by fleet and browser (one worker per account)")
