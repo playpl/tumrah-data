@@ -1,0 +1,79 @@
+import unittest
+
+from spine.align import bm25, prefilter
+
+TEXTS = ["The spinal cord ends at the lower border of the first lumbar vertebra.",
+         "It is surrounded by three meninges.",
+         "Pyramidal cells",
+         "The pyramidal cells are multipolar nerve cells of the cerebral cortex.",
+         "Stellate cells",
+         "The cerebellum has three peduncles that connect it to the brain stem.",
+         "Pyramidal cells",
+         "The red nucleus is an oval mass of grey matter in the tegmentum of the midbrain."]
+LESSON = ["m:L1", "m:L1", "m:L2", "m:L2", "m:L2", "m:L3", "m:L3", "m:L3"]
+
+
+def handout():
+    sents = [{"id": f"m:h:p{n + 1}:s1", "i": n, "kind": "fact", "text": t, "lesson": LESSON[n], "ctx": []}
+             for n, t in enumerate(TEXTS)]
+    lessons = {l: {"subject": "anatomy"} for l in set(LESSON)}
+    return prefilter.Handout("m", sents, lessons)
+
+
+def item(text, scope=("m:L1", "m:L2", "m:L3")):
+    return {"text": text, "scope": list(scope)}
+
+
+class BM25(unittest.TestCase):
+    def test_ranks_exact_first(self):
+        idx = bm25.Index([t.lower().split() for t in TEXTS])
+        self.assertEqual(idx.top("the cerebellum has three peduncles".split(), 1)[0][0], 5)
+
+    def test_allowed_limits_the_search(self):
+        idx = bm25.Index([t.lower().split() for t in TEXTS])
+        self.assertEqual(idx.top(["pyramidal", "cells"], 3, allowed={6, 7})[0][0], 6)
+        self.assertEqual(idx.top(["nothing"], 3), [])
+
+
+class Tiers(unittest.TestCase):
+    def setUp(self):
+        self.H = handout()
+
+    def test_exact_unique_accepted(self):
+        res = prefilter.code_tiers([item("It is surrounded by three meninges")], self.H)
+        self.assertEqual(res[0], ("A1", (1,)))
+
+    def test_exact_across_two_sentences(self):
+        res = prefilter.code_tiers([item(TEXTS[0] + " " + TEXTS[1])], self.H)
+        self.assertEqual(res[0], ("A1", (0, 1)))
+
+    def test_fuzzy_needs_anchors_on_both_sides(self):
+        reworded = "Pyramidal cells are multipolar nerve cell of cerebral cortex"
+        alone = prefilter.code_tiers([item(reworded)], self.H)
+        self.assertIsNone(alone[0])
+        between = prefilter.code_tiers([item(TEXTS[1]), item(reworded), item(TEXTS[5])], self.H)
+        self.assertEqual(between[1], ("A3", (3,)))
+
+    def test_short_needs_neighbours(self):
+        alone = prefilter.code_tiers([item("Pyramidal cells")], self.H)
+        self.assertIsNone(alone[0])
+        pinned = prefilter.code_tiers([item(TEXTS[1]), item("Pyramidal cells"), item(TEXTS[3])], self.H)
+        self.assertEqual(pinned[1], ("A4", (2,)))
+
+    def test_candidates_hold_the_corridor_and_the_hits(self):
+        items = [item(TEXTS[0]), item("three peduncles join the cerebellum and brain stem"), item(TEXTS[7])]
+        res = prefilter.code_tiers(items, self.H)
+        cands = prefilter.candidates(items, res, [0, 1, 2], self.H)
+        self.assertIn(5, cands)
+        self.assertEqual(cands, sorted(cands))
+        self.assertEqual(prefilter.windows(3, res), [[0, 1, 2]])
+        self.assertEqual(prefilter.windows(2, [("A1", (0,)), ("A1", (1,))]), [])
+
+    def test_page_scope_follows_the_words(self):
+        scopes = self.H.page_lessons(["spinal cord lumbar vertebra meninges", "cerebellum peduncles brain stem"])
+        self.assertEqual(scopes[0][0], "m:L1")
+        self.assertEqual(scopes[1][0], "m:L3")
+
+
+if __name__ == "__main__":
+    unittest.main()

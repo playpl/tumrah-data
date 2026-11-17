@@ -52,6 +52,11 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   or a file), each link's anchor text is the lesson name. Posts after the root that no list links to are
   kept under `unreached`. Classifying the files and attaching each quiz to a lesson is Phase 3.
 
+- 2026-11-17 Phase 1, the part with no LLM: `spine/books/split.py` + `cli.py` (`books split`, `books dedupe`;
+  sentences in `modules/year2-cns/graph/books/<book>.sentences.jsonl`), `spine/align/bm25.py`,
+  `prefilter.py` (`Handout` index, page scope, tiers A1-A4, candidates, windows), `old.py` (`p1 grade-old`,
+  verdicts in `graph/work/old_grade.jsonl`), `recall.py` (`p1 recall`), `cli.py`, `tests/test_spine_align.py`.
+
 ## Left to do (in order)
 
 3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
@@ -93,6 +98,20 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   4 QuizBot quizzes, 4 files; 8 later posts no list links to (3 files, 3 forms, 1 media, 1 text).
   `ZMSUMcqs58` from 2098 (Year 2): 87 posts: 12 lists, 35 forms, 33 files, 4 QuizBot, 2 text, 1 media;
   3 later posts no list links to (1 file, 1 form, 1 text).
+
+- Books (2026-11-17): 9 PDFs, 2 are copies (`ammar-cns-hist-partial` = `ammar-hist-1`, `nagib-cns-phys-partial`
+  = `nageb-phys-1`). 7 books -> 8,422 sentences, 7,154 of them content (the rest is page furniture).
+- `py -m spine p1 grade-old year2-cns` (7,173 old links): kept with no new read 3,475; one fleet read 3,496;
+  redo 202 (code disagrees 87, weak reworded 115); 213 old "extra / not content" blocks are in the handout
+  word for word. Tier agreement with the old links: A1 98.8% (2,201), A2 97.7% (44), A3 96.3% (1,218),
+  A4 84.8% (99).
+- `py -m spine p1 recall year2-cns` (new book sentences): code accepts 4,521 of 7,154 (63%); 646 windows
+  remain. Agreement with old links: A1 99.6%, A2 88.9% (18 cases), A3 96.8%, A4 94.3%. Page scope holds the
+  old link's lesson for 99.8% same / 98.7% partial / 95.7% reworded. Candidate list holds the old link's
+  sentence: same 98.9%, partial 96.8%, reworded 95.9%. **Gate (reworded >= 95%) passes: no embedding stage.**
+  Settings that pass: BM25 top 8 in scope + top 3 of the whole handout + neighbours + anchor corridor, cap 80
+  (cap 60 gave 93.8 to 94.7%). A window is about 60 candidates and 1,430 tokens; one reader over all books
+  is about 0.92M tokens (the old book flow used about 130M).
 
 ## Questions for the owner
 
