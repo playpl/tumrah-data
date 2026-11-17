@@ -6,12 +6,12 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
 ## Prompt for the next session (copy and paste)
 
 ```
-Read docs/spine/HANDOVER.md in tumrah-data and continue from "Left to do", item 1 (the year 1 records import).
-Rules: no Claude sub-agents; work inline; branch spine-rebuild; commit after each step and keep the handover
-current; tests stay green (py -m unittest discover tests). Year 1 (ZAG59 channels) is all old data and all of
-it is imported; year 2 "Old data" lists are fallback only. Compress every recording before upload (AAC mono
-48 kbps), never upload an original. One Telegram reader at a time. Internet is slow: download and upload in
-small batches that can be resumed, and report what is left. Do not ask before importing or fixing; report after.
+Read docs/spine/HANDOVER.md in tumrah-data and continue from "Left to do", item 1. The GitHub Actions setup has
+its own handover (docs/handovers/HANDOVER_2026-11-17_CLOUD.md) and waits for the owner. Rules: no Claude
+sub-agents; work inline; branch spine-rebuild (GitHub: playpl/tumrah-data main = spine-rebuild); commit after
+each step and keep the handover current; tests stay green (py -m unittest discover tests). Year 1 is all old
+data; year 2 "Old data" lists are fallback only. Compress every recording before upload (AAC mono 48 kbps).
+One Telegram reader at a time. Do not ask before importing or fixing; report after.
 ```
 
 ## How to run the import (owner)
@@ -322,9 +322,9 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
   `pointers_one`, `mcq` flows + `fast_lessons.py` + ledger (old system; Phase 3 of the spine is not built); file
   aligning = `books` flow (old) and `py -m spine p1 ...` (new, CNS doctor books run; Tumrah book and year 1 not).
 
-## Left to do (in order)
+## Session of 2026-11-17 night (what was done)
 
-0. (session of 2026-11-17 night) Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
+Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
    12 chapters, one per list item) added to `mother_lists.json` from the agent's map; `py -m spine parity mother`
    = 10 of 10 exact; `mother_check.py` prints only the known Wagih post 1848 line. Cocci (ZAG59_physio/58) and
    ZAG59_bio/34 stay null (owner decides).
@@ -368,40 +368,46 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
    remote, no `gh` here), the secrets and the runner's Telegram login (owner, `cloud/SETUP.md`); then set
    `records_cloud` true. Stage 2 later: year 2 Telegram lists + site import on the runner.
 
-1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
-   about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download
-   --youtube-audio`, then `records transcribe` (not in Update data yet). Nothing reaches the site until the owner
-   names the 20 doctors' site ids (item 2).
-2. Year 1 on the website: the 20 doctors need site doctor ids (`spine/tg/trees.json`, `site: null`); the
-   lessons need their module and subjects on the site (biochemistry is new); a note for students that all
-   first-year data is old data. Website code goes to the website session; the data importer here, dry run first.
-3. Dr. Khaled Aboelfadl (year 2, list 1639): once he has a site doctor (the owner's "Set site doctor" card, or
-   `doctors_folder.ALIASES`), add his 12 lectures to `mother_lists.json` from the agent's map and run
-   `py site_import.py`. Dr. Ayman Khorshed (1706) is a YouTube playlist: needs a playlist reader, or the
-   owner's word to skip him.
-4. Mother message: `spine/tg/flow.py` (`MotherFlow`: the dispatcher runs the two readers when a list changes),
-   then the switch from shadow to primary (`site_lessons.py` reads the agent's cached map; the hand file stops).
-   Until then, after every Update data: `py -m spine mother run --year 2`, add the new lectures to the hand
-   file, `py -m spine parity mother` must print 9 of 9.
-5. Phase 1 open sentences (470 of 7,154): read `py -m spine p1 audit year2-cns --list <name>` and settle
-   `split-vote` (46), `one-reader` (157), `one-no` (35), `no-reader` (13), `jump` (219). Then: the "0" retry
-   with the whole lesson listed; a third reader (Gemini web) for split votes; Claude Haiku only for what stays
-   flagged, under `spine.config()["claude_budget_tokens"]` (ask the owner with a token estimate first);
-   `spine/compat.py` (`aligned_blocks(book)` in the legacy block shape, `ledger_mirror()`);
-   `spine/parity/p1.py`; a 200-link random audit per book before it is marked ready (126 links read so far,
-   0 wrong). `spine/runners/flows.py` is written but nothing calls `register()` yet. A4 is never accepted
-   alone (84.8% agreement on old blocks). The book splitter does not catch "P a g e | 99" lines in
-   `mossafer-anat-full` as page furniture.
-6. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
-   write `spine/polls/apply.py` (`--dry` default): A deletes Batch58ATM rows labelled endocrine / other Year 2
-   from `polls.db` (+ their `own` votes), `ready/`, `bank/`, keeps a tombstone list of message ids so a
-   rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
-   and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
-   and `engine.seed_old_keys` read `polls/channels.json`. `registry.plan()` already gives the verdict per question.
-7. Phase 2 segmentation: `spine/seg/prior.py`, `segment.py`, `flow.py` (transcript paragraphs -> the doctor's
-   book sentences, strictly forward), `seg audit`, `parity p2`. Needs Phase 1 edges to reach the handout.
-8. Website importer changes W1 to W5 on a branch in the tumrah repo (`Desktop/tumrah`), dry run first.
-9. Rewrite `CLAUDE.md` rules as each takes effect (table in `START_HERE.md`). Tumrah book alignment. Phase 3 last.
+   Later the same night: reader C (third fleet reader, `p1 jobs|run --reader C`, only windows holding an open
+   sentence or a jump) ran: accepted 6,280 -> 6,480 of 7,154 (a jump that three readers agree on is accepted:
+   `engine.three_agree`). Unsettled after the first C run: one reader 35, readers disagree 17, one says no 7,
+   no reader 7, jumps 148 (C was reading the jumps when this was written: see the log `logs/p1_readerC2.log`).
+   `py -m spine parity p1` (new): elhusseiny PASS; Mossafer reaches 99.2% and Elsamahy 97.1% of the old linked
+   rows, Zahran 83.1%, Ammar 71.5% (the old flow linked fragments of Ammar's no-ruling tables, e.g. "Anatomical |
+   1- Central nervous system", that the new readers call extra: a known splitter limit, for the 200-link audit).
+   `spine/compat.py` writes the legacy aligned-block shape (shadow, `graph/compat/aligned/<book>.jsonl`, new match
+   word `open` for unsettled sentences). `spine/tg/flow.py` (`py -m spine mother flow`) runs inside Update data:
+   changed lists re-read, new items ADDED to the hand file (never edited/removed), edits/deletions reported with the
+   hold rule, parity mother (10 of 10). Website asks written: `docs/spine/WEBSITE_ASKS.md` (the website repo had
+   another session's uncommitted work in importHubData.ts, so nothing was changed there). Seg prompt v2 (segments
+   of at most 12 paragraphs, NONE only for talk with no book line): cns-002 A 12 segments, cns-003 B 15 segments,
+   all forward; the rest of the pilot was running (log `logs/seg_pilot2.log`, then `py -m spine seg collect`).
+
+## Left to do (in order)
+
+1. Seg pilot (cns-002, cns-003, cns-021, readers A and B, prompt v2): read `logs/seg_pilot2.log`, run
+   `py -m spine seg collect cns-002 cns-003 cns-021` and `py -m spine seg audit <lecture>` for each. Accept rule:
+   both readers usable and 90% of paragraphs within 5 book lines. If they agree, run all 69 lectures
+   (`py -m spine seg jobs` then `seg run`, about 150K fleet tokens and 10 minutes per read; the fleet sometimes
+   answers "No capacity available" (503): rerun, answered folders are kept). Not built: `parity p2` (segments'
+   handout pages against the old `lecture.json` ranges: `flow.audit` already prints the share per lecture) and
+   `compat.lecture_files` (links.jsonl / ranges for the Today screen and `LectureLink` rows for the site).
+   Lectures of doctors with no split book (Azouny, Khaled, Mahmoud Elhusseiny) need the design's handout-target
+   variant (H numbers, monotonic only flagged): not built.
+2. Phase 1 tail: after reader C's jump run, `py -m spine p1 accept year2-cns` and `parity p1`. Then the 200-link
+   random audit per book (`p1 audit year2-cns --sample 200 --book <b>`; 126 read so far, 0 wrong) and settle the
+   last open sentences. Claude Haiku only with the owner's OK and a token estimate. The book splitter still keeps
+   "P a g e | 99" lines in `mossafer-anat-full` as content.
+3. GitHub Actions for year 1 (owner's steps, `docs/handovers/HANDOVER_2026-11-17_CLOUD.md`), then
+   `records_cloud: true`. Stage 2 (year 2 lists + site import on the runner) after.
+4. Website asks W1-W5, lesson deadlines, the year 1 "old data" note: `docs/spine/WEBSITE_ASKS.md`, for the website
+   session. Then: mirror Telegram deletions as drafts (spine/tg/flow.py has the diff and hold rule).
+5. Mother agent shadow -> primary (`config.json` "spine": {"mother": "primary"}): only with the owner's word; the
+   CLAUDE.md "by hand" rule is the owner's.
+6. Year 1: the MSK handout PDF is not here (no handout graph, no placement); 97 records wait for upload (the
+   runner will do it); Cocci (ZAG59_physio/58) and ZAG59_bio/34 site ids, biochemistry visibility: owner.
+7. Tumrah book: the tumrah-book session exports bundles with READY.jsonl (agreed 2026-11-17); the data side reads
+   it once the MSK handouts and the site's lesson deadline exist. Phase 3 (questions) last.
 
 ## Numbers so far
 
