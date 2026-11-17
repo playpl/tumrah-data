@@ -94,7 +94,8 @@ def find_doctor_folder(subject, key, module="cns"):
 ALIASES = {"elsamahy": "dr-abdullah-el-samahi-phys", "ammar": "dr-ahmed-ammar-hist", "nageb": "dr-naguib-el-husseiny-phys",
            "azony": "dr-ibrahim-el-azouni-anat", "zahran": "dr-mohamed-zahran-hist", "amr mossafer": "dr-amr-mesafer-anat",
            "wagih elhusseiny": "dr-wajih-el-husseiny-anat", "mahmoud elhusseiny": "dr-mahmoud-el-husseiny-hist",
-           "basel": "dr-basel-sherif-hist"}
+           "basel": "dr-basel-sherif-hist",
+           "khaled aboelfadl": "dr-khaled-abualfadle-phys"}
 
 
 def owner_aliases(db=None):

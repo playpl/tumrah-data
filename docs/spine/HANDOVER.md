@@ -302,8 +302,8 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
   under `polls/grade5/raw/`. Owner: no archive of the A rows; old backup files stay. Check the polls job is not
   running first. Then rerun `py -m spine polls inventory` and compare with POLLS_INVENTORY.md.
 - KHORSHED: skipped by the owner. `spine/tg/trees.json` now has `"new": null, "skip": true` for him.
-- SITE DOCTOR IDS (from the "Data helper agent" session, read-only from prod DoctorProfile): put into
-  `spine/tg/trees.json` `site` (not done yet):
+- SITE DOCTOR IDS (from the "Data helper agent" session, read-only from prod DoctorProfile): DONE 2026-11-17
+  (18 year 1 ids + Khaled in `spine/tg/trees.json` `site`; Khaled also in `doctors_folder.ALIASES`):
   ZAG59_Anatomy/39 dr-ibrahim-el-azouni-anat, /41 dr-wajih-el-husseiny-anat, /40 dr-amr-mesafer-anat,
   /42 dr-islam-gamal-anat, /43 dr-mahmoud-hisham-anat, /44 dr-basel-el-haggag-anat, /45 dr-ahmed-hamada-anat;
   ZAG59_physio/54 dr-abdullah-el-samahi-phys, /55 dr-naguib-el-husseiny-phys, /59 dr-zein-phys;
@@ -323,6 +323,11 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
   aligning = `books` flow (old) and `py -m spine p1 ...` (new, CNS doctor books run; Tumrah book and year 1 not).
 
 ## Left to do (in order)
+
+0. (session of 2026-11-17 night) Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
+   12 chapters, one per list item) added to `mother_lists.json` from the agent's map; `py -m spine parity mother`
+   = 10 of 10 exact; `mother_check.py` prints only the known Wagih post 1848 line. Cocci (ZAG59_physio/58) and
+   ZAG59_bio/34 stay null (owner decides). Next: polls apply, Update data + site import, plan gaps.
 
 1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
    about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download
