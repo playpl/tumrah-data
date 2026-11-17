@@ -50,8 +50,8 @@ class MonotonicEnforced(unittest.TestCase):
 
     def test_parse_grammar(self):
         got, bad = segment.parse("P1-P4 = B1-B9\n```\np5 - p6 = none\nP7-P8 = B10\nchatter")
-        self.assertEqual(got, segs((1, 4, 1, 9), (5, 6, None, None)))
-        self.assertEqual(bad, ["P7-P8 = B10", "chatter"])
+        self.assertEqual(got, segs((1, 4, 1, 9), (5, 6, None, None), (7, 8, 10, 10)))
+        self.assertEqual(bad, ["chatter"])
 
 
 class RepairBoundedReask(unittest.TestCase):
@@ -101,6 +101,138 @@ class CodeRepairs(unittest.TestCase):
         s = segment.clip(segs((1, 5, 26, 36), (6, 9, 29, 40), (10, 12, 41, 44)))
         self.assertEqual([x["b"] for x in s], [[26, 36], [36, 40], [41, 44]])
         self.assertEqual(segment.check(s, 12, 50), [])
+
+
+def collapsed_answer(n_paras=173):
+    """The cns-036 failure: a real opening, then every later paragraph sent to one 6-line table (B293-B298)."""
+    rows = [(1, 9, 285, 286), (10, 20, 287, 291), (21, 22, None, None), (23, 34, 293, 298)]
+    p = 35
+    while p <= n_paras:
+        q = min(p + 11, n_paras)
+        rows.append((p, q, 293, 298))
+        p = q + 1
+    return segs(*rows)
+
+
+class RestatementIsCountedNotHidden(unittest.TestCase):
+    def test_restating_the_last_line_is_clipped_and_flagged(self):
+        s = segment.clip(segs((1, 5, 1, 10), (6, 17, 9, 10)))
+        self.assertEqual((s[1]["b"], s[1]["flag"]), ([10, 10], "clipped"))
+
+    def test_same_line_again_is_flagged(self):
+        s = segment.clip(segs((1, 5, 1, 10), (6, 17, 10, 10)))
+        self.assertEqual((s[1]["b"], s[1]["flag"]), ([10, 10], "clipped"))
+
+    def test_a_short_restatement_is_fine(self):
+        s = segment.clip(segs((1, 5, 1, 10), (6, 7, 10, 10)))
+        self.assertEqual(segment.check(s, 7, 50), [])
+
+    def test_too_much_restating_is_rejected(self):
+        rows = [(1, 10, 1, 10), (11, 22, 10, 10), (23, 34, 10, 10), (35, 44, 11, 20), (45, 54, 21, 30),
+                (55, 64, 31, 40), (65, 74, 41, 50), (75, 84, 51, 60), (85, 94, 61, 70), (95, 100, 71, 80)]
+        fixed, problems, share = segment.judge_segs(segs(*rows), 100, 100)
+        self.assertIsNone(fixed)
+        self.assertTrue(any("re-states" in p for p in problems))
+
+    def test_restating_within_the_limit_is_accepted(self):
+        rows = [(1, 10, 1, 10), (11, 20, 10, 10), (21, 30, 11, 20), (31, 40, 21, 30), (41, 50, 31, 40),
+                (51, 60, 41, 50), (61, 70, 51, 60), (71, 80, 61, 70), (81, 90, 71, 80), (91, 100, 81, 90)]
+        fixed, problems, share = segment.judge_segs(segs(*rows), 100, 100)
+        self.assertIsNotNone(fixed)
+
+    def test_new_content_overlap_is_clipped(self):
+        s = segment.clip(segs((1, 5, 26, 36), (6, 9, 29, 40)))
+        self.assertEqual(s[1]["b"], [36, 40])
+
+
+class SegmentRangeGuard(unittest.TestCase):
+    def test_reversed_range_is_a_problem(self):
+        self.assertTrue(any("not a range" in p for p in segment.check(segs((1, 4, 9, 3)), 4, 20)))
+
+    def test_range_past_the_slice_is_a_problem(self):
+        self.assertTrue(any("not a range" in p for p in segment.check(segs((1, 4, 3, 25)), 4, 20)))
+
+    def test_over_twelve_paragraphs_is_a_problem(self):
+        self.assertTrue(any("over 12 paragraphs" in p for p in segment.check(segs((1, 13, 1, 5)), 13, 20)))
+
+    def test_over_120_book_lines_is_a_problem(self):
+        self.assertTrue(any("over 120 book lines" in p for p in segment.check(segs((1, 2, 1, 200)), 2, 300)))
+
+
+class DominantRangeGuard(unittest.TestCase):
+    def test_one_range_over_thirty_percent_is_found(self):
+        s = segs((1, 12, 1, 5), (13, 24, 1, 5), (25, 36, 1, 5), (37, 48, 6, 9), (49, 60, 10, 12), (61, 72, 13, 15),
+                 (73, 84, 16, 18), (85, 96, 19, 20), (97, 100, 21, 22))
+        self.assertEqual(segment.dominant(s, 100), ([1, 5], 0.36))
+
+    def test_a_spread_talk_is_fine(self):
+        s = segs((1, 12, 1, 5), (13, 24, 6, 9), (25, 36, 10, 13), (37, 48, 14, 17), (49, 60, 18, 21),
+                 (61, 72, 22, 25), (73, 84, 26, 29), (85, 96, 30, 33), (97, 100, 34, 35))
+        self.assertIsNone(segment.dominant(s, 100))
+
+    def test_tiny_answers_are_not_judged_by_share(self):
+        self.assertIsNone(segment.dominant(segs((1, 5, 1, 5)), 5))
+
+
+class JudgeWholeAnswer(unittest.TestCase):
+    def test_collapsed_answer_is_rejected(self):
+        fixed, problems, share = segment.judge_segs(collapsed_answer(), 173, 324)
+        self.assertIsNone(fixed)
+
+    def test_clean_long_answer_is_accepted(self):
+        rows = [(1, 12, 1, 10), (13, 24, 11, 20), (25, 36, 21, 30), (37, 48, 31, 40), (49, 60, 41, 50),
+                (61, 72, 51, 60), (73, 84, 61, 70), (85, 96, None, None), (97, 108, 71, 80), (109, 120, 81, 90)]
+        fixed, problems, share = segment.judge_segs(segs(*rows), 120, 100)
+        self.assertIsNotNone(fixed)
+        self.assertEqual(share, 0.0)
+
+    def test_twenty_percent_offenders_are_the_limit(self):
+        ok = segs((1, 12, 1, 10), (13, 24, 11, 20), (25, 36, 21, 30), (37, 48, 2, 3), (49, 60, 41, 50),
+                  (61, 72, 51, 60), (73, 84, 61, 70), (85, 96, 71, 80), (97, 100, 81, 90))
+        fixed, problems, share = segment.judge_segs(ok, 100, 100)
+        self.assertAlmostEqual(share, 0.12)
+        self.assertIsNotNone(fixed)
+
+    def test_bad_lines_alone_do_not_break_a_clean_answer(self):
+        fixed, problems, share = segment.judge_segs(segs((1, 5, 1, 10), (6, 10, 11, 20)), 10, 50, bad=["chatter"])
+        self.assertIsNotNone(fixed)
+
+
+class NoneIsNotAnAnswer(unittest.TestCase):
+    def test_all_none_is_rejected(self):
+        # cns-011: both readers said NONE for all 117 paragraphs; they agreed, so agreement alone accepted it
+        rows = [(p, min(p + 11, 117), None, None) for p in range(1, 118, 12)]
+        fixed, problems, share = segment.judge_segs(segs(*rows), 117, 1177)
+        self.assertIsNone(fixed)
+        self.assertTrue(any("NONE for" in p for p in problems))
+
+    def test_a_quarter_none_is_fine(self):
+        rows = [(1, 12, 1, 10), (13, 24, 11, 20), (25, 36, None, None), (37, 48, 21, 30), (49, 60, 31, 40),
+                (61, 72, 41, 50), (73, 84, 51, 60), (85, 96, 61, 70), (97, 100, 71, 80)]
+        fixed, problems, share = segment.judge_segs(segs(*rows), 100, 100)
+        self.assertIsNotNone(fixed)
+
+
+class ParserRaw(unittest.TestCase):
+    def test_spaces_and_case_and_backticks(self):
+        got, bad = segment.parse("  `P1 - P3 = b1 - b9`  \np4-p4 = none\n")
+        self.assertEqual(got, segs((1, 3, 1, 9), (4, 4, None, None)))
+        self.assertEqual(bad, [])
+
+    def test_single_paragraph_and_single_line_forms(self):
+        got, bad = segment.parse("P1 = NONE\nP120 = B28-B34\nP82-P84 = B40\nP5-P6 = B7-B9")
+        self.assertEqual(got, segs((1, 1, None, None), (120, 120, 28, 34), (82, 84, 40, 40), (5, 6, 7, 9)))
+        self.assertEqual(bad, [])
+
+    def test_en_dash_is_reported_not_silently_read(self):
+        got, bad = segment.parse("P1\u2013P3 = B1\u2013B9")
+        self.assertEqual(got, [])
+        self.assertEqual(bad, ["P1\u2013P3 = B1\u2013B9"])
+
+    def test_prose_is_reported(self):
+        got, bad = segment.parse("Here are the segments:\n---\nP1-P2 = B1-B2")
+        self.assertEqual(got, segs((1, 2, 1, 2)))
+        self.assertEqual(bad, ["Here are the segments:", "---"])
 
 
 if __name__ == "__main__":

@@ -13,8 +13,13 @@ paragraphs) and turns the rest into bounded re-asks: "choose a range inside B<lo
 """
 import re
 
-LINE = re.compile(r"^\s*P(\d+)\s*-\s*P(\d+)\s*=\s*(?:B(\d+)\s*-\s*B(\d+)|(NONE))\s*$", re.I)
+LINE = re.compile(r"^\s*P(\d+)(?:\s*-\s*P(\d+))?\s*=\s*(?:B(\d+)(?:\s*-\s*B(\d+))?|(NONE))\s*$", re.I)
 MAX_PARAS, MAX_RANGE = 12, 120
+# One identical book range may not hold more than this share of the paragraphs (min paragraphs for the rule).
+DOMINANT_SHARE, DOMINANT_MIN = 0.3, 20
+MAX_NONE = 0.5                    # share of paragraphs a reader may call NONE (talk with no book line)
+MAX_CLIPPED = 0.2                 # share of paragraphs that may only restate the book lines already explained
+MAX_OFFEND = 0.2                  # share of paragraphs a reader may get wrong and still be used after repair
 AGREE_WITHIN, AGREE_SHARE = 5, 0.9
 VERSION = 2          # 2: segments of at most 12 paragraphs, NONE only for talk with no book line
 
@@ -67,6 +72,8 @@ def parse(answer):
             bad.append(line)
             continue
         a, b, c, d, none = m.groups()
+        b = a if b is None else b                         # "P120 = B28-B34": one paragraph
+        d = c if d is None else d                         # "P82-P84 = B40": one book line
         segs.append({"p": [int(a), int(b)], "b": None if none else [int(c), int(d)]})
     return segs, bad
 
@@ -134,11 +141,57 @@ def clip(segs):
     for s in segs:
         if s["b"]:
             c, d = s["b"]
-            if c < last_d <= d:
+            if c < last_d <= d:                            # overlaps: start at the previous end
                 s = dict(s, b=[last_d, d], flag="clipped")
+            elif c == d == last_d:                         # re-states the last line only
+                s = dict(s, flag="clipped")
             last_d = max(last_d, s["b"][1]) if s["b"][0] >= last_d else last_d
         out.append(s)
     return out
+
+
+def dominant(segs, n_paras, share=DOMINANT_SHARE, min_paras=DOMINANT_MIN):
+    """([B_c, B_d], share) of the one identical book range that holds more than `share` of the paragraphs, else None.
+    A long talk sent to one place is a collapse, not an explanation (the cns-036 table)."""
+    count = {}
+    for s in segs:
+        if s["b"]:
+            key = tuple(s["b"])
+            count[key] = count.get(key, 0) + (s["p"][1] - s["p"][0] + 1)
+    if not count or n_paras < min_paras:
+        return None
+    key, n = max(count.items(), key=lambda kv: kv[1])
+    if n / n_paras > share:
+        return list(key), round(n / n_paras, 3)
+    return None
+
+
+def judge_segs(segs, n_paras, n_book, bad=()):
+    """(repaired segments or None, problems, offending share) of one reader's parsed answer. `bad` are the lines
+    that did not parse. Every acceptance rule lives here, so tests run the same code the collect step runs."""
+    if not segs:
+        return None, ["no segment"], 1.0
+    first = check(segs, n_paras, n_book)
+    filled, holes = fill(segs, n_paras)
+    if filled is None:
+        return None, first + [f"a hole of {holes} paragraphs"], 1.0
+    segs = clip(filled)                                       # code repairs: small holes -> NONE, overlaps clipped
+    problems = check(segs, n_paras, n_book)
+    none = sum(s["p"][1] - s["p"][0] + 1 for s in segs if not s["b"]) / n_paras
+    if none > MAX_NONE:
+        return None, problems + [f"NONE for {none:.0%} of paragraphs (a lecture maps to its book)"], 1.0
+    restated = sum(s["p"][1] - s["p"][0] + 1 for s in segs if s.get("flag") == "clipped") / n_paras
+    if restated > MAX_CLIPPED:
+        return None, problems + [f"re-states earlier book lines for {restated:.0%} of paragraphs"], 1.0
+    dom = dominant(segs, n_paras)
+    if dom:
+        return None, problems + [f"one range B{dom[0][0]}-B{dom[0][1]} covers {dom[1]:.0%} of paragraphs"], 1.0
+    order = [p for p in problems if "goes back" not in p]     # only order (monotone) problems can be repaired
+    notes = [f"repaired: {p}" for p in first if p not in problems]
+    if order:
+        return None, problems + [f"{len(bad)} lines did not parse"] * bool(bad), 1.0
+    fixed, asks, share = repair(segs, n_book)
+    return (fixed if share <= MAX_OFFEND else None), problems + notes[:3], share
 
 
 def chain(segs):
