@@ -74,9 +74,13 @@ def plan(year=1, doctor=None, problems=None):
     module, doctors = year_doctors(year)
     problems = [] if problems is None else problems
     out = []
+    skipped = [d for d in doctors if d.get("subject") in SKIP_SUBJECTS]
+    if skipped:
+        problems.append(f"{', '.join(sorted({d['subject'] for d in skipped}))}: {len(skipped)} lists skipped "
+                        f"(owner 2026-11-17: no biochemistry for anyone in these modules)")
     for d in doctors:
         ref = f"{d['channel']}/{d['list']}"
-        if doctor and not matches(d, ref, doctor):
+        if d in skipped or (doctor and not matches(d, ref, doctor)):
             continue
         lst, row = mother.load(ref), mother.cached(ref)
         if not lst or not row:
@@ -92,6 +96,9 @@ def plan(year=1, doctor=None, problems=None):
 
 
 SUBJECTS = ("anatomy", "physiology", "histology", "biochemistry")
+# Owner, 2026-11-17: "No biochemistry for anyone in these modules at all." Its lists are never downloaded,
+# uploaded, transcribed or imported.
+SKIP_SUBJECTS = {"biochemistry"}
 
 
 def priority(recs):

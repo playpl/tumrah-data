@@ -51,13 +51,13 @@ the runner itself (needs the secrets).
 
 ## Where it stands
 
-1. DONE: private repo `playpl/tumrah-data`, pushed (`git push -u origin spine-rebuild:main`). Note: local
-   `spine-rebuild` now tracks `origin/main`; push later commits with `git push origin spine-rebuild:main` (the
-   runner runs what is on `main`). Commits made after the push (this handover, the login prompt fix and later
-   work) are NOT on GitHub yet.
-2. NOT DONE: `py -m cloud.tg login`. First try failed: `PhoneNumberInvalidError` (the number was typed without the
-   country code). The prompt now asks "Phone with country code, for example +201xxxxxxxxx". Egypt: drop the
-   leading 0, add +20. Two-step verification asks for its password too. The owner types all of it.
+1. DONE: private repo `playpl/tumrah-data`, pushed. Local `spine-rebuild` tracks `origin/main`; push later commits
+   with `git push origin spine-rebuild:main` (the runner runs what is on `main`). Checked 2026-11-17: `origin/main`
+   = local HEAD; the biochemistry skip (`machine.SKIP_SUBJECTS`, owner 2026-11-17) is committed and pushed after it.
+2. DONE (file exists, not verified): `py -m cloud.tg login` wrote `%USERPROFILE%\.tumrah-cloud\telegram.txt` on
+   2026-11-17 18:28 with `TG_API_ID`, `TG_API_HASH`, `TG_SESSION`. Not yet checked by a runner run. Login rules:
+   the phone needs the country code (Egypt: drop the leading 0, add +20). Two-step verification asks for its password.
+   The owner types all of it.
 3. NOT DONE: the 8 repo secrets (https://github.com/playpl/tumrah-data/settings/secrets/actions): TG_API_ID,
    TG_API_HASH, TG_SESSION (from telegram.txt, then delete the file), S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY_ID,
    S3_SECRET_ACCESS_KEY, S3_REGION (from `C:\Users\Ahmed\Desktop\tumrah\backend\.env`). Claude never types or

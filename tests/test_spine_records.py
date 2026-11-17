@@ -39,7 +39,7 @@ class Base(unittest.TestCase):
         (lists / CH / "29.json").write_text(json.dumps(lst), encoding="utf-8")
         trees = self.tmp / "trees.json"
         trees.write_text(json.dumps({"year1": {"module": "year1-test", "doctors": [
-            {"subject": "biochemistry", "name": "Dr. X", "site": None, "channel": CH, "list": 29}]}}), encoding="utf-8")
+            {"subject": "histology", "name": "Dr. X", "site": None, "channel": CH, "list": 29}]}}), encoding="utf-8")
         self.patches = [mock.patch.object(mother, "LISTS", lists), mock.patch.object(mother, "CACHE", cache),
                         mock.patch.object(mother, "TREES", trees),
                         mock.patch.object(machine, "SOURCES", self.tmp / "records"),
@@ -78,6 +78,14 @@ class Plan(Base):
         self.assertEqual(len(machine.plan(1, "dr. x")), 3)
         self.assertEqual(machine.plan(1, "nobody"), [])
         self.assertEqual(len(machine.plan(1, "ZAG59_bio/29")), 3)
+
+    def test_biochemistry_is_never_planned(self):
+        trees = json.loads(mother.TREES.read_text(encoding="utf-8"))
+        trees["year1"]["doctors"][0]["subject"] = "biochemistry"
+        mother.TREES.write_text(json.dumps(trees), encoding="utf-8")
+        problems = []
+        self.assertEqual(machine.plan(1, problems=problems), [])
+        self.assertIn("biochemistry", problems[0])
 
     def test_ids_never_look_like_year_2(self):
         self.assertEqual(machine.record_id(1, "ZAG59_Anatomy", 112), "y1-anat-112")
