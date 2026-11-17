@@ -3,15 +3,20 @@
     python -m cloud.records [--max-mb 3000]
 
 1. pull the inputs (list messages, mother maps) and the records log from the bucket;
-2. download the next Telegram records (first lessons of every subject first) up to --max-mb;
-3. compress each one downloaded in this run, upload it (only the compressed file, never the original);
-4. push the records log back (merged; the PC's rows are kept).
+2. download the next Telegram records (first lessons of every subject first) up to --max-mb or --max-minutes;
+3. right after each download: compress it, upload it (only the compressed file, never the original), make its hear
+   copy and push the records log, so a run that is stopped keeps every record it finished;
+4. push the records log back at the end too (merged; the PC's rows are kept).
+
+Every line is printed with the time, unbuffered: the GitHub step log shows progress live.
 
 YouTube captions stay on the PC (a few KB each; YouTube often refuses datacenter addresses). Transcription stays on
 the PC's fleet: it fetches the compressed file (about 21 MB an hour) from the bucket when it needs it.
 """
 import argparse
+import functools
 import sys
+import time
 
 from cloud import r2, state
 
@@ -43,11 +48,45 @@ def hear_copies(recs, say=print):
         say(f"  {r['id']}: hear copy {out.stat().st_size / 1e6:.1f} MB")
 
 
+def say(msg):
+    print(f"{time.strftime('%H:%M:%S')} {msg}", flush=True)
+
+
+def todo(recs, st):
+    """Telegram records this runner should fetch: not uploaded, and not downloaded by the PC (the PC compresses and
+    uploads its own). A record the runner downloaded earlier but did not upload (a stopped run) is fetched again:
+    the runner's disk is gone after every run."""
+    from spine.records import machine
+    out = []
+    for r in recs:
+        if r["source"] != "telegram" or machine.reached(st, r["id"], "uploaded"):
+            continue
+        row = st.get(r["id"]) or {}
+        if machine.reached(st, r["id"], "downloaded") and row.get("where") != "runner":
+            continue
+        out.append(r)
+    return out
+
+
+def finish(rec, say=say):
+    """One downloaded record: compress, upload, hear copy, records log pushed."""
+    from spine.records import machine
+    machine.compress([rec], say=say)
+    machine.upload([rec], say=say, sender=r2.send)
+    hear_copies([rec], say=say)
+    say(f"  records log pushed: {state.push_log()} rows")
+
+
 def main(argv=None):
     a = argparse.ArgumentParser()
     a.add_argument("--max-mb", type=float, default=3000)
+    a.add_argument("--max-minutes", type=float, default=120,
+                   help="stop starting downloads after this many minutes (the job's timeout is 150)")
     a.add_argument("--no-inputs", action="store_true", help="use the inputs already on disk")
     args = a.parse_args(argv)
+    print = say                                                    # noqa: A001 - every line timed and flushed
+    import logging                                                 # Telethon's flood waits and reconnects, in the log
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stdout)
     if not args.no_inputs:
         print(f"inputs: {state.pull_inputs()} files")
     before, after = state.pull_log()
@@ -61,21 +100,21 @@ def main(argv=None):
         print("no records")
         return 1
     st = machine.states(recs[0]["module"])
-    tg = [r for r in recs if r["source"] == "telegram" and not machine.reached(st, r["id"], "downloaded")]
+    tg = todo(recs, st)
+    print(f"to fetch: {len(tg)} Telegram records, {sum(r['size'] or 0 for r in tg) / 1e6:.0f} MB; this run: "
+          f"{args.max_mb:.0f} MB, {args.max_minutes:.0f} min")
     got = []
     try:
         if tg:
             import asyncio
             machine.lock()
             try:
-                got = asyncio.run(machine._download_telegram(machine.priority(tg), machine.Budget(args.max_mb), print))
+                budget = machine.Budget(args.max_mb, args.max_minutes * 60)
+                got = asyncio.run(machine._download_telegram(machine.priority(tg), budget, print,
+                                                             on_done=functools.partial(finish, say=print)))
             finally:
                 machine.unlock()
-        mine = [r for r in recs if r["id"] in set(got)]
-        if mine:
-            machine.compress(mine)
-            machine.upload(mine, sender=r2.send)
-            hear_copies(mine)
+        print(f"downloaded this run: {len(got)}")
     finally:
         print(f"records log pushed: {state.push_log()} rows")
     for line in machine.status_lines(recs)[-1:]:

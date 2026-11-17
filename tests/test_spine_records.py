@@ -135,6 +135,28 @@ class Download(Base):
         self.assertTrue(whole)
         self.assertEqual(part.read_bytes(), data)
 
+    def test_a_silent_stream_stops_instead_of_hanging(self):
+        async def stuck(off):
+            yield b"x" * 10
+            await asyncio.sleep(3600)
+            yield b"never"
+        part = self.tmp / "s.partial"
+        with self.assertRaises(TimeoutError):
+            asyncio.run(machine.fetch_into(part, 100, stuck, machine.Budget(None), stall=0.05))
+        self.assertEqual(part.stat().st_size, 10)            # what came is kept for the next run
+
+    def test_progress_beat(self):
+        data = b"y" * 4096
+        t = [0.0]
+
+        def clock():
+            t[0] += machine.BEAT_S
+            return t[0]
+        beats = []
+        asyncio.run(machine.fetch_into(self.tmp / "b.partial", len(data), lambda off: _pieces(data, off, 1024),
+                                       machine.Budget(None), beat=beats.append, clock=clock))
+        self.assertEqual(beats, [1024, 2048, 3072, 4096])
+
 
 class Upload(Base):
     def test_an_original_is_never_uploaded(self):
@@ -280,6 +302,107 @@ class Transcribe(Base):
         self.assertIsNone(got)
         self.assertFalse(p.with_suffix(".txt").exists())
 
+
+
+class Year2Tree(Base):
+    """Year 2 rows carry `new` (and `old`, fallback) and the channel once per year (the plan(2) KeyError 'channel')."""
+
+    def setUp(self):
+        super().setUp()
+        lst = make_list()
+        lst["id"], lst["channel"] = 1630, "RecordsBatch58ATM"
+        (mother.LISTS / "1630.json").write_text(json.dumps(lst), encoding="utf-8")
+        trees = json.loads(mother.TREES.read_text(encoding="utf-8"))
+        trees["year2"] = {"module": "year2-test", "channel": "RecordsBatch58ATM", "doctors": [
+            {"subject": "anatomy", "name": "Dr. A", "site": "a", "new": 1630, "old": 1205},
+            {"subject": "anatomy", "name": "Dr. K", "site": None, "new": None, "old": None, "skip": True, "note": "playlist"},
+            {"subject": "histology", "name": "Dr. B", "site": "b", "new": None, "old": 1562}]}
+        mother.TREES.write_text(json.dumps(trees), encoding="utf-8")
+
+    def test_new_list_and_year_channel(self):
+        module, docs = machine.year_doctors(2)
+        self.assertEqual((module, docs[0]["channel"], docs[0]["list"]), ("year2-test", "RecordsBatch58ATM", 1630))
+
+    def test_plan_2_reports_instead_of_crashing(self):
+        problems = []
+        recs = machine.plan(2, problems=problems)
+        self.assertEqual(recs, [])                       # no agreed map for 1630 in this test
+        text = " | ".join(problems)
+        self.assertIn("Dr. K (anatomy): playlist", text)
+        self.assertIn("Dr. B (histology): no new list", text)
+        self.assertNotIn("1205", text)                   # the old list is never planned
+        self.assertNotIn("1562", text)
+
+
+class TimeBudget(unittest.TestCase):
+    def test_out_of_time_is_spent(self):
+        t = [0.0]
+        b = machine.Budget(None, 60, clock=lambda: t[0])
+        self.assertFalse(b.spent)
+        t[0] = 61
+        self.assertTrue(b.spent)
+
+    def test_bytes_still_count(self):
+        b = machine.Budget(1, 3600)
+        b.take(1_000_001)
+        self.assertTrue(b.spent)
+
+
+class _File:
+    def __init__(self, name, size):
+        self.name, self.ext, self.size = name, ".mp3", size
+
+
+class _Msg:
+    def __init__(self, size):
+        self.media, self.file = object(), _File("lect.mp3", size)
+
+
+class _Client:
+    def __init__(self, data):
+        self.data = data
+
+    async def get_entity(self, ch):
+        return ch
+
+    async def get_messages(self, ent, ids):
+        return _Msg(len(self.data))
+
+    def iter_download(self, media, offset, request_size, file_size):
+        return _pieces(self.data, offset, request_size)
+
+    async def disconnect(self):
+        pass
+
+
+class RunnerDownload(Base):
+    def test_each_record_is_finished_before_the_next(self):
+        from cloud import tg as cloud_tg
+        data = b"x" * 3000
+        seen = []
+
+        def on_done(rec):
+            seen.append((rec["id"], machine.reached(machine.states(rec["module"]), rec["id"], "downloaded")))
+            raise RuntimeError("upload down")             # one failure never stops the next record
+
+        async def connect():
+            return _Client(data)
+        tg = [r for r in self.recs if r["source"] == "telegram"]
+        with mock.patch.object(cloud_tg, "on_runner", lambda: True), mock.patch.object(cloud_tg, "connect", connect), \
+                mock.patch.object(machine, "ROOT", self.tmp):
+            got = asyncio.run(machine._download_telegram(tg, machine.Budget(None), lambda s: None, on_done=on_done))
+        self.assertEqual(got, ["y1-bio-40", "y1-bio-41"])
+        self.assertEqual(seen, [("y1-bio-40", True), ("y1-bio-41", True)])
+        self.assertEqual(machine.states("year1-test")["y1-bio-40"]["where"], "runner")
+
+    def test_runner_todo(self):
+        from cloud import records
+        machine.mark("year1-test", "y1-bio-40", "downloaded")                    # the PC has it: the PC uploads it
+        machine.mark("year1-test", "y1-bio-41", "compressed", where="runner")    # a stopped run: fetch again
+        st = machine.states("year1-test")
+        self.assertEqual([r["id"] for r in records.todo(self.recs, st)], ["y1-bio-41"])
+        machine.mark("year1-test", "y1-bio-41", "uploaded")
+        self.assertEqual(records.todo(self.recs, machine.states("year1-test")), [])
 
 
 class SiteKey(unittest.TestCase):

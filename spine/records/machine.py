@@ -36,11 +36,14 @@ from spine.tg import mother
 
 SOURCES = ROOT / "sources" / "records"
 LOCK = SOURCES / "telegram.lock"
-SHORT = {"ZAG59_Anatomy": "anat", "ZAG59_physio": "phys", "ZAG59_Histo": "hist", "ZAG59_bio": "bio"}
+SHORT = {"ZAG59_Anatomy": "anat", "ZAG59_physio": "phys", "ZAG59_Histo": "hist", "ZAG59_bio": "bio",
+         "RecordsBatch58ATM": "rec"}
 MEDIA = ("audio", "video")
 SUFFIX = ".48k.m4a"                    # = upload_media.SUFFIX: AAC mono 48 kbps
 CHUNK = 512 * 1024                     # Telegram download piece; a resume offset is a multiple of it
 UPLOAD_TRIES = 4
+STALL_S = 120                          # no piece for this long: the download is stopped (the next run resumes)
+BEAT_S = 60                            # a progress line this often during one file
 BACKEND = Path(r"C:\Users\Ahmed\Desktop\tumrah\backend")
 ACCOUNT = "voter2"
 FINAL = {"telegram": "uploaded", "youtube": "downloaded"}
@@ -49,9 +52,18 @@ YT_ID = re.compile(r"(?:youtu\.be/|v=|/live/|/shorts/)([\w-]{6,})")
 
 # --- the plan -------------------------------------------------------------------------------------------------
 def year_doctors(year=1):
+    """(module, doctors). Year 1 rows carry `channel` and `list`; year 2 rows carry `new` (the list imported; `old` is
+    fallback data, never planned) and the channel once for the whole year. Both come out as `channel` + `list`."""
     trees = read_json(mother.TREES)
     t = trees[f"year{year}"]
-    return t["module"], t["doctors"]
+    out = []
+    for d in t["doctors"]:
+        d = dict(d)
+        d.setdefault("channel", t.get("channel"))
+        if "list" not in d:
+            d["list"] = d.get("new")
+        out.append(d)
+    return t["module"], out
 
 
 def short(channel):
@@ -81,6 +93,10 @@ def plan(year=1, doctor=None, problems=None):
     for d in doctors:
         ref = f"{d['channel']}/{d['list']}"
         if d in skipped or (doctor and not matches(d, ref, doctor)):
+            continue
+        if d.get("skip") or not d.get("list"):
+            why = d.get("note") if d.get("skip") and d.get("note") else "skipped by the owner" if d.get("skip") else                 "no new list (old data is fallback only)" + (f"; {d['note']}" if d.get("note") else "")
+            problems.append(f"{d['name']} ({d['subject']}): {why}")
             continue
         lst, row = mother.load(ref), mother.cached(ref)
         if not lst or not row:
@@ -206,8 +222,10 @@ def resume_offset(have, chunk=CHUNK):
 class Budget:
     """Bytes one run may fetch; a file that crosses it stops mid-way (its .partial is resumed next run)."""
 
-    def __init__(self, max_mb):
+    def __init__(self, max_mb, max_seconds=None, clock=time.monotonic):
         self.left = None if max_mb is None else int(max_mb * 1e6)
+        self.clock = clock
+        self.deadline = None if max_seconds is None else clock() + max_seconds
 
     def take(self, n):
         if self.left is not None:
@@ -215,22 +233,47 @@ class Budget:
 
     @property
     def spent(self):
+        """Out of bytes, or out of time (the GitHub runner is killed at its timeout: stop before it)."""
+        if self.deadline is not None and self.clock() >= self.deadline:
+            return True
         return self.left is not None and self.left <= 0
 
 
-async def fetch_into(part, total, stream, budget):
-    """Appends the pieces of `stream(offset)` to `part` from the resume offset. True when the file is whole."""
+async def fetch_into(part, total, stream, budget, stall=None, beat=None, clock=time.monotonic):
+    """Appends the pieces of `stream(offset)` to `part` from the resume offset. True when the file is whole.
+    `stall` seconds with no piece raises TimeoutError (a silent hang never eats the run); `beat(size)` is called
+    about every BEAT_S seconds so the log shows the file moving."""
     have = part.stat().st_size if part.exists() else 0
     off = resume_offset(have)
     if have != off:
         with open(part, "r+b") as f:
             f.truncate(off)
-    with open(part, "ab") as f:
-        async for piece in stream(off):
-            f.write(piece)
-            budget.take(len(piece))
-            if budget.spent and f.tell() < total:
-                break
+    it = stream(off).__aiter__()
+    last = clock()
+    try:
+        with open(part, "ab") as f:
+            while True:
+                try:
+                    nxt = it.__anext__()
+                    piece = await (asyncio.wait_for(nxt, stall) if stall else nxt)
+                except StopAsyncIteration:
+                    break
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"no data for {stall} s") from None
+                f.write(piece)
+                budget.take(len(piece))
+                if beat and clock() - last >= BEAT_S:
+                    last = clock()
+                    beat(f.tell())
+                if budget.spent and f.tell() < total:
+                    break
+    finally:
+        close = getattr(it, "aclose", None)
+        if close:
+            try:
+                await close()
+            except Exception:  # noqa: BLE001 - closing a dead stream
+                pass
     return part.stat().st_size >= total
 
 
@@ -250,9 +293,13 @@ def unlock():
     LOCK.unlink(missing_ok=True)
 
 
-async def _download_telegram(recs, budget, say, account=ACCOUNT):
+async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None):
+    """Downloads `recs` in order until `budget` is spent. `on_done(rec)` (sync, run in a thread) is called after each
+    whole file, so the runner compresses and uploads every record before the next one starts: a run that is stopped
+    (timeout, dropped link) keeps everything it finished."""
     from cloud import tg as cloud_tg
-    if cloud_tg.on_runner():                         # the GitHub runner: its own session (cloud/tg.py)
+    runner = cloud_tg.on_runner()
+    if runner:                                       # the GitHub runner: its own session (cloud/tg.py)
         client = await cloud_tg.connect()
     else:
         sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
@@ -264,10 +311,13 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT):
         for rec in recs:                                # in the order given: priority() puts first lessons first
             if budget.spent:
                 return done
-            if rec["channel"] not in ents:
-                ents[rec["channel"]] = await client.get_entity(rec["channel"])
-            ent = ents[rec["channel"]]
-            m = await client.get_messages(ent, ids=rec["post"])
+            try:
+                if rec["channel"] not in ents:
+                    ents[rec["channel"]] = await asyncio.wait_for(client.get_entity(rec["channel"]), STALL_S)
+                m = await asyncio.wait_for(client.get_messages(ents[rec["channel"]], ids=rec["post"]), STALL_S)
+            except Exception as e:  # noqa: BLE001 - a flood wait, a channel the account cannot see, a stall
+                say(f"  {rec['id']}: post {rec['post']} of {rec['channel']} not read ({type(e).__name__}: {str(e)[:120]})")
+                continue
             if m is None or not m.media or not m.file:
                 say(f"  {rec['id']}: post {rec['post']} has no file")
                 continue
@@ -282,8 +332,13 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT):
 
                 def stream(off, m=m):
                     return client.iter_download(m.media, offset=off, request_size=CHUNK, file_size=total)
+
+                def beat(size, rid=rec["id"], t0=t0, before=before):
+                    say(f"  {rid}: {size / 1e6:.0f} of {total / 1e6:.0f} MB "
+                        f"({(size - before) / 1e3 / max(time.time() - t0, 1):.0f} KB/s)")
+                say(f"  {rec['id']}: downloading {total / 1e6:.0f} MB (post {rec['post']})")
                 try:
-                    whole = await fetch_into(part, total, stream, budget)
+                    whole = await fetch_into(part, total, stream, budget, stall=STALL_S, beat=beat)
                 except Exception as e:     # an expired file reference, a dropped link: the next run resumes
                     say(f"  {rec['id']}: stopped at {part_mb(part)} of {total / 1e6:.0f} MB ({type(e).__name__}: {str(e)[:80]})")
                     continue
@@ -294,8 +349,14 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT):
                     return done
                 part.replace(final)
                 say(f"  {rec['id']}: downloaded {total / 1e6:.1f} MB ({rate * 1000:.0f} KB/s)")
-            mark(rec["module"], rec["id"], "downloaded", file=str(final.relative_to(ROOT)), size=total)
+            mark(rec["module"], rec["id"], "downloaded", file=str(final.relative_to(ROOT)), size=total,
+                 **({"where": "runner"} if runner else {}))
             done.append(rec["id"])
+            if on_done:
+                try:
+                    await asyncio.to_thread(on_done, rec)
+                except Exception as e:  # noqa: BLE001 - one record's compress/upload never stops the others
+                    say(f"  {rec['id']}: after download FAILED ({type(e).__name__}: {str(e)[:120]})")
     finally:
         await client.disconnect()
     return done

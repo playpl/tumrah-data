@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 150
     env:
       PYTHONIOENCODING: utf-8
+      PYTHONUNBUFFERED: "1"            # without it the step log stays empty until the run ends
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       S3_ENDPOINT: ${{ secrets.S3_ENDPOINT }}
       S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
@@ -42,4 +43,4 @@ jobs:
       - name: Python packages
         run: pip install -q -r cloud/requirements.txt
       - name: Download, compress, upload
-        run: python -m cloud.records --max-mb "${{ github.event.inputs.max_mb || '3000' }}"
+        run: python -u -m cloud.records --max-mb "${{ github.event.inputs.max_mb || '3000' }}"
