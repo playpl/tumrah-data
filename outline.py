@@ -71,6 +71,9 @@ def load(module):
 
 
 def write(module):
+    own = ROOT / "modules" / module / "cut.py"
+    if own.exists():   # its sections are cut by sentence there; the page-only cut here put 38 overlaps back (2026-11-18)
+        raise RuntimeError(f"{module} has its own cutter: run `py {own.relative_to(ROOT).as_posix()} build`, not outline.py")
     secs = build(module)
     (ROOT / "modules" / module / "outline.json").write_text(json.dumps(secs, ensure_ascii=False), encoding="utf-8")
     return secs
