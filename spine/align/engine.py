@@ -75,10 +75,10 @@ SHIFT = {"A": 0, "B": 5, "C": 3}         # C is the third reader: only the windo
 
 
 def open_sentences(module, book, H):
-    """Ids of the book sentences the votes have not settled: split vote, one reader, one no, no reader."""
+    """Ids of the book sentences the votes have not settled: split vote, one reader, one no, no reader, jump."""
     from spine.align import audit
     st = audit.book_state(module, book, H)
-    return {s["id"] for k in ("split-vote", "one-reader", "one-no", "no-reader") for s in st[k]}
+    return {s["id"] for k in ("split-vote", "one-reader", "one-no", "no-reader") for s in st[k]} |         {s["id"] for s, _ in st["jump"]}            # a jump is checked by the third reader too
 
 
 def make_jobs(module, reader="A"):
@@ -194,6 +194,17 @@ def jumps(targets):
     return out
 
 
+def three_agree(mine):
+    """True when three different readers (code, old, fleet A/B/C) link this sentence to a common handout sentence."""
+    links = [set(v["answer"]["dst"]) for v in mine.values() if isinstance(v["answer"], dict)]
+    for i, a in enumerate(links):
+        for j in range(i + 1, len(links)):
+            for k in range(j + 1, len(links)):
+                if a & links[j] & links[k]:
+                    return True
+    return False
+
+
 def accept(module):
     """Votes -> edges/<book>.jsonl. Returns {book: counts}."""
     H = prefilter.Handout(module)
@@ -236,6 +247,9 @@ def accept(module):
             else:
                 counts["no reader yet"] += 1
         odd = {chain[k][0] for k in jumps(chain)}
+        confirmed = {sid for sid in odd if three_agree(votes.get(sid, {}))}   # a jump three readers back is real
+        counts["jump confirmed by 3 readers"] = len(confirmed)
+        odd -= confirmed
         for e in edges:
             if e["src"] in odd:
                 e["state"] = "flagged"
