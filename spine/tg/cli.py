@@ -136,6 +136,8 @@ def _diff(a):
 
 def register(sub):
     p = sub.add_parser("mother", help="the mother-message agent (shadow mode)").add_subparsers(dest="mother_cmd")
+    from spine.tg import flow
+    flow.add(p)
     r = p.add_parser("render", help="what a reader is shown")
     r.add_argument("lists", nargs="+")
     r.set_defaults(run=_render)

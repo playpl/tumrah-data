@@ -14,9 +14,9 @@ paragraphs) and turns the rest into bounded re-asks: "choose a range inside B<lo
 import re
 
 LINE = re.compile(r"^\s*P(\d+)\s*-\s*P(\d+)\s*=\s*(?:B(\d+)\s*-\s*B(\d+)|(NONE))\s*$", re.I)
-MAX_PARAS, MAX_RANGE = 40, 120
+MAX_PARAS, MAX_RANGE = 12, 120
 AGREE_WITHIN, AGREE_SHARE = 5, 0.9
-VERSION = 1
+VERSION = 2          # 2: segments of at most 12 paragraphs, NONE only for talk with no book line
 
 PROMPT = """You map a recorded medical lecture onto the doctor's own book.
 
@@ -24,14 +24,18 @@ BOOK lines are numbered B1, B2, ... in book order. Lines that start with ## are 
 TRANSCRIPT paragraphs are numbered P1, P2, ... in time order; each starts with its time stamp. The doctor speaks
 Egyptian Arabic and says the English terms in Arabic letters (for example "سبينال كورد" = spinal cord).
 
-Cut the transcript into consecutive segments. A segment is a run of paragraphs where the doctor explains one
-stretch of the book (from two paragraphs to many). For each segment write the first and last BOOK line it explains.
+Cut the transcript into consecutive segments. A segment is a run of 1 to 12 paragraphs (about 6 minutes at most)
+where the doctor explains one stretch of the book. For each segment write the first and last BOOK line it explains.
+Read every paragraph: the doctor's Arabic explanation of an English heading or fact belongs to that book line.
 
 Rules:
 - Cover every paragraph exactly once, in order: the first segment starts at P1, the last ends at P{last}.
 - The doctor moves down the book: a segment's first B is never smaller than the previous segment's last B.
-- Use NONE for talk that explains no book line (greetings, jokes, exam advice, a part the book does not have).
-- A segment is at most 40 paragraphs and at most 120 B lines.
+- Use NONE only for talk that explains no book line at all (greetings, jokes, exam advice, a part the book does
+  not have). The opening of a topic belongs to that topic's first book lines, not NONE. In a normal lecture NONE
+  is under a quarter of the paragraphs.
+- A segment is at most 12 paragraphs and at most 120 B lines. A long explanation of one stretch is several
+  segments in a row.
 
 Answer with these lines only, nothing else:
 P<a>-P<b> = B<c>-B<d>

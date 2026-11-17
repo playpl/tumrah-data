@@ -182,6 +182,10 @@ def main(argv):
             step(report, "Nagib quizzes", nagib_quizzes_run)
         if tele:
             step(report, "waiting Telegram recordings", lambda: waiting_telegram(q, dry))
+            # the mother agent (spine/tg/flow.py): changed lists re-read by two fleet readers, new lectures ADDED to
+            # mother_lists.json (never edited or removed), edits/deletions reported, parity mother checked
+            from spine.tg import flow as mother_flow
+            step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
         step(report, "site files", site_files)
         if upload:
             import upload_media
