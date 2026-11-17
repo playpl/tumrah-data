@@ -1,5 +1,5 @@
-"""py -m spine p1 recall | grade-old <module>"""
-from spine.align import old, recall
+"""py -m spine p1 recall | grade-old | code | jobs | run | accept <module>"""
+from spine.align import engine, old, recall
 
 
 def _recall(a):
@@ -27,6 +27,22 @@ def register(sub):
     g.add_argument("module")
     g.add_argument("--dry", action="store_true")
     g.set_defaults(run=_grade_old)
+    c = p.add_parser("code", help="write the code and old-link votes (no LLM)")
+    c.add_argument("module")
+    c.set_defaults(run=lambda a: print(engine.report(engine.run_code(a.module), "votes written (code tiers, old links)")))
+    j = p.add_parser("jobs", help="fleet job folders for what a reader has not read (nothing is run)")
+    j.add_argument("module")
+    j.add_argument("--reader", default="A", choices=["A", "B"])
+    j.set_defaults(run=lambda a: print(f"{len(engine.make_jobs(a.module, a.reader))} job folders under jobs/sp_align/"))
+    n = p.add_parser("run", help="run the waiting job folders on the fleet accounts, then collect the votes")
+    n.add_argument("module")
+    n.add_argument("--reader", default="A", choices=["A", "B"])
+    n.add_argument("--limit", type=int)
+    n.add_argument("--accounts", nargs="*")
+    n.set_defaults(run=lambda a: print("fleet run:", dict(engine.run_jobs(a.module, a.reader, a.accounts, a.limit))))
+    t = p.add_parser("accept", help="votes -> edges, with the order check")
+    t.add_argument("module")
+    t.set_defaults(run=lambda a: print(engine.report(engine.accept(a.module), "links after every reader so far")))
     try:
         from spine.align import pilot
         pilot.add(p)
