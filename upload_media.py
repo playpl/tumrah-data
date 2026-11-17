@@ -60,6 +60,12 @@ LOCK = ROOT / "upload_media.lock"
 
 
 def alive(pid):
+    if os.name != "nt":                          # the GitHub runner (Linux)
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
     out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
     return str(pid) in out
 

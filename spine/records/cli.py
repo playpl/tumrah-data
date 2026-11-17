@@ -53,6 +53,10 @@ def cmd_finish(args):
     machine.upload(recs)
     n = transcribe.run(recs, via=args.via)
     print(f"{n} pieces heard")
+    from spine import config
+    if config().get("records_cloud"):             # the GitHub runner shares the log through the bucket
+        from cloud import state
+        print(f"records log pushed: {state.push_log()} rows")
     for line in machine.status_lines(recs):
         print(line)
 

@@ -96,9 +96,12 @@ def main(argv):
                "--source", "script-index-" + time.strftime("%Y-%m-%d"), "--apply"], cwd=BACKEND, env=env)
     print("== 5 tiers", flush=True)
     run(["py", "tiers.py"], keep=["\x00"])
-    out = run(["py", "apply_tiers.py"], keep=["\x00"])
+    out = run(["py", "apply_tiers.py"], env=env, keep=["\x00"])   # env: the DNS preload, or Mongo is not found
     calls = [l for l in out.splitlines() if l.strip()]
-    print(f"   {len(calls)} calls, problems: {sum(1 for l in calls if chr(39) + 'question_not_found' + chr(39) + ': 0' not in l)}")
+    bad = [l for l in calls if chr(39) + 'question_not_found' + chr(39) + ': 0' not in l]
+    print(f"   {len(calls)} calls, problems: {len(bad)}")
+    for l in bad[:3]:
+        print("   | " + l.strip()[:200])
     print("== 6 extras", flush=True)
     sys.path.insert(0, str(ROOT))
     import db

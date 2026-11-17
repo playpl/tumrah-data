@@ -351,6 +351,22 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
    is only the fallback. 69 lectures have a transcript and a split book. Pilot jobs: cns-002, cns-021 (A and B).
    Phase 1 third reader C (`p1 jobs --reader C`, only windows with an open sentence); `books.split.dedupe` is
    cached in `graph/work/dedupe.json` (opening every PDF ran out of memory).
+   Site import ran for real: year 2 +12 lessons (Khaled), 9,056 questions updated, pointers unchanged; year 1 +74
+   old-data lessons, ids saved. Step 5 had printed "87 problems": `apply_tiers.py` ran without the DNS preload and
+   never reached Mongo (fixed in `site_import.py`; rerun: 87 calls, 0 problems, all unchanged).
+   Seg pilot (fleet, default model): cns-002 A answered but coarse ("P1-P40 = NONE", then 30-paragraph blocks),
+   cns-002 B hit "No capacity available" (503), cns-021 B answered (11 segments), cns-021 A no answer. About
+   150K fleet tokens and 10 minutes per read. Next: shorter segments in the prompt (MAX_PARAS 12, "the opening
+   talk maps to the first book lines"), then rerun and `seg collect`.
+   OFF THE PC (owner, 2026-11-17: slow, limited internet, PC not always on; chose GitHub Actions): `cloud/`
+   (`r2.py` storage via boto3, `state.py` shared records log + inputs in the bucket under `ops/tumrah-data/`,
+   `tg.py` the runner's own Telegram session + `login`, `records.py` the runner job, `SETUP.md` the owner's steps)
+   and `.github/workflows/records.yml` (every 2 hours, 3 GB a run, `concurrency: telegram-records`). PC side:
+   `spine.config()["records_cloud"]` (default false) makes Update data pull/push the log, fetch only YouTube
+   captions, and the fleet hear the runner's 16 kbps copy (`hear_key`). Tested on the PC: push/pull against the
+   bucket, the runner script with 0 MB, an upload + skip + delete under `ops/`. NOT done: the GitHub repo (no
+   remote, no `gh` here), the secrets and the runner's Telegram login (owner, `cloud/SETUP.md`); then set
+   `records_cloud` true. Stage 2 later: year 2 Telegram lists + site import on the runner.
 
 1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
    about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download

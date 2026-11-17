@@ -36,7 +36,13 @@ def audio_of(rec, st):
     """What is heard: the compressed recording, or a YouTube record's audio. None when not there yet."""
     if rec["source"] == "telegram" and machine.reached(st, rec["id"], "compressed"):
         f = machine.compressed_path(rec)
-        return f if f.exists() else None
+        if f.exists():
+            return f
+        h, key = machine.hear_path(rec), (st.get(rec["id"]) or {}).get("hear_key")
+        if not h.exists() and key:                 # made on the GitHub runner: fetch the small copy (about 7 MB/h)
+            from cloud import r2
+            r2.get_file(key, h)
+        return h if h.exists() else None
     if rec["source"] == "youtube":
         row = st.get(rec["id"]) or {}
         if row.get("transcript") == "youtube" or not row.get("file"):

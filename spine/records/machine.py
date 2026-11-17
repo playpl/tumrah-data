@@ -168,6 +168,11 @@ def compressed_path(rec):
     return record_dir(rec) / f"recording{SUFFIX}"
 
 
+def hear_path(rec):
+    """The small Opus copy the fleet hears when the 48k file is not on this PC (made by the GitHub runner)."""
+    return record_dir(rec) / "hear.16k.ogg"
+
+
 def upload_key(rec):
     return f"lectures/{rec['module']}/{rec['id']}/recording{SUFFIX}"
 
@@ -239,9 +244,13 @@ def unlock():
 
 
 async def _download_telegram(recs, budget, say, account=ACCOUNT):
-    sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
-    from tg import connect
-    client = await connect(account)
+    from cloud import tg as cloud_tg
+    if cloud_tg.on_runner():                         # the GitHub runner: its own session (cloud/tg.py)
+        client = await cloud_tg.connect()
+    else:
+        sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
+        from tg import connect
+        client = await connect(account)
     done = []
     ents = {}
     try:

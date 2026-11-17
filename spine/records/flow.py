@@ -67,10 +67,16 @@ def update(dry=False, telegram=True, background=True):
     out += [f"SKIPPED {p}" for p in problems]
     if not recs:
         return out + ["year 1: no records (run `py -m spine mother run --year 1`)"]
+    cloud = config().get("records_cloud")            # the GitHub runner downloads (cloud/records.py), not this PC
+    if cloud and not dry:
+        from cloud import state
+        before, after = state.pull_log()
+        out.append(f"year 1 cloud: records log {before} -> {after} rows from the bucket; inputs pushed "
+                   f"({state.push_inputs()} files)")
     if not dry and telegram:
         budget = machine.Budget(config().get("records_batch_mb", 400))
         got = []
-        machine.download(recs, budget, say=got.append)
+        machine.download([r for r in recs if r["source"] == "youtube"] if cloud else recs, budget, say=got.append)
         out += [ln.strip() for ln in got if "downloaded" in ln or "so far" in ln or "stopped" in ln or "no file" in ln]
         out += [f"year 1 YouTube captions: {sum('YouTube captions' in ln for ln in got)} new"]
     if not dry and background:
