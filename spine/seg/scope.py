@@ -100,6 +100,34 @@ def densest(m, width=DENSE, margin=MARGIN):
     return max(0, lo - margin), min(n - 1, lo + width - 1 + margin)
 
 
+HANDOUT_MARGIN = 15
+
+
+def handout_target(lec, module="year2-cns", cache=None):
+    """No split book (Azouny, Khaled, Mahmoud Elhusseiny): the reader maps the transcript straight onto the handout
+    sentences of the lecture's placement (and its covered lectures'), +- HANDOUT_MARGIN sentences, in handout order.
+    `book` is None and `target` is "handout"; the B numbers then stand for handout sentences. None without ranges."""
+    cache = cache if cache is not None else {}
+    if "handout_sents" not in cache:
+        cache["handout_sents"] = [s for s in read_jsonl(graph_dir(module) / "sentences.jsonl")
+                                  if s["kind"] != "figure" and (s.get("text") or "").strip() and s.get("rows")]
+        cache["index"] = cache.get("index") or _handout_index(module)
+    sents = cache["handout_sents"]
+    ranges = list(lec.get("ranges") or [])
+    for other in lec.get("covers") or []:
+        try:
+            ranges += lecture(other).get("ranges") or []
+        except (OSError, ValueError):
+            pass
+    want = handout_in_ranges(module, ranges, cache["index"])
+    pts = [i for i, s in enumerate(sents) if s["id"] in want]
+    if not pts:
+        return None
+    lo, hi = max(0, min(pts) - HANDOUT_MARGIN), min(len(sents) - 1, max(pts) + HANDOUT_MARGIN)
+    return {"book": None, "target": "handout", "sents": sents, "lo": lo, "hi": hi,
+            "how": f"handout placement ({len(pts)} sentences)"}
+
+
 def pick(lid, module="year2-cns", paras=None, cache=None):
     """{book, sents (whole book), lo, hi, how} for a lecture, or None when its doctor has no book."""
     from spine.seg import prior
@@ -107,7 +135,7 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
     lec = lecture(lid)
     book = doctor_books(module).get(lec.get("doctor"))
     if not book:
-        return None
+        return handout_target(lec, module, cache)
     if book not in cache:
         cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book),
                        "index": _handout_index(module)}

@@ -37,14 +37,16 @@ def raw_of(lid):
     return f.read_text(encoding="utf-8") if f.exists() else ""
 
 
-def lectures_with_books(module="year2-cns"):
-    """Lecture ids that have a transcript and whose doctor has a split book."""
+def lectures_with_books(module="year2-cns", handout=False):
+    """Lecture ids that have a transcript and whose doctor has a split book; with `handout`, also those whose doctor
+    has none but whose lecture has a handout placement (they are read against the handout itself)."""
     books = scope.doctor_books(module)
     out = []
     for f in sorted((ROOT / "lectures").glob("*/lecture.json")):
         d = read_json(f)
-        if d.get("module") == module and d.get("doctor") in books and (f.parent / "raw.txt").exists() \
-                and not d.get("hold"):
+        if d.get("module") != module or d.get("hold") or not (f.parent / "raw.txt").exists():
+            continue
+        if d.get("doctor") in books or (handout and (d.get("ranges") or d.get("covers"))):
             out.append(d["id"])
     return out
 
@@ -196,7 +198,10 @@ def collect(lids=None, module="year2-cns", say=print):
             state["agree"] = round(share, 3)
             if share >= segment.AGREE_SHARE:
                 state["state"] = "accepted"
-                links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
+                if p["scope"].get("target") == "handout":   # read against the handout: B lines are handout sentences
+                    links = {x["id"]: [x["id"]] for x in p["slice"]}
+                else:
+                    links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
                 write_jsonl(ROOT / "lectures" / lid / "segments.jsonl",
                             segment.record(a, p["paras"], p["slice"], links, "fleetA+fleetB", round(share, 3)))
                 from spine import compat                 # shadow legacy files: lectures/<id>/spine/

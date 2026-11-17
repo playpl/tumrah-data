@@ -18,7 +18,7 @@ def _prior(a):
 
 
 def _lids(a):
-    return a.lectures or flow.lectures_with_books(a.module)
+    return a.lectures or flow.lectures_with_books(a.module, handout=getattr(a, "handout", False))
 
 
 def _jobs(a):
@@ -54,6 +54,9 @@ def register(sub):
         x = p.add_parser(name, help=hlp)
         x.add_argument("lectures", nargs="*")
         x.add_argument("--module", default="year2-cns")
+        if name == "jobs":
+            x.add_argument("--handout", action="store_true",
+                           help="also lectures whose doctor has no split book (read against the handout)")
         if name == "run":
             x.add_argument("--via", choices=["fleet", "browser"], default="fleet")
             x.add_argument("--limit", type=int)
