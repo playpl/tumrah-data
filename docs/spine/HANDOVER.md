@@ -235,7 +235,20 @@ it (every `gemini_run.py` step), `runners.web()` reads `gemini_browser.status()`
 The old `HEAVY_SKIP` / `HEAVY_CAP` account choice of `gemini_run.py` (read from gweb usage) is gone.
 - First doctor end to end: Ammar (ZAG59_Histo/41): y1-hist-93 96 MB -> 7.1 MB, uploaded, fleet transcript
   (19 min, 22K characters); his 5 YouTube records have captions. Telegram ran at about 1.2 MB/s.
-- Running: a background loop of `records run --max-mb 400` (log `logs/records_y1.log`), up to 40 batches.
+- The stand-alone batch loop was STOPPED by the owner (2026-11-17). Year 1 now runs inside the two owner commands
+  (`spine/records/flow.py`, commit `5c36fc0`):
+  - `py update_data.py`, step "year 1 records": one Telegram batch (`spine.config()["records_batch_mb"]`, 400 MB),
+    then `py -m spine records finish` (compress, upload, fleet transcription) detached, log `logs/records_y1.log`,
+    one at a time (`sources/records/finish.lock`). `--dry` only reports; `--no-telegram` skips the download.
+  - `py site_import.py`, step 7: `modules/year1-musculoskeletal/site/lessons.jsonl` (one `oldData` lesson per record
+    with a site doctor and a recording on the site; covers only lessons in the file), then
+    `hub_import_lessons.py --module year1-musculoskeletal --apply`; lesson ids go into the records state (`lesson`).
+  - Priority (owner): first lessons of every subject first (`machine.priority`: every doctor's 1st record, then
+    every 2nd...; anatomy, physiology, histology, biochemistry) for download, compress, upload and transcription.
+  - State when stopped: Telegram 136: downloaded 7, compressed 2, uploaded 2 (y1-anat-46, y1-hist-93); YouTube
+    captions 115 of 152; 6,215 MB left on Telegram. Dry run of step 7: 0 lessons, all 20 doctors lack a site id.
+  - Biochemistry: the site's year1-musculoskeletal has no biochemistry curriculum (backend `doctorRoster`): those
+    lessons are reported and left out until the website session adds it (`flow.SITE_SUBJECTS`).
 
 ## Shadow mode: what is live and what is not
 
@@ -248,12 +261,37 @@ leaves doctor-less lectures off the site, `site_import.py` (the import chain as 
 buttons in `control.COMMANDS`).
 Tests: `py -m unittest discover tests` = 335 tests, all pass.
 
+## The original plan (owner's pasted plan, OWNER_WORDS.md message 3) against what exists (review 2026-11-17)
+
+| Original item | State |
+|---|---|
+| Handout = SSOT, sentence-level graph, tree University > Year > Subject > Chapter > Lesson > Sentence | year2-cns DONE (6,704 sentences, 11 invariants). Year 1 MSK: NOT done (no MSK handout graph). NU: schema only |
+| Phase 0 polls: Year 1 polls handled, Year 2 CNS kept, MSK schema | NOT done: inventory only, waits for the owner's "go" (Questions for the owner). `polls/channels.json` written but `engine.py` still uses its own list |
+| Phase 1 code pre-filter (embeddings + BM25) | DONE with BM25 only; the recall gate (95% reworded) passed, so no embeddings (plan decision 8) |
+| Phase 1 AI window aligner | DONE for the 7 CNS doctor books: 6,280 of 7,154 sentences accepted by two readers |
+| Phase 1 audit (orphans, jumps, low confidence) | PARTIAL: audit lists exist; 470 open sentences unsettled; third reader, Haiku pass, `compat.py`, `parity p1`, 200-link audit per book (126 read) NOT done |
+| Tumrah book alignment | NOT done |
+| Books cross-link through the handout | by design (no stored cross-links); nothing reads it yet |
+| Whiteboards uploaded as-is to a Whiteboards section | NOT done: `lesson_files.jsonl` is written; the site has no section (W3) |
+| MCQ files: extract, link, archive | NOT done (Phase 3) |
+| Phase 2 mother-message agent (LLM, cached) | DONE in shadow: 9 of 9 year 2 doctors exact; 20 year 1 lists mapped. Primary switch and `tg/flow.py` NOT done (the hand file still drives year 2) |
+| Phase 2 live sync of additions, edits, deletions | additions DONE through Update data + site import; edits and deletions (draft + undo, two-fetch rule, mass hold) NOT done (needs W1, W2) |
+| Phase 2 immediate upload | year 2: background upload in Update data; year 1: merged today. Not "immediate": runs when Update data runs; no `records watch` process |
+| Phase 2 async transcription on the fleet | year 2: queue + fleet; year 1: `records finish` (fleet) and `--via browser` (Gemini web profiles) |
+| Phase 2 monotonic segmentation to the doctor's book | NOT built (`spine/seg/` empty): the biggest open piece of Phases 0 to 2 |
+| Phase 3 questions | deferred as ordered; link trees fetched (zagexam59 503, ZMSUMcqs58 2098); nothing else |
+| Migration: shadow > parity > primary, `legacy/`, CLAUDE.md rules | NOT done: everything in `spine/` is shadow; no `config.json` "spine" block |
+| Website W1 to W5 | NOT done |
+
+So Phases 0 to 2 are NOT complete: open are the polls changes, the Phase 1 tail, Tumrah book alignment, whiteboards,
+edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-primary switch.
+
 ## Left to do (in order)
 
-1. Year 1 records import: BUILT and RUNNING (2026-11-17, see "Year 1 records machine" below). Left: let the
-   batch loop finish (`py -m spine records status` prints what is left), then
-   `py -m spine records transcribe` until every Telegram record has a transcript, then
-   `py -m spine records download --youtube-audio` for YouTube posts with no captions and transcribe those.
+1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
+   about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download
+   --youtube-audio`, then `records transcribe` (not in Update data yet). Nothing reaches the site until the owner
+   names the 20 doctors' site ids (item 2).
 2. Year 1 on the website: the 20 doctors need site doctor ids (`spine/tg/trees.json`, `site: null`); the
    lessons need their module and subjects on the site (biochemistry is new); a note for students that all
    first-year data is old data. Website code goes to the website session; the data importer here, dry run first.
