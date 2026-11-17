@@ -273,5 +273,16 @@ class Transcribe(Base):
         self.assertFalse(p.with_suffix(".txt").exists())
 
 
+
+class SiteKey(unittest.TestCase):
+    def test_keys_fit_the_site_pattern(self):
+        import re
+        from spine.records import flow
+        self.assertEqual(flow.site_key("y1-hist-93"), "lecture:y1-hist-93")
+        a, b = flow.site_key("y1-hist-ytDUuSlklkU70"), flow.site_key("y1-hist-ytduuslklku70")
+        self.assertRegex(a, r"^lecture:[a-z0-9-]+$")
+        self.assertNotEqual(a, b)
+
+
 if __name__ == "__main__":
     unittest.main()

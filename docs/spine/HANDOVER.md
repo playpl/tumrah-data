@@ -338,7 +338,19 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
    votes them). `engine.CHANNELS` / `SEED_OLD` now come from `polls/channels.json` (`harvest`, `vote` order,
    `seed_old`); `config.json` `poll_channels` lost zagpolls58. Inventory after: `docs/spine/POLLS_INVENTORY_AFTER.md`
    (0 rows left to change). No backup of the A rows (owner). `polls/grade5/` and the tombstones are not tracked.
-   Next: Update data + site import, then plan gaps.
+   Step 3: `py update_data.py` (2026-11-17 night): no new year 2 lecture; year 1 batch downloaded y1-anat-62
+   (227 MB), y1-anat-66 partial (193 of 210 MB); 37 new YouTube captions (151 of 152); 5,815 MB left on
+   Telegram; queue: transcribe 43, place 36, lecture_links 12. `site_import.py` step 7 failed its dry run on
+   YouTube record ids with capitals (the site key allows `[a-z0-9-]`): fixed by `records.flow.site_key` (lowered,
+   plus 6 hex of the real id). Dry run then: year 2 creates 12 (Khaled), year 1 creates 74 old-data lessons
+   (left out: 97 not uploaded yet, Cocci and ZAG59_bio/34 no site id, biochemistry hidden, 1 mini lecture).
+   Elsamahy's book card had `doctor: null`: set to dr-abdullah-el-samahi-phys (cards are not tracked).
+   Step 4 started: `spine/seg/` (prior, scope, segment, flow, cli; `tests/test_spine_seg.py`): `seg prior | jobs
+   | run | collect | audit`. The slice comes from the lecture's handout placement through the Phase 1 edges
+   (cns-002 -> book pages 5-13, cns-003 -> 5-19); a whole-book prior drifts on Arabic-script transcripts, so it
+   is only the fallback. 69 lectures have a transcript and a split book. Pilot jobs: cns-002, cns-021 (A and B).
+   Phase 1 third reader C (`p1 jobs --reader C`, only windows with an open sentence); `books.split.dedupe` is
+   cached in `graph/work/dedupe.json` (opening every PDF ran out of memory).
 
 1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
    about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download

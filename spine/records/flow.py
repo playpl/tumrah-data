@@ -84,6 +84,17 @@ def youtube_url(url):
     return f"https://youtu.be/{vid}" if vid else url
 
 
+def site_key(rid):
+    """The site lesson key of a record: `lecture:<id>`, where the site allows only [a-z0-9-]. A YouTube record id
+    holds the video id (capitals, `_`): lowered, other signs to `-`, plus 6 hex of the real id so two never meet."""
+    import hashlib
+    import re
+    safe = re.sub(r"[^a-z0-9-]", "-", rid.lower())
+    if safe != rid:
+        safe += "-" + hashlib.sha1(rid.encode("utf-8")).hexdigest()[:6]
+    return f"lecture:{safe}"
+
+
 def site_rows(recs, st):
     """(rows for importHubData lessons, report lines). Chapters and order follow the doctor's list."""
     keep, out, why = [], [], {}
@@ -104,7 +115,7 @@ def site_rows(recs, st):
             why.setdefault("no recording in the post", set()).add(r["id"])
             continue
         keep.append(r)
-    keys = {f"lecture:{r['id']}" for r in keep}
+    keys = {site_key(r["id"]) for r in keep}
     chapters, order = {}, {}
     rows = []
     for r in sorted(keep, key=lambda r: (r["doctor_order"], r["rank"])):
@@ -113,12 +124,12 @@ def site_rows(recs, st):
         if r["chapter"] not in chapters[r["doctor"]]:
             chapters[r["doctor"]][r["chapter"]] = len(chapters[r["doctor"]]) + 1
         order[ck] = order.get(ck, 0) + 1
-        covers = [f"lecture:{c}" for c in r["covers"] if f"lecture:{c}" in keys]
+        covers = [site_key(c) for c in r["covers"] if site_key(c) in keys]
         kind = KIND[r["role"]]
         if kind == "summary" and len(covers) != 1:
             why.setdefault("mini lecture whose lecture is not on the site yet", set()).add(r["id"])
             continue
-        row = {"key": f"lecture:{r['id']}", "subject": r["subject"],
+        row = {"key": site_key(r["id"]), "subject": r["subject"],
                "chapter": {"title": r["chapter"] or r["name"], "order": chapters[r["doctor"]][r["chapter"]]},
                "name": r["name"], "order": order[ck], "kind": kind, "doctorId": r["site"], "covers": covers if kind != "lesson" else [],
                "oldData": True, "ranges": []}
@@ -156,9 +167,10 @@ def save_ids(result_line, module="year1-musculoskeletal"):
     """The importer's result (last output line, JSON): each lesson id into the state log (`lesson`)."""
     res = json.loads(result_line)
     st = machine.states(module)
+    back = {site_key(rid): rid for rid in st}
     n = 0
     for key, lesson in (res.get("lessons") or {}).items():
-        rid = key.split(":", 1)[1]
+        rid = back.get(key, key.split(":", 1)[1])
         if lesson and (st.get(rid) or {}).get("lesson") != lesson:
             machine.mark(module, rid, lesson=lesson)
             n += 1
