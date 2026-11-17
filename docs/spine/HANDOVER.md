@@ -57,6 +57,16 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   `prefilter.py` (`Handout` index, page scope, tiers A1-A4, candidates, windows), `old.py` (`p1 grade-old`,
   verdicts in `graph/work/old_grade.jsonl`), `recall.py` (`p1 recall`), `cli.py`, `tests/test_spine_align.py`.
 
+- 2026-11-17 Fleet window task and pilot: `spine/align/windows.py` (prompt, `render`, `parse` with grammar,
+  hidden probe, flags), `spine/align/pilot.py` (`p1 pilot make | check`). The 20-window pilot ran on the four
+  fleet accounts (`jobs/sp_align/pilot/job1..4`, 5 windows per job, plain `fleet.py run`, no tools).
+
+## How to run a fleet job by hand (what the pilot did)
+
+`py C:/Users/Ahmed/agy-fleet/fleet.py run -a <zero|work|personal|other> --cwd <job dir> -f prompt.md --out
+result.json --timeout 15`, from Bash with the sandbox off (the fleet's sign-ins live in the real profile).
+The answer is `result.json["response"]`; tokens are in `result.json["usage"]`.
+
 ## Left to do (in order)
 
 3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
@@ -112,6 +122,15 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   Settings that pass: BM25 top 8 in scope + top 3 of the whole handout + neighbours + anchor corridor, cap 80
   (cap 60 gave 93.8 to 94.7%). A window is about 60 candidates and 1,430 tokens; one reader over all books
   is about 0.92M tokens (the old book flow used about 130M).
+
+- Fleet pilot (2026-11-17, 20 windows, 4 jobs, default flash model): 4 of 4 jobs answered; 17 of 20 windows
+  clean under the final rules. Against the old links: same 12 of 12, reworded 4 of 4, partial 1 of 2.
+  The 3 rejected windows: one skipped a line; two "wrong probes" were bare headings ("Characters:") that the
+  reader called X. Lessons applied in code: a probe is now a full sentence (5+ words); H numbers far apart
+  are a flag, not a reject (a book table row can cover several handout sentences); the prompt now says a
+  heading is teaching content. Cost: 163,870 tokens for 20 windows = 8.2K per window (3.5K in, the rest is
+  the model's thinking, which swings 9K to 43K per job). All 646 windows, one reader: about 5.3M free fleet
+  tokens (the design guessed 1.7K per window; the old flow used about 130M).
 
 ## Questions for the owner
 

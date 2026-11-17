@@ -1,6 +1,6 @@
 import unittest
 
-from spine.align import bm25, prefilter
+from spine.align import bm25, prefilter, windows
 
 TEXTS = ["The spinal cord ends at the lower border of the first lumbar vertebra.",
          "It is surrounded by three meninges.",
@@ -73,6 +73,53 @@ class Tiers(unittest.TestCase):
         scopes = self.H.page_lessons(["spinal cord lumbar vertebra meninges", "cerebellum peduncles brain stem"])
         self.assertEqual(scopes[0][0], "m:L1")
         self.assertEqual(scopes[1][0], "m:L3")
+
+
+class Windows(unittest.TestCase):
+    def setUp(self):
+        self.H = handout()
+        self.items = [item(TEXTS[0]), item("three peduncles join the cerebellum to the brain stem"),
+                      item("Page 4"), item(TEXTS[7])]
+        self.res = prefilter.code_tiers(self.items, self.H)
+        self.cands = prefilter.candidates(self.items, self.res, [0, 1, 2, 3], self.H)
+        self.text, self.key = windows.render(self.items, self.res, [0, 1, 2, 3], self.cands, self.H, label="W1")
+
+    def h(self, pos):
+        return next(n for n, p in self.key["h"].items() if p == pos)
+
+    def answer(self, probe_pos=None):
+        probe = next(iter(self.key["probe"]))
+        want = self.key["h"][str(self.key["probe"][probe][0])] if probe_pos is None else probe_pos
+        return "\n".join([f"W1 B{probe} = H{self.h(want)} S", f"W1 B2 = H{self.h(5)} R", "W1 B3 = X"])
+
+    def test_render_hides_one_known_sentence(self):
+        self.assertEqual(len(self.key["probe"]), 1)
+        self.assertIn("[done=", self.text)
+        self.assertEqual(sorted(self.key["open"]), sorted({2, 3} | {int(b) for b in self.key["probe"]}))
+
+    def test_good_answer_parses(self):
+        verdicts, errors = windows.parse(self.answer(), self.key, self.H, self.items)
+        self.assertEqual(errors, [])
+        self.assertEqual(verdicts[1][:3], ("link", [5], "R"))
+        self.assertEqual(verdicts[2], "X")
+
+    def test_grammar_rejects_bad_line(self):
+        _, errors = windows.parse("\n".join([self.answer(), "W1 B2 is H3 maybe"]), self.key, self.H, self.items)
+        self.assertTrue(any("grammar" in e for e in errors))
+        _, errors = windows.parse(self.answer().replace("W1 B3 = X", "W1 B3 = H99 S"), self.key, self.H, self.items)
+        self.assertTrue(any("no H99" in e for e in errors))
+        _, errors = windows.parse("W1 B2 = 0", self.key, self.H, self.items)
+        self.assertTrue(any("no answer" in e for e in errors))
+
+    def test_probe_fail_rejects(self):
+        wrong = next(p for p in self.cands if p not in (0, 7))
+        _, errors = windows.parse(self.answer(probe_pos=wrong), self.key, self.H, self.items)
+        self.assertTrue(any(e.startswith("probe") for e in errors))
+
+    def test_same_with_few_shared_words_becomes_reworded_and_flagged(self):
+        ans = self.answer().replace(f"W1 B2 = H{self.h(5)} R", f"W1 B2 = H{self.h(1)} S")
+        verdicts, _ = windows.parse(ans, self.key, self.H, self.items)
+        self.assertEqual((verdicts[1][2], verdicts[1][3]), ("R", True))
 
 
 if __name__ == "__main__":
