@@ -45,6 +45,13 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   --save` is read-only and wrote `docs/spine/POLLS_INVENTORY.md`. `registry.plan(row, module, reg)` already
   decides per bank question: keep / delete / grade5 / trim.
 
+- 2026-11-17 Link trees: `spine/linktree/crawl.py`, `cli.py`, `tests/test_spine_linktree.py`.
+  `py -m spine tree fetch zagexam59 503` and `py -m spine tree fetch ZMSUMcqs58 2098` ran (account `voter2`,
+  read only, no file downloaded) and saved `sources/tree/<channel>_<root>.json`; `tree show` prints the
+  outline. Shape of both trees: root -> one list per doctor -> that doctor's quizzes (Google Form, QuizBot
+  or a file), each link's anchor text is the lesson name. Posts after the root that no list links to are
+  kept under `unreached`. Classifying the files and attaching each quiz to a lesson is Phase 3.
+
 ## Left to do (in order)
 
 3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
@@ -53,7 +60,6 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
    rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
    and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
    and `engine.seed_old_keys` read `polls/channels.json`.
-4. Link trees: `spine/linktree/` and `py -m spine tree fetch zagexam59 503`, `... ZMSUMcqs58 2098` (links only).
 5. Mother message: `spine/tg/mother.py` (render, parse, validate, diff, cache), `spine/tg/flow.py`,
    `spine/records/` (upload state machine, chunk plan), `spine/parity/mother.py`.
 6. Phase 1: `spine/books/split.py` (+ partial dedupe), `spine/align/bm25.py`, `prefilter.py` (tiers A1-A4, N1),
@@ -82,6 +88,11 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   - Change B (zagpolls58 to grade 5): 39,954 bank questions move, 48,582 `polls.db` rows. 816 archive
     questions repeated in `ZAG_59_Polls` or in a quiz/form/book stay where they are.
   - Kept untouched: 34,905 bank questions (CNS 21,852; Batch58ATM unlabelled 1,013 and Year-1-labelled 1,091).
+
+- Link trees (2026-11-17): `zagexam59` from 503 (Year 1, MSK): 47 posts, 2 levels deep: 11 lists, 28 forms,
+  4 QuizBot quizzes, 4 files; 8 later posts no list links to (3 files, 3 forms, 1 media, 1 text).
+  `ZMSUMcqs58` from 2098 (Year 2): 87 posts: 12 lists, 35 forms, 33 files, 4 QuizBot, 2 text, 1 media;
+  3 later posts no list links to (1 file, 1 form, 1 text).
 
 ## Questions for the owner
 
