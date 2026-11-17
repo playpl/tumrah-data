@@ -101,6 +101,46 @@ def check(segs, n_paras, n_book):
     return out
 
 
+def fill(segs, n_paras, max_hole=3):
+    """Holes of at most `max_hole` paragraphs (before the first, between two, after the last segment) become NONE
+    segments. Returns (segments, holes filled) or (None, holes) when a hole is bigger."""
+    out, want, holes = [], 1, 0
+    for s in sorted(segs, key=lambda s: s["p"][0]):
+        a, b = s["p"]
+        if a > want:
+            if a - want > max_hole:
+                return None, a - want
+            out.append({"p": [want, a - 1], "b": None, "flag": "filled"})
+            holes += 1
+        if a < want:                    # overlaps the one before: start after it
+            if b < want:
+                continue
+            s = dict(s, p=[want, b])
+        out.append(s)
+        want = s["p"][1] + 1
+    if want <= n_paras:
+        if n_paras - want + 1 > max_hole:
+            return None, n_paras - want + 1
+        out.append({"p": [want, n_paras], "b": None, "flag": "filled"})
+        holes += 1
+    return out, holes
+
+
+def clip(segs):
+    """A range that starts above the previous range's end but ends at or below it is the reader re-stating the
+    stretch just explained: it starts at the previous end instead (flag "clipped"). A range wholly above stays
+    (repair makes it a re-ask)."""
+    out, last_d = [], 0
+    for s in segs:
+        if s["b"]:
+            c, d = s["b"]
+            if c < last_d <= d:
+                s = dict(s, b=[last_d, d], flag="clipped")
+            last_d = max(last_d, s["b"][1]) if s["b"][0] >= last_d else last_d
+        out.append(s)
+    return out
+
+
 def chain(segs):
     """Indexes of the longest forward chain of mapped segments (weight = paragraphs): each next c >= previous d."""
     mapped = [k for k, s in enumerate(segs) if s["b"]]

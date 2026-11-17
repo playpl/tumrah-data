@@ -164,12 +164,18 @@ def judge(d, n_paras, n_book):
     if not answered(d):
         return None, ["no answer"], 1.0
     segs, bad = segment.parse((d / "answer.txt").read_text(encoding="utf-8"))
+    first = segment.check(segs, n_paras, n_book)
+    filled, holes = segment.fill(segs, n_paras) if segs else (None, 0)
+    if filled is None:
+        return None, first + [f"a hole of {holes} paragraphs"], 1.0
+    segs = segment.clip(filled)                               # code repairs: small holes -> NONE, overlaps clipped
     problems = segment.check(segs, n_paras, n_book)
     order = [p for p in problems if "goes back" not in p]     # only order (monotone) problems can be repaired
-    if not segs or order:
-        return None, (problems or []) + [f"{len(bad)} lines did not parse"] * bool(bad), 1.0
+    notes = [f"repaired: {p}" for p in first if p not in problems]
+    if order:
+        return None, problems + [f"{len(bad)} lines did not parse"] * bool(bad), 1.0
     fixed, asks, share = segment.repair(segs, n_book)
-    return (fixed if share <= MAX_OFFEND else None), problems, share
+    return (fixed if share <= MAX_OFFEND else None), problems + notes[:3], share
 
 
 def collect(lids=None, module="year2-cns", say=print):

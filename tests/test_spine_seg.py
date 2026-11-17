@@ -86,5 +86,22 @@ class TranslitAnchors(unittest.TestCase):
         self.assertEqual(int(np.argmax(m[0])), 0)
 
 
+
+class CodeRepairs(unittest.TestCase):
+    def test_small_holes_become_none(self):
+        s, holes = segment.fill(segs((2, 5, 1, 3), (7, 8, 4, 6)), 10)
+        self.assertEqual([x["p"] for x in s], [[1, 1], [2, 5], [6, 6], [7, 8], [9, 10]])
+        self.assertEqual(holes, 3)
+        self.assertEqual(segment.check(s, 10, 20), [])
+
+    def test_big_hole_is_refused(self):
+        self.assertIsNone(segment.fill(segs((1, 2, 1, 3), (9, 10, 4, 6)), 10)[0])
+
+    def test_overlap_is_clipped_not_dropped(self):
+        s = segment.clip(segs((1, 5, 26, 36), (6, 9, 29, 40), (10, 12, 41, 44)))
+        self.assertEqual([x["b"] for x in s], [[26, 36], [36, 40], [41, 44]])
+        self.assertEqual(segment.check(s, 12, 50), [])
+
+
 if __name__ == "__main__":
     unittest.main()

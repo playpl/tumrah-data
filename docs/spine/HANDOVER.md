@@ -386,15 +386,14 @@ Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
 
 ## Left to do (in order)
 
-1. Seg pilot (cns-002, cns-003, cns-021, readers A and B, prompt v2): read `logs/seg_pilot2.log`, run
-   `py -m spine seg collect cns-002 cns-003 cns-021` and `py -m spine seg audit <lecture>` for each. Accept rule:
-   both readers usable and 90% of paragraphs within 5 book lines. If they agree, run all 69 lectures
-   (`py -m spine seg jobs` then `seg run`, about 150K fleet tokens and 10 minutes per read; the fleet sometimes
-   answers "No capacity available" (503): rerun, answered folders are kept). Not built: `parity p2` (segments'
-   handout pages against the old `lecture.json` ranges: `flow.audit` already prints the share per lecture) and
-   `compat.lecture_files` (links.jsonl / ranges for the Today screen and `LectureLink` rows for the site).
-   Lectures of doctors with no split book (Azouny, Khaled, Mahmoud Elhusseiny) need the design's handout-target
-   variant (H numbers, monotonic only flagged): not built.
+1. Segmentation: pilot v2 PASSED on 2 of 3 (cns-002 agree 99%, cns-003 96%; both 100% inside the old placement,
+   `parity p2`); cns-021 disputed (81%: reader B has the doctor go back to B45 near P73). Code repairs in `judge`:
+   holes of up to 3 paragraphs become NONE (`segment.fill`), a range restarting inside the previous one is clipped
+   (`segment.clip`), then the longest forward chain (`repair`). The bulk run of all 69 lectures was started
+   (`py -m spine seg jobs`, `seg run`, `seg collect`; log `logs/seg_bulk.log`): rerun `seg run` then `seg collect`
+   until no folder waits (answered folders are kept; "No capacity available" 503 = run again). Not built: the
+   bounded re-ask of disputed spans, `compat.lecture_files` (links.jsonl / lecture.json ranges / LectureLink rows),
+   the handout-target variant for doctors with no split book (Azouny, Khaled, Mahmoud Elhusseiny).
 2. Phase 1 tail: after reader C's jump run, `py -m spine p1 accept year2-cns` and `parity p1`. Then the 200-link
    random audit per book (`p1 audit year2-cns --sample 200 --book <b>`; 126 read so far, 0 wrong) and settle the
    last open sentences. Claude Haiku only with the owner's OK and a token estimate. The book splitter still keeps
