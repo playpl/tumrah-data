@@ -371,7 +371,8 @@ Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
    Later the same night: reader C (third fleet reader, `p1 jobs|run --reader C`, only windows holding an open
    sentence or a jump) ran: accepted 6,280 -> 6,480 of 7,154 (a jump that three readers agree on is accepted:
    `engine.three_agree`). Unsettled after the first C run: one reader 35, readers disagree 17, one says no 7,
-   no reader 7, jumps 148 (C was reading the jumps when this was written: see the log `logs/p1_readerC2.log`).
+   no reader 7, jumps 148. C's jump run then: accepted 6,538, jumps flagged 97 (136 confirmed by 3 readers), one
+   reader 29, readers disagree 16, one says no 5, no reader 7, not in the handout 462 (`logs/p1_readerC2.log`).
    `py -m spine parity p1` (new): elhusseiny PASS; Mossafer reaches 99.2% and Elsamahy 97.1% of the old linked
    rows, Zahran 83.1%, Ammar 71.5% (the old flow linked fragments of Ammar's no-ruling tables, e.g. "Anatomical |
    1- Central nervous system", that the new readers call extra: a known splitter limit, for the 200-link audit).
