@@ -3,6 +3,28 @@
 Updated after every step. A new session reads this file first, then `START_HERE.md` only for background.
 Finished items are deleted from "Left to do" and moved to "Done" as one line.
 
+## Prompt for the next session (copy and paste)
+
+```
+Read docs/spine/HANDOVER.md in tumrah-data and continue from "Left to do", item 1 (the year 1 records import).
+Rules: no Claude sub-agents; work inline; branch spine-rebuild; commit after each step and keep the handover
+current; tests stay green (py -m unittest discover tests). Year 1 (ZAG59 channels) is all old data and all of
+it is imported; year 2 "Old data" lists are fallback only. Compress every recording before upload (AAC mono
+48 kbps), never upload an original. One Telegram reader at a time. Internet is slow: download and upload in
+small batches that can be resumed, and report what is left. Do not ask before importing or fixing; report after.
+```
+
+## How to run the import (owner)
+
+1. New lectures and recordings: `py update_data.py` (or the "Update data" button on the admin page). It reads the
+   doctors' lists, downloads the new recordings, compresses them (AAC mono 48 kbps) and uploads them in the
+   background (`logs/upload_media_auto.log`). Stopped half way: run it again, it goes on where it stopped.
+2. The website: `py site_import.py` (button "Site import (writes the website)"). Lessons, questions, pointers,
+   tiers, extras, in that order; the first failure stops it and prints why; running it again is safe.
+   `py site_import.py --dry` (button "Site import (dry run)") only shows what the lesson step would create.
+   Run it after the upload has finished, so the new lessons point at their recordings.
+3. Year 1 has no import yet (item 1 below).
+
 ## Rules for the session that continues
 
 - **No Claude sub-agents** (owner, 2026-11-17: three build agents burned 30% of his 5-hour limit at once). Build
@@ -184,36 +206,54 @@ year 1 records machine must do the same and never upload an original file.
 Everything in `spine/` is in shadow mode. "Update data", the Today screen, the control room, `ledger.db`,
 `queue.db`, `lectures/`, the hand-written `mother_lists.json` and the website are untouched and work as before.
 `config.json` has no `"spine"` block yet (`spine.config()` supplies the defaults: p1, p2, mother = shadow).
-`CLAUDE.md` is unchanged: no rule has taken effect yet. The only new rule is in memory: no Claude sub-agents.
+`CLAUDE.md` has one new section, "Mother trees" (the owner's rules of 2026-11-17); no spine rule replaces an old
+rule yet. Live changes made on 2026-11-17 outside `spine/`: `tg_lists.py` takes a channel, `site_lessons.py`
+leaves doctor-less lectures off the site, `site_import.py` (the import chain as one command, also two
+buttons in `control.COMMANDS`).
 Tests: `py -m unittest discover tests` = 335 tests, all pass.
 
 ## Left to do (in order)
 
-1. Phase 1 open sentences (470): read `p1 audit --list ...` and settle `readers disagree` (46), `one reader
-   only` (157), `one reader says no` (35), `no reader yet` (13), `jump (flagged)` (219).
-2. Phase 1 leftovers: the "0" retry with the whole lesson listed; a third reader
-   (Gemini web) for split votes; Claude Haiku only for what stays flagged, under
-   `spine.config()["claude_budget_tokens"]` (ask the owner with a token estimate first); `spine/compat.py`
-   (`aligned_blocks(book)` in the legacy block shape, `ledger_mirror()`); `spine/parity/p1.py`; a 200-link
-   random audit per book before it is marked ready. `spine/runners/flows.py` is written but nothing calls
-   `register()` yet (one line in `flows/__init__.py` when the dispatcher should run `sp_align`).
-   A4 agrees with old links only 84.8% on old blocks (94.3% on new sentences): it is never accepted alone.
-   The book splitter does not catch "P a g e | 99" lines in `mossafer-anat-full` as page furniture.
-3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
+1. Year 1 records import (the owner waits for this). Build `spine/records/` so it takes a channel:
+   `plan` (what would be downloaded, MB per doctor, from the cached maps of `mother run --year 1`),
+   `download` (Telegram post -> `sources/records/<channel>/<post>/`; a YouTube post -> audio only), `compress`
+   (AAC mono 48 kbps, the rule of `upload_media.compress`), `upload`, `transcribe` (`plan_chunks`, the fleet,
+   model 3.5 Flash-Lite). State per record: seen -> downloaded -> compressed -> uploaded, transcribed in
+   parallel; every step can be resumed; one Telegram connection at a time. 288 records: 7.5 GB on Telegram and
+   152 YouTube posts, so run it doctor by doctor and report after each. Tests first.
+   Decide while building (code can tell): the lecture id scheme for year 1 (the module is
+   `year1-musculoskeletal` in `doctors_folder.MODULES` and `config.module_windows`) and where its lectures
+   live so the year 2 flow never sees them.
+2. Year 1 on the website: the 20 doctors need site doctor ids (`spine/tg/trees.json`, `site: null`); the
+   lessons need their module and subjects on the site (biochemistry is new); a note for students that all
+   first-year data is old data. Website code goes to the website session; the data importer here, dry run first.
+3. Dr. Khaled Aboelfadl (year 2, list 1639): once he has a site doctor (the owner's "Set site doctor" card, or
+   `doctors_folder.ALIASES`), add his 12 lectures to `mother_lists.json` from the agent's map and run
+   `py site_import.py`. Dr. Ayman Khorshed (1706) is a YouTube playlist: needs a playlist reader, or the
+   owner's word to skip him.
+4. Mother message: `spine/tg/flow.py` (`MotherFlow`: the dispatcher runs the two readers when a list changes),
+   then the switch from shadow to primary (`site_lessons.py` reads the agent's cached map; the hand file stops).
+   Until then, after every Update data: `py -m spine mother run --year 2`, add the new lectures to the hand
+   file, `py -m spine parity mother` must print 9 of 9.
+5. Phase 1 open sentences (470 of 7,154): read `py -m spine p1 audit year2-cns --list <name>` and settle
+   `split-vote` (46), `one-reader` (157), `one-no` (35), `no-reader` (13), `jump` (219). Then: the "0" retry
+   with the whole lesson listed; a third reader (Gemini web) for split votes; Claude Haiku only for what stays
+   flagged, under `spine.config()["claude_budget_tokens"]` (ask the owner with a token estimate first);
+   `spine/compat.py` (`aligned_blocks(book)` in the legacy block shape, `ledger_mirror()`);
+   `spine/parity/p1.py`; a 200-link random audit per book before it is marked ready (126 links read so far,
+   0 wrong). `spine/runners/flows.py` is written but nothing calls `register()` yet. A4 is never accepted
+   alone (84.8% agreement on old blocks). The book splitter does not catch "P a g e | 99" lines in
+   `mossafer-anat-full` as page furniture.
+6. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
    write `spine/polls/apply.py` (`--dry` default): A deletes Batch58ATM rows labelled endocrine / other Year 2
    from `polls.db` (+ their `own` votes), `ready/`, `bank/`, keeps a tombstone list of message ids so a
    rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
    and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
    and `engine.seed_old_keys` read `polls/channels.json`. `registry.plan()` already gives the verdict per question.
-4. Mother message, what is left: `spine/tg/flow.py` (`MotherFlow`, so the dispatcher runs the readers when a
-   list changes) and the switch from shadow to primary (`site_lessons.py` reads the agent's map, the hand file
-   stops). Khaled Aboelfadl (list 1639) needs a site doctor before his 12 lessons can go to the site.
-5. Records (year 1 waits on this; it must take a channel, see "Year 1" above): `spine/records/upload.py` (state machine seen -> lesson_upserted | downloading -> uploaded,
-   transcribing in parallel; plan only until `auto_publish_records`), `transcribe.py` (`plan_chunks`), tests.
-6. Phase 2 segmentation: `spine/seg/prior.py`, `segment.py`, `flow.py` (transcript paragraphs -> the doctor's
+7. Phase 2 segmentation: `spine/seg/prior.py`, `segment.py`, `flow.py` (transcript paragraphs -> the doctor's
    book sentences, strictly forward), `seg audit`, `parity p2`. Needs Phase 1 edges to reach the handout.
-7. Website importer changes W1 to W5 on a branch in the tumrah repo (`Desktop/tumrah`), dry run first.
-8. Rewrite `CLAUDE.md` rules as each takes effect (table in `START_HERE.md`). Tumrah book alignment. Phase 3 last.
+8. Website importer changes W1 to W5 on a branch in the tumrah repo (`Desktop/tumrah`), dry run first.
+9. Rewrite `CLAUDE.md` rules as each takes effect (table in `START_HERE.md`). Tumrah book alignment. Phase 3 last.
 
 ## Numbers so far
 
@@ -268,6 +308,13 @@ Tests: `py -m unittest discover tests` = 335 tests, all pass.
   that exist only in `zagpolls58` are labelled CNS by the fleet (and 102 endocrine). Under change B they go to
   grade 5 with the rest of the archive. If some are live on the site as CNS questions, the next question import
   would draft them. Say "go" for A and B as counted, or say what to do with those 219.
+
+- Dr. Khaled Aboelfadl (year 2 physiology, 12 lectures imported): which site doctor? Until then his lessons
+  are not on the site.
+- Year 1: which site doctors are the 20 list doctors (some are the year 2 doctors, some are new: Eslam Gamal,
+  Mahmoud Hisham, Basel Hagag, Ahmed Hamada, Zain, Cocci / Mohamed Ezzat, and the five biochemistry doctors)?
+- Dr. Ayman Khorshed (year 2 anatomy): a YouTube playlist, not a list. Import the playlist, or skip?
+- Dr. Basel's post 1592 has a second video (Brain meninges & barriers revision) that is no lesson. Add it?
 
 - `modules/year2-cns/graph/chapters.json`: 4 chapters as printed in the handout's contents. One look, please.
   (Other known open items are at the end of `START_HERE.md`.)

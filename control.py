@@ -37,6 +37,8 @@ COMMANDS = {
     "update-dry": {"label": "Update data (dry run)", "cmd": ["py", "update_data.py", "--dry"], "group": "Data"},
     "update": {"label": "Update data", "cmd": ["py", "update_data.py"], "group": "Data"},
     "update-notg": {"label": "Update data, no Telegram", "cmd": ["py", "update_data.py", "--no-telegram"], "group": "Data"},
+    "site-dry": {"label": "Site import (dry run)", "cmd": ["py", "site_import.py", "--dry"], "group": "Data"},
+    "site-import": {"label": "Site import (writes the website)", "cmd": ["py", "site_import.py"], "group": "Data"},
     "ledger-sync": {"label": "Ledger sync", "cmd": ["py", "ledger.py", "sync"], "group": "Ledger"},
     "ledger-status": {"label": "Ledger status", "cmd": ["py", "ledger.py", "status"], "group": "Ledger"},
     "placement": {"label": "Placement verdicts", "cmd": ["py", "placement.py"], "group": "Ledger"},
