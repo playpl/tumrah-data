@@ -26,7 +26,8 @@ LABEL_WORDS = 8         # a short line with no sentence end can be the parent of
 CTX_DEPTH = 4
 MIN_SIDE_WORDS = 3
 
-_BULLET = r"[-•▪■□●○◦➢➤❖✓✔◆◇*#►▶→·\-–—−]"
+_ARROWS = "→⇒➔"      # "leads to": inside a sentence, never a bullet
+_BULLET = r"(?![])[-•▪■□●○◦➢➤❖✓✔◆◇*#►▶·\-–—−]"
 MARKER = re.compile(rf"^\s*(?:({_BULLET}+)\s*(?=\S)|(\(?(?:\d{{1,2}}|[A-Za-z]|[ivxIVX]{{2,4}})[.)\-])\s+(?=\S)"
                     r"|(o)\s+(?=[A-Z]))")        # a small "o" before a capital is a hollow bullet
 _SPLIT = re.compile(r"(?<=[.?!])[\"')\]]?\s+(?=[A-Z(ء-ي])")
@@ -142,7 +143,7 @@ def units(rows, headings=(), tables=None, breaks=()):
                 and not heading and row["id"] not in breaks and not prev["text"].rstrip().endswith((":", "?"))):
             if prev["page"] == row["page"]:
                 gap = row["bbox"][1] - prev["bbox"][3]
-                open_end = ((raw[:1].islower() or raw[:1] in "(&→,;")
+                open_end = ((raw[:1].islower() or raw[:1] in "(&,;" + _ARROWS)
                             and not prev["text"].rstrip().endswith(T.SENTENCE_END))
                 joins = ((wraps(prev, raw, right) or open_end) and gap <= prev["bbox"][3] - prev["bbox"][1]
                          and row["bbox"][0] >= cur["x0"] - 3)

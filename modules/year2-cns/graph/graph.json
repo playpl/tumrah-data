@@ -1,0 +1,594 @@
+{
+ "university": "ZU",
+ "year": 2,
+ "module": "year2-cns",
+ "handout": {
+  "sha8": "d30dcde2",
+  "pages": 456
+ },
+ "subjects": [
+  {
+   "id": "anatomy",
+   "chapters": [
+    {
+     "id": "anatomy/c1",
+     "n": 1,
+     "title": "structural principles of central nervous system",
+     "handout_chapter": "year2-cns:C1",
+     "lessons": [
+      {
+       "id": "year2-cns:L03",
+       "title": "Anatomy of the spinal cord",
+       "pdf_pages": [
+        49,
+        57
+       ]
+      },
+      {
+       "id": "year2-cns:L05",
+       "title": "Anatomy of the brain stem nuclei",
+       "pdf_pages": [
+        71,
+        76
+       ]
+      },
+      {
+       "id": "year2-cns:L07",
+       "title": "Anatomy of the cerebellum",
+       "pdf_pages": [
+        96,
+        98
+       ]
+      },
+      {
+       "id": "year2-cns:L08",
+       "title": "Anatomy of the 4th ventricle",
+       "pdf_pages": [
+        99,
+        101
+       ]
+      },
+      {
+       "id": "year2-cns:L10",
+       "title": "Anatomy of diencephalon",
+       "pdf_pages": [
+        108,
+        110
+       ]
+      },
+      {
+       "id": "year2-cns:L11",
+       "title": "Anatomy of the third ventricle",
+       "pdf_pages": [
+        111,
+        112
+       ]
+      },
+      {
+       "id": "year2-cns:L12",
+       "title": "Anatomy of the Limbic system",
+       "pdf_pages": [
+        113,
+        115
+       ]
+      },
+      {
+       "id": "year2-cns:L13",
+       "title": "Anatomy of the cerebrum internal structure",
+       "pdf_pages": [
+        116,
+        122
+       ]
+      },
+      {
+       "id": "year2-cns:L14",
+       "title": "Anatomy of the Lateral ventricle",
+       "pdf_pages": [
+        123,
+        123
+       ]
+      },
+      {
+       "id": "year2-cns:L15",
+       "title": "CSF circulation",
+       "pdf_pages": [
+        124,
+        125
+       ]
+      },
+      {
+       "id": "year2-cns:L16",
+       "title": "Arterial supply of the brain",
+       "pdf_pages": [
+        126,
+        131
+       ]
+      }
+     ]
+    },
+    {
+     "id": "anatomy/c3",
+     "n": 3,
+     "title": "Head And Neck Anatomy",
+     "handout_chapter": "year2-cns:C3",
+     "lessons": [
+      {
+       "id": "year2-cns:L37",
+       "title": "Anatomy of scalp",
+       "pdf_pages": [
+        272,
+        276
+       ]
+      },
+      {
+       "id": "year2-cns:L38",
+       "title": "Anatomy of face",
+       "pdf_pages": [
+        277,
+        284
+       ]
+      },
+      {
+       "id": "year2-cns:L39",
+       "title": "Anatomy of Muscles of mastication",
+       "pdf_pages": [
+        285,
+        286
+       ]
+      },
+      {
+       "id": "year2-cns:L40",
+       "title": "Pterygoid venous plexus",
+       "pdf_pages": [
+        287,
+        287
+       ]
+      },
+      {
+       "id": "year2-cns:L41",
+       "title": "Anatomy of mandibular nerve",
+       "pdf_pages": [
+        288,
+        290
+       ]
+      },
+      {
+       "id": "year2-cns:L42",
+       "title": "Maxillary nerve",
+       "pdf_pages": [
+        291,
+        292
+       ]
+      },
+      {
+       "id": "year2-cns:L43",
+       "title": "Sphenopalatine ganglion",
+       "pdf_pages": [
+        293,
+        293
+       ]
+      },
+      {
+       "id": "year2-cns:L44",
+       "title": "Maxillary artery",
+       "pdf_pages": [
+        294,
+        296
+       ]
+      },
+      {
+       "id": "year2-cns:L45",
+       "title": "Anatomy of dural venous folds, sinuses",
+       "pdf_pages": [
+        297,
+        302
+       ]
+      },
+      {
+       "id": "year2-cns:L46",
+       "title": "Middle meningeal artery",
+       "pdf_pages": [
+        303,
+        304
+       ]
+      },
+      {
+       "id": "year2-cns:L47",
+       "title": "Cervical fascia",
+       "pdf_pages": [
+        305,
+        305
+       ]
+      },
+      {
+       "id": "year2-cns:L48",
+       "title": "Neck triangles",
+       "pdf_pages": [
+        306,
+        310
+       ]
+      },
+      {
+       "id": "year2-cns:L49",
+       "title": "Lymphatic drainage of head and neck",
+       "pdf_pages": [
+        311,
+        312
+       ]
+      },
+      {
+       "id": "year2-cns:L50",
+       "title": "Glossopharyngeal nerve (IX)",
+       "pdf_pages": [
+        313,
+        315
+       ]
+      },
+      {
+       "id": "year2-cns:L51",
+       "title": "Vagus nerve (X)",
+       "pdf_pages": [
+        316,
+        319
+       ]
+      },
+      {
+       "id": "year2-cns:L52",
+       "title": "Accessory nerve (XI)",
+       "pdf_pages": [
+        320,
+        320
+       ]
+      },
+      {
+       "id": "year2-cns:L53",
+       "title": "Hypoglossal nerve (XII)",
+       "pdf_pages": [
+        321,
+        321
+       ]
+      }
+     ]
+    },
+    {
+     "id": "anatomy/c4",
+     "n": 4,
+     "title": "Special Sense Organs",
+     "handout_chapter": "year2-cns:C4",
+     "lessons": [
+      {
+       "id": "year2-cns:L54",
+       "title": "ANATOMY OF THE EYE",
+       "pdf_pages": [
+        322,
+        334
+       ]
+      },
+      {
+       "id": "year2-cns:L57",
+       "title": "Anatomy of the ear",
+       "pdf_pages": [
+        392,
+        399
+       ]
+      },
+      {
+       "id": "year2-cns:L58",
+       "title": "Anatomy of facial nerve (vii)",
+       "pdf_pages": [
+        400,
+        403
+       ]
+      },
+      {
+       "id": "year2-cns:L59",
+       "title": "Anatomy of vestibulocochlear nerve (viii)",
+       "pdf_pages": [
+        404,
+        404
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "histology",
+   "chapters": [
+    {
+     "id": "histology/c1",
+     "n": 1,
+     "title": "structural principles of central nervous system",
+     "handout_chapter": "year2-cns:C1",
+     "lessons": [
+      {
+       "id": "year2-cns:L01",
+       "title": "General histological characters of nervous tissue",
+       "pdf_pages": [
+        10,
+        39
+       ]
+      },
+      {
+       "id": "year2-cns:L02",
+       "title": "General features of nervous system",
+       "pdf_pages": [
+        40,
+        48
+       ]
+      },
+      {
+       "id": "year2-cns:L04",
+       "title": "Histology of the spinal cord",
+       "pdf_pages": [
+        58,
+        70
+       ]
+      },
+      {
+       "id": "year2-cns:L06",
+       "title": "Histology of the brain stem",
+       "pdf_pages": [
+        77,
+        95
+       ]
+      },
+      {
+       "id": "year2-cns:L09",
+       "title": "Histology of the cerebellum",
+       "pdf_pages": [
+        102,
+        107
+       ]
+      },
+      {
+       "id": "year2-cns:L17",
+       "title": "Histology of cerebrum",
+       "pdf_pages": [
+        132,
+        135
+       ]
+      }
+     ]
+    },
+    {
+     "id": "histology/c4",
+     "n": 4,
+     "title": "Special Sense Organs",
+     "handout_chapter": "year2-cns:C4",
+     "lessons": [
+      {
+       "id": "year2-cns:L55",
+       "title": "Histology of eye",
+       "pdf_pages": [
+        335,
+        356
+       ]
+      },
+      {
+       "id": "year2-cns:L60",
+       "title": "Histology of the ear",
+       "pdf_pages": [
+        405,
+        416
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "physiology",
+   "chapters": [
+    {
+     "id": "physiology/c2",
+     "n": 2,
+     "title": "Functional principles of central nervous system",
+     "handout_chapter": "year2-cns:C2",
+     "lessons": [
+      {
+       "id": "year2-cns:L18",
+       "title": "Functional unit of the nervous system",
+       "pdf_pages": [
+        136,
+        138
+       ]
+      },
+      {
+       "id": "year2-cns:L19",
+       "title": "Sensory Receptors",
+       "pdf_pages": [
+        139,
+        144
+       ]
+      },
+      {
+       "id": "year2-cns:L20",
+       "title": "Sensations",
+       "pdf_pages": [
+        145,
+        168
+       ]
+      },
+      {
+       "id": "year2-cns:L21",
+       "title": "Some sensory disturbances",
+       "pdf_pages": [
+        169,
+        174
+       ]
+      },
+      {
+       "id": "year2-cns:L22",
+       "title": "The reflex action",
+       "pdf_pages": [
+        175,
+        186
+       ]
+      },
+      {
+       "id": "year2-cns:L23",
+       "title": "Stretch reflex & skeletal muscle tone",
+       "pdf_pages": [
+        187,
+        200
+       ]
+      },
+      {
+       "id": "year2-cns:L24",
+       "title": "The descending tracts",
+       "pdf_pages": [
+        201,
+        208
+       ]
+      },
+      {
+       "id": "year2-cns:L25",
+       "title": "Motor lesions",
+       "pdf_pages": [
+        209,
+        219
+       ]
+      },
+      {
+       "id": "year2-cns:L26",
+       "title": "Physiology and lesion of the cerebellum",
+       "pdf_pages": [
+        220,
+        229
+       ]
+      },
+      {
+       "id": "year2-cns:L27",
+       "title": "Physiology and Lesion of the Basal Ganglia",
+       "pdf_pages": [
+        230,
+        238
+       ]
+      },
+      {
+       "id": "year2-cns:L28",
+       "title": "Physiology of the thalamus",
+       "pdf_pages": [
+        239,
+        240
+       ]
+      },
+      {
+       "id": "year2-cns:L29",
+       "title": "Physiology of the hypothalamus",
+       "pdf_pages": [
+        241,
+        243
+       ]
+      },
+      {
+       "id": "year2-cns:L30",
+       "title": "Physiology of the Limbic system",
+       "pdf_pages": [
+        244,
+        245
+       ]
+      },
+      {
+       "id": "year2-cns:L31",
+       "title": "The Reticular formation",
+       "pdf_pages": [
+        246,
+        247
+       ]
+      },
+      {
+       "id": "year2-cns:L32",
+       "title": "Physiology of sleep",
+       "pdf_pages": [
+        248,
+        252
+       ]
+      },
+      {
+       "id": "year2-cns:L33",
+       "title": "Electroencephalogram (EEG)",
+       "pdf_pages": [
+        253,
+        256
+       ]
+      },
+      {
+       "id": "year2-cns:L34",
+       "title": "Physiology of the Cerebral cortex",
+       "pdf_pages": [
+        257,
+        263
+       ]
+      },
+      {
+       "id": "year2-cns:L35",
+       "title": "Physiology of Speech",
+       "pdf_pages": [
+        264,
+        266
+       ]
+      },
+      {
+       "id": "year2-cns:L36",
+       "title": "Memory",
+       "pdf_pages": [
+        267,
+        271
+       ]
+      }
+     ]
+    },
+    {
+     "id": "physiology/c4",
+     "n": 4,
+     "title": "Special Sense Organs",
+     "handout_chapter": "year2-cns:C4",
+     "lessons": [
+      {
+       "id": "year2-cns:L56",
+       "title": "PHYSIOLOGY OF THE EYE",
+       "pdf_pages": [
+        357,
+        391
+       ]
+      },
+      {
+       "id": "year2-cns:L61",
+       "title": "Physiology of hearing",
+       "pdf_pages": [
+        417,
+        432
+       ]
+      },
+      {
+       "id": "year2-cns:L62",
+       "title": "Physiology of the vestibular apparatus",
+       "pdf_pages": [
+        433,
+        442
+       ]
+      },
+      {
+       "id": "year2-cns:L63",
+       "title": "Physiology of smell",
+       "pdf_pages": [
+        443,
+        447
+       ]
+      },
+      {
+       "id": "year2-cns:L64",
+       "title": "Physiology of taste",
+       "pdf_pages": [
+        448,
+        451
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

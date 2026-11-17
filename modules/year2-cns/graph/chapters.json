@@ -1,0 +1,164 @@
+[
+ {
+  "n": 1,
+  "title": "structural principles of central nervous system",
+  "printed_from": 1,
+  "units": [
+   {
+    "n": 1,
+    "title": "General histological characters of nervous tissue"
+   },
+   {
+    "n": 2,
+    "title": "General features of nervous system"
+   },
+   {
+    "n": 3,
+    "title": "Spinal cord"
+   },
+   {
+    "n": 4,
+    "title": "Brain stem"
+   },
+   {
+    "n": 5,
+    "title": "Cerebellum and 4th ventricle"
+   },
+   {
+    "n": 6,
+    "title": "Anatomy of diencephalon & third ventricle"
+   },
+   {
+    "n": 7,
+    "title": "Cerebrum"
+   }
+  ],
+  "source": "contents p5",
+  "id": "year2-cns:C1",
+  "pdf_pages": [
+   10,
+   135
+  ],
+  "lessons": [
+   "year2-cns:L01",
+   "year2-cns:L02",
+   "year2-cns:L03",
+   "year2-cns:L04",
+   "year2-cns:L05",
+   "year2-cns:L06",
+   "year2-cns:L07",
+   "year2-cns:L08",
+   "year2-cns:L09",
+   "year2-cns:L10",
+   "year2-cns:L11",
+   "year2-cns:L12",
+   "year2-cns:L13",
+   "year2-cns:L14",
+   "year2-cns:L15",
+   "year2-cns:L16",
+   "year2-cns:L17"
+  ]
+ },
+ {
+  "n": 2,
+  "title": "Functional principles of central nervous system",
+  "printed_from": 121,
+  "units": [],
+  "source": "contents p6",
+  "id": "year2-cns:C2",
+  "pdf_pages": [
+   136,
+   271
+  ],
+  "lessons": [
+   "year2-cns:L18",
+   "year2-cns:L19",
+   "year2-cns:L20",
+   "year2-cns:L21",
+   "year2-cns:L22",
+   "year2-cns:L23",
+   "year2-cns:L24",
+   "year2-cns:L25",
+   "year2-cns:L26",
+   "year2-cns:L27",
+   "year2-cns:L28",
+   "year2-cns:L29",
+   "year2-cns:L30",
+   "year2-cns:L31",
+   "year2-cns:L32",
+   "year2-cns:L33",
+   "year2-cns:L34",
+   "year2-cns:L35",
+   "year2-cns:L36"
+  ]
+ },
+ {
+  "n": 3,
+  "title": "Head And Neck Anatomy",
+  "printed_from": 256,
+  "units": [],
+  "source": "contents p7",
+  "id": "year2-cns:C3",
+  "pdf_pages": [
+   272,
+   321
+  ],
+  "lessons": [
+   "year2-cns:L37",
+   "year2-cns:L38",
+   "year2-cns:L39",
+   "year2-cns:L40",
+   "year2-cns:L41",
+   "year2-cns:L42",
+   "year2-cns:L43",
+   "year2-cns:L44",
+   "year2-cns:L45",
+   "year2-cns:L46",
+   "year2-cns:L47",
+   "year2-cns:L48",
+   "year2-cns:L49",
+   "year2-cns:L50",
+   "year2-cns:L51",
+   "year2-cns:L52",
+   "year2-cns:L53"
+  ]
+ },
+ {
+  "n": 4,
+  "title": "Special Sense Organs",
+  "printed_from": 305,
+  "units": [
+   {
+    "n": 1,
+    "title": "Eye"
+   },
+   {
+    "n": 2,
+    "title": "EAR (Hearing and Equilibrium)"
+   },
+   {
+    "n": 3,
+    "title": "Smell & Taste"
+   }
+  ],
+  "source": "contents p7",
+  "id": "year2-cns:C4",
+  "pdf_pages": [
+   322,
+   451
+  ],
+  "lessons": [
+   "year2-cns:L54",
+   "year2-cns:L55",
+   "year2-cns:L56",
+   "year2-cns:L57",
+   "year2-cns:L58",
+   "year2-cns:L59",
+   "year2-cns:L60",
+   "year2-cns:L61",
+   "year2-cns:L62",
+   "year2-cns:L63",
+   "year2-cns:L64"
+  ]
+ }
+]
