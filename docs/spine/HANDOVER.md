@@ -286,6 +286,42 @@ Tests: `py -m unittest discover tests` = 335 tests, all pass.
 So Phases 0 to 2 are NOT complete: open are the polls changes, the Phase 1 tail, Tumrah book alignment, whiteboards,
 edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-primary switch.
 
+## Owner answers and findings of 2026-11-17 (late; session moved, nothing built after this)
+
+- POLLS: the owner said GO for changes A and B as counted. Not built yet. Design read from the code:
+  `bank/questions.jsonl` is rebuilt by `merge.build` from `polls/ready/questions.jsonl` (+ quizbot, forms, MCQ
+  books); `ready/` is rebuilt by `engine.build_ready` from `polls.db` rows + `raw/`; scrape resumes by
+  `channels.last_id`. So `spine/polls/apply.py` (`--dry` default) must, in one run: (1) write
+  `polls/grade5/questions.jsonl` from the bank rows `registry.plan` calls grade5, and the zagpolls58 `polls`+`own`
+  rows to a grade 5 file; (2) delete A rows (Batch58ATM labelled year2-endocrine-and-reproductive / year2-other)
+  and all zagpolls58 rows from `polls.db` (`polls`, `own`); (3) filter `ready/questions.jsonl` and
+  `bank/questions.jsonl` by the same verdicts (delete / grade5 rows out, trim = drop the dropped/archive
+  sightings); (4) `polls/tombstones.jsonl` (chat, msg_id only) and a skip in `engine.scrape`; (5) `engine.CHANNELS`
+  and `seed_old_keys` from `polls/channels.json` (harvest / seed_old; keep voting order Batch58ATM first);
+  `config.json` `poll_channels["2"]` still lists zagpolls58: remove it; (6) `raw/zagpolls58/` moved (not deleted)
+  under `polls/grade5/raw/`. Owner: no archive of the A rows; old backup files stay. Check the polls job is not
+  running first. Then rerun `py -m spine polls inventory` and compare with POLLS_INVENTORY.md.
+- KHORSHED: skipped by the owner. `spine/tg/trees.json` now has `"new": null, "skip": true` for him.
+- SITE DOCTOR IDS (from the "Data helper agent" session, read-only from prod DoctorProfile): put into
+  `spine/tg/trees.json` `site` (not done yet):
+  ZAG59_Anatomy/39 dr-ibrahim-el-azouni-anat, /41 dr-wajih-el-husseiny-anat, /40 dr-amr-mesafer-anat,
+  /42 dr-islam-gamal-anat, /43 dr-mahmoud-hisham-anat, /44 dr-basel-el-haggag-anat, /45 dr-ahmed-hamada-anat;
+  ZAG59_physio/54 dr-abdullah-el-samahi-phys, /55 dr-naguib-el-husseiny-phys, /59 dr-zein-phys;
+  ZAG59_Histo/41 dr-ahmed-ammar-hist, /43 dr-mohamed-zahran-hist, /40 dr-basel-sherif-hist,
+  /42 dr-mahmoud-el-husseiny-hist; ZAG59_bio/29 dr-ibrahim-el-husseiny-biochem, /30 dr-mohamed-hisham-biochem,
+  /32 dr-el-zaeem-biochem, /33 dr-omar-abdel-aziz-biochem.
+  OWNER DECIDES: ZAG59_physio/58 Cocci (dr-cocci-phys is year2-cns only; dr-mohamed-ezzat-phys has no modules;
+  dr-mohamed-ezzat-free-phys has all 4 modules and is in DOCTOR_MODULE_ROSTER, most likely); ZAG59_bio/34
+  (dr-mohamed-el-kassar-biochem or dr-ahmed-kassab-biochem, both exist).
+  Year 2 Dr. Khaled Aboelfadl = dr-khaled-abualfadle-phys (then item 3 of Left to do can run).
+  Biochemistry: the MSK CurriculumModule for biochemistry EXISTS on the site (so `flow.SITE_SUBJECTS` may add it),
+  but backend `doctorRoster.ts` hides biochemistry from MSK students (owner rule of 2026-11-05): the 72
+  biochemistry records would not show unless the owner reverses that rule.
+- Flows that exist (owner asked): transcription = `flows/lecture.py` transcribe + piece (queue.db, fleet or
+  `gemini_run.py pieces`) for year 2, `py -m spine records transcribe|finish` for year 1; questions = `pointers`,
+  `pointers_one`, `mcq` flows + `fast_lessons.py` + ledger (old system; Phase 3 of the spine is not built); file
+  aligning = `books` flow (old) and `py -m spine p1 ...` (new, CNS doctor books run; Tumrah book and year 1 not).
+
 ## Left to do (in order)
 
 1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
