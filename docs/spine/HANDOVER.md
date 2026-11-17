@@ -391,9 +391,14 @@ Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
    holes of up to 3 paragraphs become NONE (`segment.fill`), a range restarting inside the previous one is clipped
    (`segment.clip`), then the longest forward chain (`repair`). The bulk run of all 69 lectures was started
    (`py -m spine seg jobs`, `seg run`, `seg collect`; log `logs/seg_bulk.log`): rerun `seg run` then `seg collect`
-   until no folder waits (answered folders are kept; "No capacity available" 503 = run again). Not built: the
-   bounded re-ask of disputed spans, `compat.lecture_files` (links.jsonl / lecture.json ranges / LectureLink rows),
-   the handout-target variant for doctors with no split book (Azouny, Khaled, Mahmoud Elhusseiny).
+   until no folder waits (answered folders are kept; "No capacity available" 503 = run again). 81 lectures have a
+   split book (Elsamahy's card had `doctor: null`, fixed) + 12 read against the handout itself (`seg jobs
+   --handout`: Azouny, Mahmoud Elhusseiny; the slice = the handout sentences of the placement +- 15). Khaled's 12
+   have no placement and no book: not segmented. `compat.lecture_files` writes the legacy shapes in shadow
+   (`lectures/<id>/spine/links.jsonl`, `ranges.json`; titles = the book heading, running headers skipped); the
+   bulk run's own `seg collect` started before that code: run `py -m spine seg collect` once more after it.
+   Not built: the bounded re-ask of disputed spans; going primary (the Today screen and `LectureLink` rows on the
+   site read the spine files).
 2. Phase 1 tail: after reader C's jump run, `py -m spine p1 accept year2-cns` and `parity p1`. Then the 200-link
    random audit per book (`p1 audit year2-cns --sample 200 --book <b>`; 126 read so far, 0 wrong) and settle the
    last open sentences. Claude Haiku only with the owner's OK and a token estimate. The book splitter still keeps
