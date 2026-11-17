@@ -199,6 +199,8 @@ def collect(lids=None, module="year2-cns", say=print):
                 links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
                 write_jsonl(ROOT / "lectures" / lid / "segments.jsonl",
                             segment.record(a, p["paras"], p["slice"], links, "fleetA+fleetB", round(share, 3)))
+                from spine import compat                 # shadow legacy files: lectures/<id>/spine/
+                compat.lecture_files(lid, module, cache.setdefault("handout", compat._handout(module)))
             else:
                 state["state"] = "disputed"
                 state["runs"] = segment.disputed(a, b, n)

@@ -73,6 +73,62 @@ def aligned_blocks(module, book, handout=None):
     return [triage] + rows
 
 
+def lecture_files(lid, module="year2-cns", handout=None, write=True):
+    """A segmented lecture (lectures/<id>/segments.jsonl) in the legacy shapes, written in shadow beside the live
+    files: lectures/<id>/spine/links.jsonl ({part, sub: 0, title, start, end, line_ids}; title = the book heading
+    the segment starts under) and lectures/<id>/spine/ranges.json (the handout rows the segments reach, merged per
+    page into {from, to, pages}). Returns (links, ranges) or None when the lecture has no segments."""
+    from spine import ROOT, ids, write_json
+    segs = read_jsonl(ROOT / "lectures" / lid / "segments.jsonl")
+    if not segs:
+        return None
+    sents, _ = handout or _handout(module)
+    book = next((ids.parse(s["book"][0])["book"] for s in segs if s.get("book")), None)
+    bsents = split.load(module, book) if book else []
+    at = {s["id"]: i for i, s in enumerate(bsents)}
+
+    from collections import Counter
+    pages = {}
+    for s in bsents:                                   # a heading on many pages is a running header, not a title
+        for t in ([s["text"]] if s["kind"] == "heading" else []) + list(s.get("ctx") or []):
+            pages.setdefault(t.strip().lower(), set()).add(s["page"])
+
+    def title_ok(t):
+        return t.strip() and len(pages.get(t.strip().lower(), ())) <= 6
+
+    def heading(bid):
+        """The sentence's innermost heading (ctx), else the nearest heading above; never a running header."""
+        i = at.get(bid)
+        while i is not None and i >= 0:
+            s = bsents[i]
+            if s["kind"] != "not_content":
+                for t in reversed(s.get("ctx") or []):
+                    if title_ok(t):
+                        return t
+                if s["kind"] == "heading" and title_ok(s["text"]):
+                    return s["text"]
+            i -= 1
+        return ""
+
+    links, rows = [], []
+    for s in segs:
+        line_ids = []
+        for h in s.get("handout") or []:
+            line_ids += [r for r in (sents.get(h) or {}).get("rows") or [] if r not in line_ids]
+        rows += line_ids
+        links.append({"part": s["n"], "sub": 0, "title": heading(s["book"][0]) if s.get("book") else "",
+                      "start": s["start"], "end": s["end"], "line_ids": line_ids})
+    by_page = {}
+    for r in sorted(set(rows), key=ids.order_key):
+        by_page.setdefault(ids.parse(r)["page"], []).append(r)
+    ranges = [{"from": v[0], "to": v[-1], "pages": [p, p]} for p, v in sorted(by_page.items())]
+    if write:
+        d = ROOT / "lectures" / lid / "spine"
+        write_jsonl(d / "links.jsonl", links)
+        write_json(d / "ranges.json", {"ranges": ranges, "placed_by": "spine"})
+    return links, ranges
+
+
 def path(module, book):
     return graph_dir(module) / "compat" / "aligned" / f"{book}.jsonl"
 

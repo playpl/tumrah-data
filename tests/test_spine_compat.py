@@ -19,5 +19,18 @@ class LegacyBlockShape(unittest.TestCase):
         self.assertTrue(all(b["line_ids"] and b["handout"] for b in linked))
 
 
+
+class LectureFiles(unittest.TestCase):
+    def test_links_shape(self):
+        from spine import ROOT
+        if not (ROOT / "lectures" / "cns-002" / "segments.jsonl").exists():
+            self.skipTest("cns-002 has no segments on this machine")
+        links, ranges = compat.lecture_files("cns-002", write=False)
+        self.assertTrue(all({"part", "sub", "title", "start", "end", "line_ids"} <= set(x) for x in links))
+        starts = [x["start"] for x in links]
+        self.assertEqual(starts, sorted(starts))
+        self.assertTrue(all(r["from"] <= r["to"] or r["pages"][0] == r["pages"][1] for r in ranges))
+
+
 if __name__ == "__main__":
     unittest.main()
