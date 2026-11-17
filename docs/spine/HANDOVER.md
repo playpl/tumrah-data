@@ -201,6 +201,29 @@ questions updated, 8,957 pointers, tiers 87 calls with 0 problems, extras for 14
 "make sure to compress before uploading" (slow internet): `upload_media.py` already does it for year 2; the
 year 1 records machine must do the same and never upload an original file.
 
+## Year 1 records machine (2026-11-17, `655c5b3`, `84e811b`)
+
+`spine/records/` (`machine.py`, `transcribe.py`, `cli.py`), `tests/test_spine_records.py` (17 tests).
+`py -m spine records plan | status | download | compress | upload | transcribe | run [--doctor X]`.
+- Records = links the agreed year 1 maps call lecture, mini or revision: 288 (136 Telegram audio/video, 7.5 GB;
+  152 YouTube). A list whose map is stale (other sha) is skipped and reported.
+- Ids `y1-<anat|phys|hist|bio>-<post>` (YouTube with no post: `y1-<chan>-yt<video>`). They live in
+  `modules/year1-musculoskeletal/records/<id>/` (ignored by git), never in `lectures/`, so Update data, queue.db and
+  `mother.lecture_index` never see them. State log: `modules/year1-musculoskeletal/graph/records.jsonl` (last row
+  per id wins): seen -> downloaded -> compressed -> uploaded; `transcript` (youtube | gemini) apart.
+- Telegram download resumes from `<name>.partial` (whole 512 KB pieces); `--max-mb` (default 300) caps one run;
+  lock `sources/records/telegram.lock`; "database is locked" = Update data's reader is running.
+- Compress = `upload_media.compress` (AAC mono 48 kbps) into `recording.48k.m4a`; `upload` refuses any other file
+  (`check_uploadable`); key `lectures/year1-musculoskeletal/<id>/recording.48k.m4a`. YouTube is not uploaded (the
+  site plays the video); its captions become `raw.txt`.
+- Transcribe: 5-minute pieces; default `--via fleet` (one worker per account, model `lite`, the year 2 piece
+  prompt and check, two tries per piece per run). `--via gemini` runs `gweb wake` first, as tumrah-book does.
+  On 2026-11-17 gweb was dead on all 4 slots (`cookie_dead`); the owner says Gemini web works in the browser:
+  no browser driver exists in code yet.
+- First doctor end to end: Ammar (ZAG59_Histo/41): y1-hist-93 96 MB -> 7.1 MB, uploaded, fleet transcript
+  (19 min, 22K characters); his 5 YouTube records have captions. Telegram ran at about 1.2 MB/s.
+- Running: a background loop of `records run --max-mb 400` (log `logs/records_y1.log`), up to 40 batches.
+
 ## Shadow mode: what is live and what is not
 
 Everything in `spine/` is in shadow mode. "Update data", the Today screen, the control room, `ledger.db`,
@@ -214,16 +237,10 @@ Tests: `py -m unittest discover tests` = 335 tests, all pass.
 
 ## Left to do (in order)
 
-1. Year 1 records import (the owner waits for this). Build `spine/records/` so it takes a channel:
-   `plan` (what would be downloaded, MB per doctor, from the cached maps of `mother run --year 1`),
-   `download` (Telegram post -> `sources/records/<channel>/<post>/`; a YouTube post -> audio only), `compress`
-   (AAC mono 48 kbps, the rule of `upload_media.compress`), `upload`, `transcribe` (`plan_chunks`, the fleet,
-   model 3.5 Flash-Lite). State per record: seen -> downloaded -> compressed -> uploaded, transcribed in
-   parallel; every step can be resumed; one Telegram connection at a time. 288 records: 7.5 GB on Telegram and
-   152 YouTube posts, so run it doctor by doctor and report after each. Tests first.
-   Decide while building (code can tell): the lecture id scheme for year 1 (the module is
-   `year1-musculoskeletal` in `doctors_folder.MODULES` and `config.module_windows`) and where its lectures
-   live so the year 2 flow never sees them.
+1. Year 1 records import: BUILT and RUNNING (2026-11-17, see "Year 1 records machine" below). Left: let the
+   batch loop finish (`py -m spine records status` prints what is left), then
+   `py -m spine records transcribe` until every Telegram record has a transcript, then
+   `py -m spine records download --youtube-audio` for YouTube posts with no captions and transcribe those.
 2. Year 1 on the website: the 20 doctors need site doctor ids (`spine/tg/trees.json`, `site: null`); the
    lessons need their module and subjects on the site (biochemistry is new); a note for students that all
    first-year data is old data. Website code goes to the website session; the data importer here, dry run first.
