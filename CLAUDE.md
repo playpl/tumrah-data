@@ -3,6 +3,9 @@
 Adds all data to the website, linked through the handout. Design and plan live in the tumrah repo:
 `docs/superpowers/specs/2026-11-06-data-workflow-design.md`, `docs/superpowers/plans/2026-11-06-data-workflow.md`.
 
+Cloud (GitHub Actions, year 1 records off the PC): `docs/handovers/HANDOVER_2026-11-17_CLOUD.md`.
+Spine rebuild: `docs/spine/HANDOVER.md`.
+
 Start here: `docs/handovers/HANDOVER_2026-11-14_EVENING.md` (site data rework, hand-written mother_lists.json, balanced questions), then `docs/handovers/HANDOVER_2026-11-14.md` (newest: poll titles scope pointers, Haiku reader A, site import 11-14), then `docs/handovers/HANDOVER_2026-11-12.md` (fleet in quota rest, uploads now start from Update data,
 open owner decisions: Cocci doctor id, Haiku, publishing), then `docs/handovers/HANDOVER_2026-11-10_LEDGER.md` (the ledger, checked placement and the Today screen; what is done
 and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web instead of the fleet, the lowest-error plan), then

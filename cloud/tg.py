@@ -45,7 +45,8 @@ def login():
 
     async def go():
         client = TelegramClient(StringSession(), int(api_id), str(api_hash), device_model="tumrah-data runner")
-        await client.start()          # asks for the phone number and the code in this terminal
+        # asks for the phone number and the code in this terminal; the number needs its country code (+20 1...)
+        await client.start(phone=lambda: input("Phone with country code, for example +201xxxxxxxxx: ").strip())
         s = client.session.save()
         await client.disconnect()
         return s
