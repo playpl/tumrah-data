@@ -67,23 +67,65 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
 result.json --timeout 15`, from Bash with the sandbox off (the fleet's sign-ins live in the real profile).
 The answer is `result.json["response"]`; tokens are in `result.json["usage"]`.
 
+- 2026-11-17 Phase 1 engine: `spine/align/engine.py` (`p1 code`, `p1 jobs`, `p1 run`, `p1 accept`). Votes per
+  reader in `modules/year2-cns/graph/votes/<book>.<reader>.jsonl`, links in `graph/edges/<book>.jsonl`.
+  `p1 code` + `p1 accept` ran: with no fleet reader yet, 3,855 of 7,154 book sentences are linked
+  (110 more are flagged as jumps, 1,412 have one reader, 1,773 have none).
+- 2026-11-17 Mother message, first half: `spine/tg/mother.py` (render, prompt, parse, validate, agree,
+  lecture ids, `to_doctor` in the `mother_lists.json` shape, cache, diff, the mass-delete hold). It imports and
+  `render(load(1632))` gives 2,738 characters and 18 links. NOT done: its CLI, tests, the fleet run, parity.
+
+## IN PROGRESS when this session ended: fleet reader A
+
+`py -m spine p1 run year2-cns --reader A` was started in the background (144 job folders under
+`jobs/sp_align/<book>/A-NNN/`, 5 windows each, 4 fleet accounts). 5 of 144 had answered after about 10
+minutes (about 8 minutes per job, slower than the pilot), so the whole run takes several hours and may have
+been cut off when the session closed. It is resumable: run the same command again (it skips answered folders
+and collects the votes), then `py -m spine p1 accept year2-cns` and read the counts. Log:
+`jobs/sp_align/run_A.log`. The command needs the sandbox off (fleet sign-ins). Consider 3 windows per job
+(`engine.WINDOWS_PER_JOB`) if jobs keep taking 8 minutes.
+
+## Shadow mode: what is live and what is not
+
+Everything in `spine/` is in shadow mode. "Update data", the Today screen, the control room, `ledger.db`,
+`queue.db`, `lectures/`, the hand-written `mother_lists.json` and the website are untouched and work as before.
+`config.json` has no `"spine"` block yet (`spine.config()` supplies the defaults: p1, p2, mother = shadow).
+`CLAUDE.md` is unchanged: no rule has taken effect yet. The only new rule is in memory: no Claude sub-agents.
+Tests: `py -m unittest discover tests` = 309 tests, all pass (265 old + 44 `test_spine_*`).
+
 ## Left to do (in order)
 
+1. Finish fleet reader A (above), then reader B: `p1 jobs year2-cns --reader B`, `p1 run ... --reader B`
+   (windows shifted by 5), `p1 accept`. Then look at what stays `readers disagree`, `one reader only`,
+   `jump (flagged)`.
+2. Phase 1 leftovers: `spine/align/audit.py` (orphan-book, orphan-handout, low-conf, split-vote, coverage; the
+   jump rule already lives in `engine.jumps`); the "0" retry with the whole lesson listed; a third reader
+   (Gemini web) for split votes; Claude Haiku only for what stays flagged, under
+   `spine.config()["claude_budget_tokens"]` (ask the owner with a token estimate first); `spine/compat.py`
+   (`aligned_blocks(book)` in the legacy block shape, `ledger_mirror()`); `spine/parity/p1.py`; a 200-link
+   random audit per book before it is marked ready. `spine/runners/flows.py` is written but nothing calls
+   `register()` yet (one line in `flows/__init__.py` when the dispatcher should run `sp_align`).
+   A4 agrees with old links only 84.8% on old blocks (94.3% on new sentences): it is never accepted alone.
+   The book splitter does not catch "P a g e | 99" lines in `mossafer-anat-full` as page furniture.
 3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
    write `spine/polls/apply.py` (`--dry` default): A deletes Batch58ATM rows labelled endocrine / other Year 2
    from `polls.db` (+ their `own` votes), `ready/`, `bank/`, keeps a tombstone list of message ids so a
    rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
    and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
-   and `engine.seed_old_keys` read `polls/channels.json`.
-5. Mother message: `spine/tg/mother.py` (render, parse, validate, diff, cache), `spine/tg/flow.py`,
-   `spine/records/` (upload state machine, chunk plan), `spine/parity/mother.py`.
-6. Phase 1: `spine/books/split.py` (+ partial dedupe), `spine/align/bm25.py`, `prefilter.py` (tiers A1-A4, N1),
-   `old.py`; `py -m spine p1 recall`, `p1 grade-old`. Then `windows.py`, `order.py`, `audit.py`, `flow.py`,
-   `compat.py`; pilot 20 fleet windows before any bulk run.
-7. Phase 2: `spine/seg/prior.py`, `segment.py`; mother agent to primary only when `parity mother` is exact
-   for all nine doctors.
-8. Rewrite `CLAUDE.md` rules as each takes effect (table in `START_HERE.md`).
-9. Website importer changes W1 to W5 (branch in the tumrah repo). Phase 3 last.
+   and `engine.seed_old_keys` read `polls/channels.json`. `registry.plan()` already gives the verdict per question.
+4. Mother message, second half: `spine/tg/cli.py` (`mother render | job | run | diff`), `spine/tg/flow.py`
+   (`MotherFlow`), `tests/test_spine_mother.py` (`PdfNeverLecture`, `DiffAddEditDelete`, `MassDeleteHeld`),
+   `spine/parity/mother.py` (compare `to_doctor()` of the cached map with the hand file per doctor; exit 0
+   only when all nine are exact). Run two fleet readers per list (1632, 1630, 1631, 1675, 1562, 1635, 1657,
+   1637, 1638, 1636) and cache the agreed map with `mother.save`. Known gap: `sources/lists/<id>.json` keeps no
+   entity offsets, so `render` shows the message text plus a link table built from the `tg_lists.parse`
+   sections. A list item with no link yet (hand file `post: null`) is kept as a link with no post.
+5. Records: `spine/records/upload.py` (state machine seen -> lesson_upserted | downloading -> uploaded,
+   transcribing in parallel; plan only until `auto_publish_records`), `transcribe.py` (`plan_chunks`), tests.
+6. Phase 2 segmentation: `spine/seg/prior.py`, `segment.py`, `flow.py` (transcript paragraphs -> the doctor's
+   book sentences, strictly forward), `seg audit`, `parity p2`. Needs Phase 1 edges to reach the handout.
+7. Website importer changes W1 to W5 on a branch in the tumrah repo (`Desktop/tumrah`), dry run first.
+8. Rewrite `CLAUDE.md` rules as each takes effect (table in `START_HERE.md`). Tumrah book alignment. Phase 3 last.
 
 ## Numbers so far
 
