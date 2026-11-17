@@ -184,7 +184,7 @@ class Transcribe(Base):
             return "word " * 3000, {"account": "x"}
         import lectures
         with mock.patch.object(transcribe, "cut", lambda r, a: pieces), mock.patch.object(lectures, "duration", lambda p: 300.0):
-            n = transcribe.run(self.recs, say=lambda s: None, ask=ask, via="gemini", workers=1)
+            n = transcribe.run(self.recs, say=lambda s: None, ask=ask, via="direct", workers=1)
         self.assertEqual((n, asked), (1, ["c01.ogg"]))
         raw = (machine.record_dir(aud) / "raw.txt").read_text(encoding="utf-8")
         self.assertTrue(raw.startswith("[00:00] heard before\n[05:00] word"))

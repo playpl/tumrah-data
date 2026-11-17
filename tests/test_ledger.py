@@ -352,27 +352,24 @@ class TestRefresh(LedgerCase):
 
 
 class TestRunnerHealth(unittest.TestCase):
-    def web(self, rows):
-        run = mock.Mock(stdout=json.dumps(rows))
-        with mock.patch.object(runners.subprocess, "run", return_value=run), \
-                mock.patch.dict(runners._CACHE, {"at": 0, "web": None}):
+    def web(self, rows=None, error=None):
+        import gemini_browser
+        st = mock.Mock(side_effect=error) if error else mock.Mock(return_value=rows)
+        with mock.patch.object(gemini_browser, "status", st), mock.patch.dict(runners._CACHE, {"at": 0, "web": None}):
             return runners.web()
 
-    def test_a_dead_login_is_not_up_even_when_gweb_calls_it_usable(self):
-        w = self.web([{"slot": s, "usable": True, "state": "READY", "cause": "cookie_dead", "used_5h": 10} for s in "ab"])
-        self.assertEqual((w["up"], w["usable"], w["thinking"]), (False, [], []))
-        self.assertIn("export the cookies again", w["note"])
+    def test_no_signed_in_profile_is_down(self):
+        w = self.web({"acct1": "needs sign-in (accounts.google.com)", "acct2": "never opened"})
+        self.assertEqual((w["up"], w["usable"]), (False, []))
+        self.assertIn("login", w["note"])
 
-    def test_live_accounts_are_up_and_a_full_one_does_no_thinking(self):
-        w = self.web([{"slot": "a", "usable": True, "used_5h": 10}, {"slot": "b", "usable": True, "used_5h": 95},
-                      {"slot": "c", "usable": True, "cause": "cookie_dead"}, {"slot": "d", "usable": False}])
-        self.assertEqual((w["up"], w["usable"], w["thinking"], w["note"]), (True, ["a", "b"], ["a"], "2 of 4 accounts usable"))
+    def test_signed_in_profiles_are_up(self):
+        w = self.web({"acct1": "signed in", "acct2": "needs sign-in (x)", "acct3": "signed in"})
+        self.assertEqual((w["up"], w["usable"], w["note"]), (True, ["acct1", "acct3"], "2 of 3 accounts usable"))
 
     def test_a_failed_status_call_is_down(self):
-        with mock.patch.object(runners.subprocess, "run", side_effect=OSError), \
-                mock.patch.dict(runners._CACHE, {"at": 0, "web": None}):
-            w = runners.web()
-        self.assertEqual((w["up"], w["note"]), (False, "gweb status failed: OSError"))
+        w = self.web(error=OSError)
+        self.assertEqual((w["up"], w["note"]), (False, "browser status failed: OSError"))
 
 
 class TestOwnerAliases(unittest.TestCase):

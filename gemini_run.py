@@ -1,7 +1,7 @@
 """Queue jobs done by Gemini on the web while the Antigravity fleet is down (owner, 2026-11-10).
 
-Gemini web (C:/Users/Ahmed/gemini-web/gweb, 4 accounts, one Google session) is a chat: it reads attached files but has no
-tools. So each job is turned into one self-contained prompt, Gemini answers in a compact form, code rebuilds the
+Gemini web (gemini_browser.py: the owner's four signed-in Chrome profiles, no cookie files; owner 2026-11-17) is a
+chat: it reads attached files but has no tools. So each job is turned into one self-contained prompt, Gemini answers in a compact form, code rebuilds the
 flow's own output file from that answer, and the flow's own checker decides as always. A Gemini PASS is never trusted.
 
     py gemini_run.py pieces [--workers 8] [--model flash-lite] [--limit N]   transcribe: cut queued lectures, hear pieces
@@ -36,8 +36,6 @@ import queue_db
 from flows import REGISTRY, common
 
 ROOT = Path(__file__).resolve().parent
-GWEB = r"C:\Users\Ahmed\gemini-web\.venv\Scripts\python.exe"
-GWEB_PY = r"C:\Users\Ahmed\gemini-web\gweb.py"
 NOTE = "gemini web"
 LOG = ROOT / "jobs" / "gemini_run.log"
 MIN_CHARS_PER_MIN = 450   # the fleet's passed CNS transcripts: 530-1285; a condensed (summarised) answer falls under this
@@ -53,65 +51,17 @@ def log(*parts):
             f.write(line + "\n")
 
 
-# Measured 2026-11-10: ~20 Flash-Lite pieces moved an account's 5-hour usage by 2%; a few Carbon calls moved accounts to
-# 70-93%. An account at 100% stops transcribing too, so a heavy call only goes to an account under HEAVY_CAP.
-HEAVY_CAP = 80
-# Owner 2026-11-10: "Do not use 3.1 or Carbon. Use Argon only. Carbon is what fucked up the usage." Transcription stays
-# on 3.5 Flash-Lite. Argon was not in any account's model list on 2026-11-10 (only Flash-Lite, Flash, 3.1 Pro, 4 Carbon):
-# heavy steps then fail with "model 'argon' not found" and their jobs stay queued.
-ALLOWED_MODELS = {"flash-lite", "gemini-flash-lite", "flash", "gemini-flash"}  # owner 2026-11-10: "we will use 3.8 flash, no more Argon"
-_heavy_lock = threading.Lock()
-
-
-# `work` (/u/1) answers 3.8 Flash and Argon with error cards (gemini-web notes 2026-11-05; again 2026-11-10), and an error
-# card rests the account for 5 minutes, which also stops its transcription: heavy calls never go there.
-HEAVY_SKIP = {"work"}
-
-
-def heavy_account():
-    """The usable account (not in HEAVY_SKIP) with the lowest 5-hour usage under HEAVY_CAP, or None."""
-    try:
-        run = subprocess.run([GWEB, GWEB_PY, "status", "--json"], capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=120)
-        rows = json.loads(run.stdout)
-    except (subprocess.TimeoutExpired, ValueError):
-        return None
-    ok = [r for r in rows if r.get("usable") and r.get("cause") != "cookie_dead"  # gweb keeps `usable` on a dead login
-          and r.get("slot") not in HEAVY_SKIP and (r.get("used_5h") or 0) < HEAVY_CAP]
-    return min(ok, key=lambda r: r.get("used_5h") or 0)["slot"] if ok else None
+ALLOWED_MODELS = {"flash-lite", "gemini-flash-lite", "flash", "gemini-flash"}  # owner 2026-11-10: never 3.1 Pro, Carbon
 
 
 def ask(prompt_file, model, attach=(), timeout=1500, account=None):
-    """(text, meta) from one fresh, temporary Gemini chat; text None on failure (meta holds the error).
-    Any model but Flash-Lite waits for an account under HEAVY_CAP (never `work`) and stays on it."""
+    """(text, meta) from one fresh Gemini chat in a signed-in Chrome profile (gemini_browser.ask); text None on failure
+    (meta["error"] holds why; "no account ready" when no profile could take it)."""
+    import gemini_browser
     if model.lower() not in ALLOWED_MODELS:
         return None, {"error": f"model {model} is not allowed (owner 2026-11-10: 3.8 Flash or 3.5 Flash-Lite only)"}
-    cmd = [GWEB, GWEB_PY, "ask", "--json", "--temporary", "-m", model, "-f", str(prompt_file)]
-    if "lite" not in model:
-        cmd.append("-t")  # owner 2026-11-10: 3.8 Flash "set it on high" = extended thinking
-    if "lite" not in model and not account:
-        while True:
-            with _heavy_lock:
-                account = heavy_account()
-            if account:
-                break
-            log("heavy call waits: every account is at", HEAVY_CAP, "% of its 5-hour usage or resting")
-            time.sleep(300)
-        cmd += ["-a", account]
-    elif account:
-        cmd += ["-a", account, "--fallback"]
-    for a in attach:
-        cmd += ["--attach", str(a)]
-    try:
-        run = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout)
-    except subprocess.TimeoutExpired:
-        return None, {"error": "timeout"}
-    try:
-        out = json.loads(run.stdout)
-    except ValueError:
-        return None, {"error": (run.stderr or run.stdout).strip()[-300:], "code": run.returncode}
-    text = out.get("text")
-    return (text if run.returncode == 0 and text else None), {k: out.get(k) for k in ("account", "model", "secs")}
+    prompt = Path(prompt_file).read_text(encoding="utf-8")
+    return gemini_browser.ask(prompt, model, list(attach), wait=timeout, account=account)
 
 
 def strip_fence(text):

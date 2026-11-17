@@ -217,13 +217,22 @@ year 1 records machine must do the same and never upload an original file.
   (`check_uploadable`); key `lectures/year1-musculoskeletal/<id>/recording.48k.m4a`. YouTube is not uploaded (the
   site plays the video); its captions become `raw.txt`.
 - Transcribe: 5-minute pieces. `--via fleet` (default: one worker per account, model `lite`, the year 2 piece
-  prompt and check, two tries per piece per run). `--via browser` (`spine/records/gemini_browser.py`): Gemini web
-  in the owner's four signed-in Chrome profiles `~/.tumrah-chrome/acct1..4`, through tumrah-book's driver
-  `flow/images/browser.py` (no cookie files; `py -m flow.images.browser status | login <n> | stop` from
-  tumrah-book); the piece is pasted into the prompt box, Flash-Lite, about 36 s a piece, the answer goes through
-  `gemini_run.piece_text` and the 450 characters a minute floor; a failed piece moves to another account. Faults
-  land in tumrah-book's `flow/live.log` (its `fault()`). `--via gemini` is the old cookie route (gweb, dead on
-  2026-11-17 on all 4 slots: `cookie_dead`); do not use it.
+  prompt and check, two tries per piece per run). `--via browser`: Gemini web (see below), the piece pasted
+  into the prompt box, Flash-Lite, about 36 s a piece, the answer through `gemini_run.piece_text` and the 450
+  characters a minute floor; a failed piece moves to another account.
+
+## Gemini web = the signed-in Chrome profiles (owner, 2026-11-17: "Completely replace your old cookie stuff")
+
+`gemini_browser.py` (root) is the only way to Gemini web here; gweb and cookie files are gone from the code.
+It reuses tumrah-book's driver `C:/Users/Ahmed/Desktop/tumrah-book/flow/images/browser.py`: profiles
+`~/.tumrah-chrome/acct1..4` (the owner signs in once: `py -m flow.images.browser login <n>` from tumrah-book),
+Chrome with `--remote-debugging-port=934<n>` over CDP, model picked before every prompt, `acct<n>.busy` locks.
+`ask(prompt, model, attach, wait, account)` pastes attachments as files and returns the answer's body text (a
+trailing chip with a file name is dropped); a faulted account hands the call to the next. `gemini_run.ask` calls
+it (every `gemini_run.py` step), `runners.web()` reads `gemini_browser.status()` (cached `status.json`).
+`py gemini_browser.py` checks the four profiles live. Faults are logged in tumrah-book's `flow/live.log`
+(its `fault()`). Tested 2026-11-17: a text attachment on acct1 (27 s), audio pieces on acct1 and acct2.
+The old `HEAVY_SKIP` / `HEAVY_CAP` account choice of `gemini_run.py` (read from gweb usage) is gone.
 - First doctor end to end: Ammar (ZAG59_Histo/41): y1-hist-93 96 MB -> 7.1 MB, uploaded, fleet transcript
   (19 min, 22K characters); his 5 YouTube records have captions. Telegram ran at about 1.2 MB/s.
 - Running: a background loop of `records run --max-mb 400` (log `logs/records_y1.log`), up to 40 batches.

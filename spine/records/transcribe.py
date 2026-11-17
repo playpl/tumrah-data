@@ -1,10 +1,11 @@
 """Transcripts of the records machine's recordings: 5-minute pieces heard on Flash-Lite (the owner's transcription
 model), outside queue.db so the year 2 flow never sees a year 1 job. Two ways to hear a piece:
 
-    --via fleet    (default, owner 2026-11-17) the Antigravity fleet, one worker per account, model `lite`, the year 2
-                   piece prompt and check (flows/lecture.py PIECE_PROMPT, PieceFlow.check); job folders pieces/jobs/cNN/
-    --via gemini   Gemini web: `gweb wake` first, as tumrah-book's image step does (exit 3 = login dead: stop), then
-                   `gemini_run.ask` with `gemini_run.PIECE_PROMPT` / `piece_text` and the 450 characters a minute floor
+    --via fleet    (default) the Antigravity fleet, one worker per account, model `lite`, the year 2 piece prompt and
+                   check (flows/lecture.py PIECE_PROMPT, PieceFlow.check); job folders pieces/jobs/cNN/
+    --via browser  Gemini web in the owner's four signed-in Chrome profiles (gemini_browser.py, no cookie files): the
+                   piece pasted into the prompt box with `gemini_run.PIECE_PROMPT`, the answer through `piece_text`
+                   and the 450 characters a minute floor; a failed piece moves to another account (browser.parallel)
 
     modules/<m>/records/<id>/pieces/c00.ogg ...   5-minute pieces, mono Opus 16 kbps (lectures.chunks)
     modules/<m>/records/<id>/pieces/c00.txt ...   what was heard, [mm:ss] inside the piece; a stopped run keeps these
@@ -29,7 +30,6 @@ STAMP = re.compile(r"^\[(\d+):(\d{2})\]", re.M)
 STOP = ROOT / "jobs" / "gemini.stop"
 FLEET = [sys.executable, r"C:\Users\Ahmed\agy-fleet\fleet.py"]
 ACCOUNTS = ("zero", "work", "personal", "other")
-GWEB = r"C:\Users\Ahmed\gemini-web\gweb.cmd"
 
 
 def audio_of(rec, st):
@@ -141,16 +141,6 @@ def read_result(f):
         return {}
 
 
-def wake():
-    """`gweb wake` (tumrah-book's way in): (ok, last line). Exit 3 = the login is dead and waits for the owner."""
-    try:
-        r = subprocess.run([GWEB, "wake"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
-    except (subprocess.TimeoutExpired, OSError) as e:
-        return False, str(e)
-    lines = (r.stdout + r.stderr).strip().splitlines() or ["gweb wake: no output"]
-    return r.returncode == 0, lines[-1]
-
-
 def finish(rec, pieces):
     """raw.txt once every piece has its text. True when written."""
     texts = [p.with_suffix(".txt") for p in pieces]
@@ -168,11 +158,6 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
     account, each takes the next piece; a piece that fails twice waits for the next run."""
     if not recs:
         return 0
-    if via == "gemini" and ask is None:
-        ok, line = wake()
-        if not ok:
-            say(f"  Gemini web is not usable: {line}")
-            return 0
     st = machine.states(recs[0]["module"])
     jobs, by_rec = [], {}
     for r in todo(recs, st):
@@ -194,7 +179,7 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
                 say(f"  {r['id']}: transcript ready ({len(pieces)} pieces)")
 
     if via == "browser":
-        from spine.records import gemini_browser
+        import gemini_browser
 
         def one(pw, n, job):            # raising hands the piece to another account (browser.parallel)
             r, p = job
@@ -202,7 +187,7 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
                 return
 
             def asker(prompt, model, attach, timeout):
-                return gemini_browser.ask_audio(pw, n, prompt.read_text(encoding="utf-8"), attach[0]), {"account": n}
+                return gemini_browser.ask_on(pw, n, prompt.read_text(encoding="utf-8"), [attach[0]], timeout, model), {"account": n}
             if hear(p, tries=1, ask=asker, say=say) is None:
                 raise RuntimeError("the answer failed the piece check")
             done(r)
@@ -224,7 +209,7 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
                     work.put(((r, p), tries + 1))
                 continue
             done(r)
-    names = list(accounts) if via == "fleet" else [None] * workers
+    names = list(accounts) if via == "fleet" else [None] * workers   # "direct": hear() with the given `ask` (tests)
     threads = [threading.Thread(target=worker, args=(a,)) for a in names]
     for t in threads:
         t.start()

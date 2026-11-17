@@ -14,8 +14,6 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-GWEB = [r"C:\Users\Ahmed\gemini-web\.venv\Scripts\python.exe", r"C:\Users\Ahmed\gemini-web\gweb.py"]
-HEAVY_CAP = 80           # same cap as gemini_run.py: a thinking call only goes to an account under this 5-hour usage
 _CACHE = {"at": 0, "web": None}
 
 
@@ -25,25 +23,19 @@ def fleet():
     return {"up": not cfg.get("down"), "note": cfg.get("note") or ""}
 
 
-def web(max_age=300):
-    """Gemini web accounts from `gweb status` (cached 5 minutes: the call takes a few seconds)."""
+def web(max_age=600):
+    """Gemini web = the four signed-in Chrome profiles (gemini_browser.status, cached: a live check opens each)."""
     if _CACHE["web"] is not None and time.time() - _CACHE["at"] < max_age:
         return _CACHE["web"]
     try:
-        run = subprocess.run([*GWEB, "status", "--json"], capture_output=True, text=True, encoding="utf-8",
-                             errors="replace", timeout=120)
-        rows = json.loads(run.stdout)
-    except (OSError, subprocess.TimeoutExpired, ValueError) as e:
-        rows, err = [], f"gweb status failed: {type(e).__name__}"
-    else:
-        err = None
-    dead = [r["slot"] for r in rows if r.get("cause") == "cookie_dead"]
-    # gweb keeps `usable` true on a dead login (state READY, cause cookie_dead: seen 2026-11-11), so the cause decides
-    usable = [r["slot"] for r in rows if r.get("usable") and r["slot"] not in dead]
-    note = err or ("the Google login is dead on every account: export the cookies again" if rows and len(dead) == len(rows)
-                   else f"{len(usable)} of {len(rows)} accounts usable")
-    out = {"up": bool(usable), "usable": usable, "note": note,
-           "thinking": [r["slot"] for r in rows if r["slot"] in usable and (r.get("used_5h") or 0) < HEAVY_CAP]}
+        import gemini_browser
+        rows, err = gemini_browser.status(max_age), None
+    except Exception as e:  # noqa: BLE001 - no Chrome, no Playwright, no tumrah-book driver: the web runner is down
+        rows, err = {}, f"browser status failed: {type(e).__name__}"
+    usable = [k for k, v in rows.items() if v == "signed in"]
+    note = err or ("no Chrome profile is signed in: the owner runs `py -m flow.images.browser login <n>` in tumrah-book"
+                   if rows and not usable else f"{len(usable)} of {len(rows)} accounts usable")
+    out = {"up": bool(usable), "usable": usable, "note": note, "thinking": usable}
     _CACHE.update(at=time.time(), web=out)
     return out
 
