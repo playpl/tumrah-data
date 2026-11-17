@@ -145,6 +145,17 @@
   },
   {
    "answer": null,
+   "at": 1794899104.418514,
+   "detail": "Type the site doctor id (like dr-name-subj). Asked once: it becomes a rule for every later file. Until then this doctor's files stay held.",
+   "id": "doctor:khaled aboelfadl",
+   "kind": "doctor",
+   "options": "[\"Set site doctor\", \"Keep held\"]",
+   "payload": "{\"input\": \"site doctor id\", \"key\": \"khaled aboelfadl\"}",
+   "state": "gone",
+   "title": "khaled aboelfadl has no doctor on the site"
+  },
+  {
+   "answer": null,
    "at": 1794659958.262591,
    "detail": "Two sources give different keys. Never settled by an AI: they stay off the site until you pick.",
    "id": "keys",

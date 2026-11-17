@@ -12,7 +12,7 @@ from collections import Counter
 import hub
 import outline
 from books_merge import page_offset
-from spine import SPLITTER, graph_dir, ids, module_dir, read_json, read_jsonl, rows as R, text as T, write_jsonl
+from spine import SPLITTER, graph_dir, ids, module_dir, read_json, read_jsonl, rows as R, text as T, write_json, write_jsonl
 
 MIN_PAGE_WORDS = 15         # a page with fewer words is a cover, a divider or a picture
 REPEAT_SHARE = 0.3          # a line on this share of the pages is a running header or footer
@@ -30,9 +30,21 @@ def books(module):
 def dedupe(module):
     """{alias: (canonical book, page offset)}: alias page i is canonical page i + offset.
 
-    The alias is the smaller book; of two copies of one file, the one named "partial"."""
-    import fitz
+    The alias is the smaller book; of two copies of one file, the one named "partial". Cached in
+    graph/work/dedupe.json, keyed by the PDFs' names and sizes (comparing pages opens every PDF)."""
     d = module_dir(module) / "books"
+    key = {name: (d / f"{name}.pdf").stat().st_size for name in books(module)}
+    cache = graph_dir(module) / "work" / "dedupe.json"
+    hit = read_json(cache) if cache.exists() else None
+    if hit and hit.get("key") == key:
+        return {a: tuple(v) for a, v in hit["aliases"].items()}
+    out = _dedupe(module, d)
+    write_json(cache, {"key": key, "aliases": out})
+    return out
+
+
+def _dedupe(module, d):
+    import fitz
     size = {}
     for name in books(module):
         with fitz.open(d / f"{name}.pdf") as doc:

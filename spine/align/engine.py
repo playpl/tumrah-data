@@ -71,17 +71,31 @@ def run_code(module):
     return out
 
 
+SHIFT = {"A": 0, "B": 5, "C": 3}         # C is the third reader: only the windows that hold an open sentence
+
+
+def open_sentences(module, book, H):
+    """Ids of the book sentences the votes have not settled: split vote, one reader, one no, no reader."""
+    from spine.align import audit
+    st = audit.book_state(module, book, H)
+    return {s["id"] for k in ("split-vote", "one-reader", "one-no", "no-reader") for s in st[k]}
+
+
 def make_jobs(module, reader="A"):
-    """Job folders for the windows this reader still has to read. Returns the folders written."""
+    """Job folders for the windows this reader still has to read. Returns the folders written.
+
+    Reader C (third reader) only reads windows that hold a sentence still open after A and B."""
     H = prefilter.Handout(module)
-    shift = 5 if reader == "B" else 0
+    shift = SHIFT[reader]
     made = []
     for book in canonical_books(module)[0]:
         sents, items, res = state(module, book, H)
         shown = [r if r and r[0] in PROVEN else None for r in res]
         read = {v["src"] for v in read_jsonl(votes_path(module, book, f"fleet{reader}"))}
+        want = open_sentences(module, book, H) if reader == "C" else None
         wins = [w for w in prefilter.windows(len(items), shown, shift=shift)
-                if any(not shown[i] and sents[i]["id"] not in read for i in w)]
+                if any(not shown[i] and sents[i]["id"] not in read and (want is None or sents[i]["id"] in want)
+                       for i in w)]
         home = jobs_home(book)
         for d in home.glob(f"{reader}-*"):                 # unfinished folders of an earlier plan are rebuilt
             if not (d / "done").exists() and not (d / "result.json").exists():
