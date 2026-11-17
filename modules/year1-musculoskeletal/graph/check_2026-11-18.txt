@@ -1,0 +1,12 @@
+ok    every row is in a sentence
+ok    row order is kept
+ok    ids are unique
+ok    every id parses and names its first row
+ok    a rebuild gives the same file
+ok    every lesson has sentences
+ok    no sentence spans more than two pages
+ok    no fact sentence over 90 words
+ok    no empty sentence
+ok    every lesson is in the tree once
+FAIL  every lesson has a handout chapter  [no chapter: ['year1-musculoskeletal:L01', 'year1-musculoskeletal:L02', 'year1-musculoskeletal:L03', 'year1-musculoskeletal:L04', 'year1-musculoskeletal:L05', 'year1-musculoskeletal:L06', 'year1-musculoskeletal:L07', 'year1-musculoskeletal:L08', 'year1-musculoskeletal:L09', 'year1-musculoskeletal:L10', 'year1-musculoskeletal:L11', 'year1-musculoskeletal:L12', 'year1-musculoskeletal:L13', 'year1-musculoskeletal:L14', 'year1-musculoskeletal:L15', 'year1-musculoskeletal:L16', 'year1-musculoskeletal:L17', 'year1-musculoskeletal:L18', 'year1-musculoskeletal:L19', 'year1-musculoskeletal:L20', 'year1-musculoskeletal:L21', 'year1-musculoskeletal:L22', 'year1-musculoskeletal:L23', 'year1-musculoskeletal:L24', 'year1-musculoskeletal:L25', 'year1-musculoskeletal:L26', 'year1-musculoskeletal:L27', 'year1-musculoskeletal:L28', 'year1-musculoskeletal:L29', 'year1-musculoskeletal:L30', 'year1-musculoskeletal:L31', 'year1-musculoskeletal:L32', 'year1-musculoskeletal:L33', 'year1-musculoskeletal:L34', 'year1-musculoskeletal:L35', 'year1-musculoskeletal:L36', 'year1-musculoskeletal:L37', 'year1-musculoskeletal:L38', 'year1-musculoskeletal:L39']]
+graph check: 1 invariants fail

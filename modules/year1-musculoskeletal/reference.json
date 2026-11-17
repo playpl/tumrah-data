@@ -1,0 +1,434 @@
+{
+ "source": "tumrah-book modules/year1-musculoskeletal/*/_work/chapter.json (the Tumrah book's lesson cuts, 2026-11-17)",
+ "lectures": [
+  {
+   "lecture_id": "year1-musculoskeletal:L01",
+   "title": "Pectoral region",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    6,
+    10
+   ],
+   "start": "Pectoral Region"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L02",
+   "title": "Axilla",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    10,
+    16
+   ],
+   "start": "Axilla"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L03",
+   "title": "Shoulder region",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    16,
+    22
+   ],
+   "start": "Shoulder region"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L04",
+   "title": "Muscles of the back",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    22,
+    25
+   ],
+   "start": "The muscles of the back"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L05",
+   "title": "The arm",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    25,
+    34
+   ],
+   "start": "The Arm"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L06",
+   "title": "The forearm",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    34,
+    45
+   ],
+   "start": "The Forearm"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L07",
+   "title": "The hand",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    45,
+    56
+   ],
+   "start": "The Hand"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L08",
+   "title": "Blood vessels of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    56,
+    64
+   ],
+   "start": "Blood vessels of the upper limb"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L09",
+   "title": "Nerves of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    64,
+    78
+   ],
+   "start": "Nerves of the upper limb"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L10",
+   "title": "Joints of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    78,
+    84
+   ],
+   "start": "Joints of Upper limb"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L11",
+   "title": "Superficial veins of the lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    84,
+    86
+   ],
+   "start": "Anatomy of Lower Limbs"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L12",
+   "title": "Front of the thigh",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    86,
+    94
+   ],
+   "start": "Muscles of the front of thigh"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L13",
+   "title": "Medial compartment of the thigh",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    94,
+    97
+   ],
+   "start": "Medial compartment of the thigh"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L14",
+   "title": "The gluteal region",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    97,
+    103
+   ],
+   "start": "The gluteal region"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L15",
+   "title": "Back of the thigh",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    103,
+    108
+   ],
+   "start": "Back of the Thigh"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L16",
+   "title": "Front and lateral leg",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    108,
+    113
+   ],
+   "start": "The leg"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L17",
+   "title": "Retinacula and back of the leg",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    113,
+    119
+   ],
+   "start": "Retinacula"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L18",
+   "title": "The foot",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    119,
+    127
+   ],
+   "start": "Muscles on the dorsum of the foot"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L19",
+   "title": "Nerves of the lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    127,
+    136
+   ],
+   "start": "Nerves of lower limb"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L20",
+   "title": "Joints of the lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    136,
+    148
+   ],
+   "start": "Hip joint"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L21",
+   "title": "Histology of cartilage",
+   "subject": "Histology",
+   "chapter": "Histology of the musculoskeletal system and skin",
+   "pdf_pages": [
+    148,
+    156
+   ],
+   "start": "Histology of Cartilage"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L22",
+   "title": "Histology of bone",
+   "subject": "Histology",
+   "chapter": "Histology of the musculoskeletal system and skin",
+   "pdf_pages": [
+    156,
+    173
+   ],
+   "start": "Histology of Bone"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L23",
+   "title": "Muscular tissue",
+   "subject": "Histology",
+   "chapter": "Histology of the musculoskeletal system and skin",
+   "pdf_pages": [
+    173,
+    183
+   ],
+   "start": "Muscular Tissue"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L24",
+   "title": "Histology of skin",
+   "subject": "Histology",
+   "chapter": "Histology of the musculoskeletal system and skin",
+   "pdf_pages": [
+    183,
+    201
+   ],
+   "start": "Histology of Skin"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L25",
+   "title": "Physiology of skin",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    201,
+    207
+   ],
+   "start": "Physiology of Skin"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L26",
+   "title": "Ca++ homeostasis",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    207,
+    211
+   ],
+   "start": "Ca++Homeostasis"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L27",
+   "title": "Neuron",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    211,
+    214
+   ],
+   "start": "Neuron"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L28",
+   "title": "Excitability",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    214,
+    216
+   ],
+   "start": "Excitability"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L29",
+   "title": "Resting membrane potential",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    216,
+    221
+   ],
+   "start": "The Resting Membrane Potential (RMP)"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L30",
+   "title": "Action potential",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    221,
+    229
+   ],
+   "start": "Action potential and its ionic basis"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L31",
+   "title": "Effect of subthreshold stimulus",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    229,
+    231
+   ],
+   "start": "Effect of subthreshold stimulus"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L32",
+   "title": "Conduction of nerve impulse",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    231,
+    234
+   ],
+   "start": "Conduction of nerve impulse"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L33",
+   "title": "Synapse",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    234,
+    240
+   ],
+   "start": "Synapse"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L34",
+   "title": "Neuromuscular transmission",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    240,
+    246
+   ],
+   "start": "Neuromuscular Transmission"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L35",
+   "title": "Skeletal muscle and muscle proteins",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    246,
+    252
+   ],
+   "start": "Muscle physiology"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L36",
+   "title": "Mechanism of muscle contraction",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    252,
+    262
+   ],
+   "start": "Mechanism of muscle contraction"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L37",
+   "title": "Summation of muscle contractions",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    262,
+    266
+   ],
+   "start": "Summation of muscle contractions"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L38",
+   "title": "Smooth muscle",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    266,
+    271
+   ],
+   "start": "Smooth Muscle"
+  },
+  {
+   "lecture_id": "year1-musculoskeletal:L39",
+   "title": "Electrical activity of cardiac muscle",
+   "subject": "Physiology",
+   "chapter": "Physiology of skin, nerve and muscle",
+   "pdf_pages": [
+    271,
+    277
+   ],
+   "start": "Electrical activity of Cardiac muscle"
+  }
+ ]
+}
