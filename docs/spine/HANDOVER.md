@@ -173,6 +173,11 @@ exist (Wagih, Basal ganglia revision, post 1848).
 `site_lessons.py write` now leaves a lecture with no site doctor out of `lessons.jsonl` and prints
 "NO SITE DOCTOR" (Khaled's 12 lessons would have been created on the site with no doctor).
 Elsamahy's "Pain revision" (post 1702) flipped between two reads (parts 1-2, then 1-3): fixed by hand.
+Site, same day: the 5 new Telegram recordings were compressed (AAC mono 48 kbps, 64 MB in place of 137 MB) and
+uploaded; then the whole import chain ran (source tag `script-index-2026-11-17`): 7 lessons created, 9,079
+questions updated, 8,957 pointers, tiers 87 calls with 0 problems, extras for 146 lessons. Owner, 2026-11-17:
+"make sure to compress before uploading" (slow internet): `upload_media.py` already does it for year 2; the
+year 1 records machine must do the same and never upload an original file.
 
 ## Shadow mode: what is live and what is not
 
