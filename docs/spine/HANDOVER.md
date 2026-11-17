@@ -77,13 +77,15 @@ The answer is `result.json["response"]`; tokens are in `result.json["usage"]`.
 
 ## IN PROGRESS when this session ended: fleet reader A
 
-`py -m spine p1 run year2-cns --reader A` was started in the background (144 job folders under
-`jobs/sp_align/<book>/A-NNN/`, 5 windows each, 4 fleet accounts). 5 of 144 had answered after about 10
-minutes (about 8 minutes per job, slower than the pilot), so the whole run takes several hours and may have
-been cut off when the session closed. It is resumable: run the same command again (it skips answered folders
-and collects the votes), then `py -m spine p1 accept year2-cns` and read the counts. Log:
-`jobs/sp_align/run_A.log`. The command needs the sandbox off (fleet sign-ins). Consider 3 windows per job
-(`engine.WINDOWS_PER_JOB`) if jobs keep taking 8 minutes.
+The first run was slow only because the runner ran one fleet session per account (4 at a time, about 8
+minutes a job: 28 of 144 in an hour). Owner, 2026-11-17: "run on all the four accounts ... multiple sessions
+on every account ... just burn the limits, it's fine". The runner now takes `--per-account` (default 6).
+Readers A and B were restarted together, 6 sessions per account each (48 fleet sessions at once):
+`py -m spine p1 run year2-cns --reader A --per-account 6` (144 folders `jobs/sp_align/<book>/A-NNN/`) and
+`... --reader B --per-account 6` (146 folders `B-NNN`, windows shifted by 5). Logs: `jobs/sp_align/run_A.log`,
+`run_B.log`. Both are resumable: run the same command again (answered folders are skipped, votes are
+collected), then `py -m spine p1 accept year2-cns`. Run one runner per reader, never two for the same reader.
+The commands need the sandbox off (fleet sign-ins). An account that reports quota is rested for that run.
 
 ## Shadow mode: what is live and what is not
 

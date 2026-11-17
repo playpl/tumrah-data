@@ -27,6 +27,7 @@ REL_OF_OLD = {"same": "S", "partial": "P", "reworded": "R"}
 WINDOWS_PER_JOB = 5
 FLEET = Path(r"C:\Users\Ahmed\agy-fleet\fleet.py")
 ACCOUNTS = ["zero", "work", "personal", "other"]
+PER_ACCOUNT = 6                         # fleet sessions at once on one account (owner, 2026-11-17: use the limits)
 JUMP = 40                               # sentences away from its neighbours' targets = a jump
 
 
@@ -134,8 +135,10 @@ def collect(module, book, reader, H):
     return stats
 
 
-def run_jobs(module, reader="A", accounts=None, limit=None):
-    """Run the unanswered job folders, one at a time per fleet account, then collect. Safe to run again."""
+def run_jobs(module, reader="A", accounts=None, limit=None, per_account=PER_ACCOUNT):
+    """Run the unanswered job folders, `per_account` at a time on each fleet account, then collect.
+
+    Safe to run again: answered folders are skipped. One runner at a time (two would run a job twice)."""
     H = prefilter.Handout(module)
     todo = [d for book in canonical_books(module)[0] for d in sorted(jobs_home(book).glob(f"{reader}-*"))
             if not (d / "done").exists() and (read_json(d / "result.json") or {}).get("status") != "SUCCESS"]
@@ -158,7 +161,7 @@ def run_jobs(module, reader="A", accounts=None, limit=None):
                 resting.add(account)
         return "failed"
 
-    with ThreadPoolExecutor(max_workers=len(accounts)) as pool:
+    with ThreadPoolExecutor(max_workers=len(accounts) * per_account) as pool:
         for verdict in pool.map(work, enumerate(todo)):
             stats[verdict] += 1
     for book in canonical_books(module)[0]:

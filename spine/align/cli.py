@@ -39,7 +39,9 @@ def register(sub):
     n.add_argument("--reader", default="A", choices=["A", "B"])
     n.add_argument("--limit", type=int)
     n.add_argument("--accounts", nargs="*")
-    n.set_defaults(run=lambda a: print("fleet run:", dict(engine.run_jobs(a.module, a.reader, a.accounts, a.limit))))
+    n.add_argument("--per-account", type=int, default=engine.PER_ACCOUNT, help="fleet sessions at once per account")
+    n.set_defaults(run=lambda a: print("fleet run:", dict(engine.run_jobs(a.module, a.reader, a.accounts, a.limit,
+                                                                           a.per_account))))
     t = p.add_parser("accept", help="votes -> edges, with the order check")
     t.add_argument("module")
     t.set_defaults(run=lambda a: print(engine.report(engine.accept(a.module), "links after every reader so far")))
