@@ -40,11 +40,19 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
 - A centred second line under a numbered heading is not joined.
 - Changing a rule: bump `spine.SPLITTER`, rebuild, rerun `graph check`; links keep `rows`, so they re-derive.
 
+- 2026-11-17 Polls: `spine/polls/registry.py`, `cli.py`, `polls/channels.json` (the ordered target state;
+  `polls/engine.py` still uses its own `CHANNELS`), `tests/test_spine_polls.py`. `py -m spine polls inventory
+  --save` is read-only and wrote `docs/spine/POLLS_INVENTORY.md`. `registry.plan(row, module, reg)` already
+  decides per bank question: keep / delete / grade5 / trim.
+
 ## Left to do (in order)
 
-3. Polls: `spine/polls/registry.py`, `cli.py`, `polls/channels.json`; read-only `py -m spine polls inventory`.
-   Show the counts to the owner. The two changes (delete Batch58ATM non-CNS Year 2; move `zagpolls58` to the
-   grade 5 store) wait for his word.
+3. Polls changes, ONLY after the owner has seen the inventory and said go (see "Questions for the owner"):
+   write `spine/polls/apply.py` (`--dry` default): A deletes Batch58ATM rows labelled endocrine / other Year 2
+   from `polls.db` (+ their `own` votes), `ready/`, `bank/`, keeps a tombstone list of message ids so a
+   rescrape does not bring them back; B moves `zagpolls58`-only questions to `polls/grade5/questions.jsonl`
+   and its `polls.db` rows to a grade 5 file, sets `harvest: false`; then `engine.CHANNELS`, `config.poll_channels`
+   and `engine.seed_old_keys` read `polls/channels.json`.
 4. Link trees: `spine/linktree/` and `py -m spine tree fetch zagexam59 503`, `... ZMSUMcqs58 2098` (links only).
 5. Mother message: `spine/tg/mother.py` (render, parse, validate, diff, cache), `spine/tg/flow.py`,
    `spine/records/` (upload state machine, chunk plan), `spine/parity/mother.py`.
@@ -67,7 +75,20 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
   the Tumrah book folders. Histology has handout chapters 1 and 4, while the Tumrah book's Histology folders
   are numbered by the units inside chapter 1 (1 to 5, 7) plus 8 for special senses.
 
+- Polls inventory (full table in `docs/spine/POLLS_INVENTORY.md`):
+  - Change A (delete Batch58ATM non-CNS Year 2): 26,669 bank questions (22,368 endocrine, 4,301 other Year 2),
+    30,264 `polls.db` rows, 28,287 own votes, 26,669 ready questions. 220 more of those questions are also in a
+    doctor's quiz, form or MCQ book: they stay and only lose the Batch58ATM sighting.
+  - Change B (zagpolls58 to grade 5): 39,954 bank questions move, 48,582 `polls.db` rows. 816 archive
+    questions repeated in `ZAG_59_Polls` or in a quiz/form/book stay where they are.
+  - Kept untouched: 34,905 bank questions (CNS 21,852; Batch58ATM unlabelled 1,013 and Year-1-labelled 1,091).
+
 ## Questions for the owner
+
+- Polls, before anything is deleted or moved: the inventory matches the plan, with one surprise. 219 questions
+  that exist only in `zagpolls58` are labelled CNS by the fleet (and 102 endocrine). Under change B they go to
+  grade 5 with the rest of the archive. If some are live on the site as CNS questions, the next question import
+  would draft them. Say "go" for A and B as counted, or say what to do with those 219.
 
 - `modules/year2-cns/graph/chapters.json`: 4 chapters as printed in the handout's contents. One look, please.
   (Other known open items are at the end of `START_HERE.md`.)
