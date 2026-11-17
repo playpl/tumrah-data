@@ -83,7 +83,12 @@ def lecture_files(lid, module="year2-cns", handout=None, write=True):
     if not segs:
         return None
     sents, _ = handout or _handout(module)
-    book = next((ids.parse(s["book"][0])["book"] for s in segs if s.get("book")), None)
+
+    def book_of(bid):           # a handout-target lecture points at handout sentences: no book, no headings
+        p = ids.parse(bid)
+        return p.get("book") if p.get("space") == "book" else None
+
+    book = next((b for b in (book_of(s["book"][0]) for s in segs if s.get("book")) if b), None)
     bsents = split.load(module, book) if book else []
     at = {s["id"]: i for i, s in enumerate(bsents)}
 

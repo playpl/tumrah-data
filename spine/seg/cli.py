@@ -37,6 +37,11 @@ def _collect(a):
     return 0
 
 
+def _dry(a):
+    print(f"seg dry: {flow.dry(a.lectures or None, a.module)}")
+    return 0
+
+
 def _audit(a):
     flow.audit(a.lecture)
     return 0
@@ -50,7 +55,8 @@ def register(sub):
     x.add_argument("--every", type=int, default=10)
     x.set_defaults(run=_prior)
     for name, fn, hlp in (("jobs", _jobs, "write job folders"), ("run", _run, "readers answer the job folders"),
-                          ("collect", _collect, "judge answers, write segments.jsonl")):
+                          ("collect", _collect, "judge answers, write segments.jsonl"),
+                          ("dry", _dry, "what collect would decide, writing nothing")):
         x = p.add_parser(name, help=hlp)
         x.add_argument("lectures", nargs="*")
         x.add_argument("--module", default="year2-cns")

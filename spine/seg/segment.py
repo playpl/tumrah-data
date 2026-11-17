@@ -14,7 +14,17 @@ paragraphs) and turns the rest into bounded re-asks: "choose a range inside B<lo
 import re
 
 LINE = re.compile(r"^\s*P(\d+)(?:\s*-\s*P(\d+))?\s*=\s*(?:B(\d+)(?:\s*-\s*B(\d+))?|(NONE))\s*$", re.I)
+# Formatting only, never meaning: byte-order mark, no-break and zero-width spaces, typographic dashes, Arabic-Indic
+# digits, a colon or arrow for "=". A line that still looks like a segment after this is an error, not prose.
+_FOLD = {**{c: None for c in (0xFEFF, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2060)}, 0xA0: " ",
+         **{c: "-" for c in (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2212, 0xFE58, 0xFE63, 0xFF0D)},
+         **{c: "=" for c in (0x3A, 0x2192)},
+         **{0x660 + i: str(i) for i in range(10)}, **{0x6F0 + i: str(i) for i in range(10)}}
+BULLET = re.compile(r"^(?:[-*" + chr(0x2022) + r"]+|\d{1,2}[.)])\s+")
+SEG_LIKE = re.compile(r"P\s*\d+\s*(?:-\s*P?\s*\d+\s*)?=", re.I)     # a range then "=" anywhere in the line, read
+# after norm(): "Segment 3: P5-P9 = B7-B9" is a segment we could not read, not prose (searched, not matched at the start)
 MAX_PARAS, MAX_RANGE = 12, 120
+MAX_HOLE = 3                      # paragraphs a hole (filled as NONE) or a conflicting overlap may span
 # One identical book range may not hold more than this share of the paragraphs (min paragraphs for the rule).
 DOMINANT_SHARE, DOMINANT_MIN = 0.3, 20
 MAX_NONE = 0.5                    # share of paragraphs a reader may call NONE (talk with no book line)
@@ -60,16 +70,27 @@ def render(paras, sents):
             + "\n\nTRANSCRIPT\n" + "\n".join(talk) + "\n")
 
 
+def norm(line):
+    """A line with formatting removed: fold characters, markdown bold/code marks, a bullet or number, a final period."""
+    line = (line or "").translate(_FOLD).strip()
+    for _ in range(6):                             # wrappers nest ("**1. P8-P12 = NONE**"): peel until stable
+        before = line
+        line = BULLET.sub("", line).strip("`*_ \t").rstrip(".;").rstrip()
+        if line == before:
+            break
+    return line
+
+
 def parse(answer):
     """[{"p": [a, b], "b": [c, d] or None}] in answer order, and the lines that did not parse."""
     segs, bad = [], []
-    for line in (answer or "").splitlines():
-        line = line.strip().strip("`").strip()
+    for raw in (answer or "").splitlines():
+        line = norm(raw)
         if not line:
             continue
         m = LINE.match(line)
         if not m:
-            bad.append(line)
+            bad.append(raw.strip())
             continue
         a, b, c, d, none = m.groups()
         b = a if b is None else b                         # "P120 = B28-B34": one paragraph
@@ -108,7 +129,7 @@ def check(segs, n_paras, n_book):
     return out
 
 
-def fill(segs, n_paras, max_hole=3):
+def fill(segs, n_paras, max_hole=MAX_HOLE):
     """Holes of at most `max_hole` paragraphs (before the first, between two, after the last segment) become NONE
     segments. Returns (segments, holes filled) or (None, holes) when a hole is bigger."""
     out, want, holes = [], 1, 0
@@ -131,6 +152,22 @@ def fill(segs, n_paras, max_hole=3):
         out.append({"p": [want, n_paras], "b": None, "flag": "filled"})
         holes += 1
     return out, holes
+
+
+def conflict(segs):
+    """(paragraphs, [a, b]): the most paragraphs one segment answers again with a different answer than an earlier
+    segment, and that segment's paragraphs. fill() keeps the first answer and drops the rest, so a reader that
+    answers a stretch twice (a draft, then a correction) would be read by its draft without a word. An exact
+    repeat (same answer) is not a conflict; a one-paragraph boundary slip (P1-P12, P12-P20) is under MAX_HOLE."""
+    seen, worst, where = {}, 0, None
+    for s in sorted(segs, key=lambda s: s["p"][0]):
+        a, b = s["p"]
+        k = sum(1 for p in range(a, b + 1) if p in seen and seen[p] != s["b"])
+        if k > worst:
+            worst, where = k, s["p"]
+        for p in range(a, b + 1):
+            seen.setdefault(p, s["b"])
+    return worst, where
 
 
 def clip(segs):
@@ -166,32 +203,60 @@ def dominant(segs, n_paras, share=DOMINANT_SHARE, min_paras=DOMINANT_MIN):
     return None
 
 
+def shares(segs, n_paras):
+    """Problems of an answer's shape as the rules count them: NONE share, restated share, one dominant range.
+    Run on the reader's answer AND on its repaired form, because repair can create a NONE-heavy or a
+    restated answer that the first pass never saw (the fuzz found 6 of 10 NONE accepted that way)."""
+    out = []
+    none = sum(s["p"][1] - s["p"][0] + 1 for s in segs if not s["b"]) / n_paras
+    if none > MAX_NONE:
+        out.append(f"NONE for {none:.0%} of paragraphs (a lecture maps to its book)")
+    restated = sum(s["p"][1] - s["p"][0] + 1 for s in segs if s.get("flag") == "clipped") / n_paras
+    if restated > MAX_CLIPPED:
+        out.append(f"re-states earlier book lines for {restated:.0%} of paragraphs")
+    dom = dominant(segs, n_paras)
+    if dom:
+        out.append(f"one range B{dom[0][0]}-B{dom[0][1]} covers {dom[1]:.0%} of paragraphs")
+    return out
+
+
 def judge_segs(segs, n_paras, n_book, bad=()):
     """(repaired segments or None, problems, offending share) of one reader's parsed answer. `bad` are the lines
     that did not parse. Every acceptance rule lives here, so tests run the same code the collect step runs."""
+    if n_paras <= 0:
+        return None, ["no paragraphs"], 1.0
     if not segs:
         return None, ["no segment"], 1.0
+    malformed = [b for b in bad if SEG_LIKE.search(norm(b))]
+    if malformed:                                             # a segment line we could not read: never guess it
+        return None, [f"{len(malformed)} segment line(s) did not parse, e.g. {malformed[0][:60]!r}"], 1.0
+    outside = [s["p"] for s in segs if s["p"][0] < 1 or s["p"][1] > n_paras or s["p"][0] > s["p"][1]]
+    if outside:                                               # P0, past the last paragraph, or reversed: a numbering slip
+        a, b = outside[0]
+        return None, [f"P{a}-P{b}: paragraph numbers outside P1-P{n_paras}"], 1.0
+    twice, where = conflict(segs)
+    if twice > MAX_HOLE:                                      # two different answers for one stretch: never pick one
+        return None, [f"P{where[0]}-P{where[1]}: {twice} paragraphs answered twice, differently"], 1.0
     first = check(segs, n_paras, n_book)
     filled, holes = fill(segs, n_paras)
     if filled is None:
         return None, first + [f"a hole of {holes} paragraphs"], 1.0
     segs = clip(filled)                                       # code repairs: small holes -> NONE, overlaps clipped
     problems = check(segs, n_paras, n_book)
-    none = sum(s["p"][1] - s["p"][0] + 1 for s in segs if not s["b"]) / n_paras
-    if none > MAX_NONE:
-        return None, problems + [f"NONE for {none:.0%} of paragraphs (a lecture maps to its book)"], 1.0
-    restated = sum(s["p"][1] - s["p"][0] + 1 for s in segs if s.get("flag") == "clipped") / n_paras
-    if restated > MAX_CLIPPED:
-        return None, problems + [f"re-states earlier book lines for {restated:.0%} of paragraphs"], 1.0
-    dom = dominant(segs, n_paras)
-    if dom:
-        return None, problems + [f"one range B{dom[0][0]}-B{dom[0][1]} covers {dom[1]:.0%} of paragraphs"], 1.0
+    why = shares(segs, n_paras)
+    if why:
+        return None, problems + why, 1.0
     order = [p for p in problems if "goes back" not in p]     # only order (monotone) problems can be repaired
-    notes = [f"repaired: {p}" for p in first if p not in problems]
     if order:
-        return None, problems + [f"{len(bad)} lines did not parse"] * bool(bad), 1.0
+        return None, problems + ([f"{len(bad)} lines did not parse"] if bad else []), 1.0
+    notes = [f"repaired: {p}" for p in first if p not in problems]
     fixed, asks, share = repair(segs, n_book)
-    return (fixed if share <= MAX_OFFEND else None), problems + notes[:3], share
+    if share > MAX_OFFEND:
+        return None, problems + [f"{share:.0%} of paragraphs out of order"], share
+    why = shares(fixed, n_paras)                              # the repaired answer is what gets written
+    if why:
+        return None, problems + why, share
+    return fixed, problems + notes[:3], share
 
 
 def chain(segs):

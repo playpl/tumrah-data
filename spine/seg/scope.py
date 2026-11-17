@@ -25,7 +25,8 @@ def doctor_books(module):
 
 
 def lecture(lid):
-    return read_json(ROOT / "lectures" / lid / "lecture.json")
+    """The lecture record, or {} when there is none (a `covers` id with no record must not stop the batch)."""
+    return read_json(ROOT / "lectures" / lid / "lecture.json") or {}
 
 
 def book_sentences(module, book):
