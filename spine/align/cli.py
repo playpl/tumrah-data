@@ -1,5 +1,5 @@
-"""py -m spine p1 recall | grade-old | code | jobs | run | accept <module>"""
-from spine.align import engine, old, recall
+"""py -m spine p1 recall | grade-old | code | jobs | run | accept | audit <module>"""
+from spine.align import audit, engine, old, recall
 
 
 def _recall(a):
@@ -45,6 +45,7 @@ def register(sub):
     t = p.add_parser("accept", help="votes -> edges, with the order check")
     t.add_argument("module")
     t.set_defaults(run=lambda a: print(engine.report(engine.accept(a.module), "links after every reader so far")))
+    audit.add(p)
     try:
         from spine.align import pilot
         pilot.add(p)
