@@ -99,5 +99,5 @@ def register(sub):
         if name == "transcribe":
             q.add_argument("--limit", type=int, help="at most N pieces this run")
             q.add_argument("--workers", type=int, default=4, help="Gemini web workers (the fleet uses one per account)")
-            q.add_argument("--via", choices=("fleet", "gemini"), default="fleet")
+            q.add_argument("--via", choices=("fleet", "browser", "gemini"), default="fleet")
         q.set_defaults(run=fn)

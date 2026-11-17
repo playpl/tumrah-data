@@ -185,6 +185,30 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
     jobs = jobs[:limit]
     say(f"  {len(jobs)} pieces to hear now ({len(by_rec)} records waiting)")
     lock, heard, work = threading.Lock(), [0], queue.Queue()
+
+    def done(r):
+        with lock:
+            heard[0] += 1
+            rec, pieces = by_rec[r["id"]]
+            if finish(rec, pieces):
+                say(f"  {r['id']}: transcript ready ({len(pieces)} pieces)")
+
+    if via == "browser":
+        from spine.records import gemini_browser
+
+        def one(pw, n, job):            # raising hands the piece to another account (browser.parallel)
+            r, p = job
+            if STOP.exists():
+                return
+
+            def asker(prompt, model, attach, timeout):
+                return gemini_browser.ask_audio(pw, n, prompt.read_text(encoding="utf-8"), attach[0]), {"account": n}
+            if hear(p, tries=1, ask=asker, say=say) is None:
+                raise RuntimeError("the answer failed the piece check")
+            done(r)
+        gemini_browser.driver().parallel(jobs, one, lambda j: f"{j[0]['id']}/{j[1].stem}")
+        return heard[0]
+
     for j in jobs:
         work.put((j, 0))
 
@@ -199,11 +223,7 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
                 if tries + 1 < 2:
                     work.put(((r, p), tries + 1))
                 continue
-            with lock:
-                heard[0] += 1
-                rec, pieces = by_rec[r["id"]]
-                if finish(rec, pieces):
-                    say(f"  {r['id']}: transcript ready ({len(pieces)} pieces)")
+            done(r)
     names = list(accounts) if via == "fleet" else [None] * workers
     threads = [threading.Thread(target=worker, args=(a,)) for a in names]
     for t in threads:

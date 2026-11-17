@@ -216,10 +216,14 @@ year 1 records machine must do the same and never upload an original file.
 - Compress = `upload_media.compress` (AAC mono 48 kbps) into `recording.48k.m4a`; `upload` refuses any other file
   (`check_uploadable`); key `lectures/year1-musculoskeletal/<id>/recording.48k.m4a`. YouTube is not uploaded (the
   site plays the video); its captions become `raw.txt`.
-- Transcribe: 5-minute pieces; default `--via fleet` (one worker per account, model `lite`, the year 2 piece
-  prompt and check, two tries per piece per run). `--via gemini` runs `gweb wake` first, as tumrah-book does.
-  On 2026-11-17 gweb was dead on all 4 slots (`cookie_dead`); the owner says Gemini web works in the browser:
-  no browser driver exists in code yet.
+- Transcribe: 5-minute pieces. `--via fleet` (default: one worker per account, model `lite`, the year 2 piece
+  prompt and check, two tries per piece per run). `--via browser` (`spine/records/gemini_browser.py`): Gemini web
+  in the owner's four signed-in Chrome profiles `~/.tumrah-chrome/acct1..4`, through tumrah-book's driver
+  `flow/images/browser.py` (no cookie files; `py -m flow.images.browser status | login <n> | stop` from
+  tumrah-book); the piece is pasted into the prompt box, Flash-Lite, about 36 s a piece, the answer goes through
+  `gemini_run.piece_text` and the 450 characters a minute floor; a failed piece moves to another account. Faults
+  land in tumrah-book's `flow/live.log` (its `fault()`). `--via gemini` is the old cookie route (gweb, dead on
+  2026-11-17 on all 4 slots: `cookie_dead`); do not use it.
 - First doctor end to end: Ammar (ZAG59_Histo/41): y1-hist-93 96 MB -> 7.1 MB, uploaded, fleet transcript
   (19 min, 22K characters); his 5 YouTube records have captions. Telegram ran at about 1.2 MB/s.
 - Running: a background loop of `records run --max-mb 400` (log `logs/records_y1.log`), up to 40 batches.
