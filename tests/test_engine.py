@@ -64,33 +64,33 @@ class OwnVotes(unittest.TestCase):
 
 class Queue(Base):
     def test_claims_never_overlap_and_follow_channel_order(self):
-        self.add("zagpolls58", 1, "a")
+        self.add("ZAG_59_Polls", 1, "a")
         self.add("Batch58ATM", 5, "b")
         self.add("Batch58ATM", 9, "c")
-        chats = ["Batch58ATM", "zagpolls58"]
+        chats = ["Batch58ATM", "ZAG_59_Polls"]
         self.assertEqual(engine.claim(self.c, "v1", chats, 2), [("Batch58ATM", 9), ("Batch58ATM", 5)])
-        self.assertEqual(engine.claim(self.c, "v2", chats, 2), [("zagpolls58", 1)])
+        self.assertEqual(engine.claim(self.c, "v2", chats, 2), [("ZAG_59_Polls", 1)])
 
     def test_account_gets_only_its_channels(self):
-        self.add("zagpolls58", 1, "a")
+        self.add("ZAG_59_Polls", 1, "a")
         self.assertEqual(engine.claim(self.c, "v1", ["Batch58ATM"], 5), [])
 
     def test_release_returns_claims(self):
-        self.add("zagpolls58", 1, "a")
-        engine.claim(self.c, "v1", ["zagpolls58"], 5)
+        self.add("ZAG_59_Polls", 1, "a")
+        engine.claim(self.c, "v1", ["ZAG_59_Polls"], 5)
         engine.release(self.c, "v1")
-        self.assertEqual(engine.claim(self.c, "v2", ["zagpolls58"], 5), [("zagpolls58", 1)])
+        self.assertEqual(engine.claim(self.c, "v2", ["ZAG_59_Polls"], 5), [("ZAG_59_Polls", 1)])
 
     def test_one_vote_per_distinct_question(self):
-        self.add("zagpolls58", 1, "same")
+        self.add("ZAG_59_Polls", 1, "same")
         self.add("Batch58ATM", 2, "same")
         self.add("Batch58ATM", 3, "keyed", "keyed")
-        self.add("zagpolls58", 4, "keyed")
+        self.add("ZAG_59_Polls", 4, "keyed")
         engine.mark_dupes(self.c)
         rows = {(r["chat"], r["msg_id"]): r["status"] for r in self.c.execute("SELECT * FROM polls")}
         self.assertEqual(rows[("Batch58ATM", 2)], "need")
-        self.assertEqual(rows[("zagpolls58", 1)], "dupe")
-        self.assertEqual(rows[("zagpolls58", 4)], "dupe")
+        self.assertEqual(rows[("ZAG_59_Polls", 1)], "dupe")
+        self.assertEqual(rows[("ZAG_59_Polls", 4)], "dupe")
 
 
 class FakeFlood(Exception):
@@ -201,8 +201,8 @@ class Joining(unittest.TestCase):
     def test_joins_only_what_is_missing(self):
         client, have = self.Client(), {"Batch58ATM": "ent"}
         self.assertEqual(self.run_join(client, have), "")
-        self.assertEqual(sorted(client.joined), ["ZAG_59_Polls", "zagpolls58"])
-        self.assertEqual(len(have), 3)
+        self.assertEqual(sorted(client.joined), ["ZAG_59_Polls"])       # zagpolls58 left the harvest (grade 5)
+        self.assertEqual(len(have), 2)
 
     def test_failed_join_is_reported_and_keeps_the_rest(self):
         have = {"Batch58ATM": "ent"}
@@ -211,8 +211,8 @@ class Joining(unittest.TestCase):
         self.assertEqual(list(have), ["Batch58ATM"])
 
     def test_never_joins_a_username_that_moved_to_another_chat(self):
-        client = self.Client(ids=dict(engine.CHANNELS, zagpolls58=1))
-        problem = self.run_join(client, {"Batch58ATM": "e", "ZAG_59_Polls": "e"})
+        client = self.Client(ids=dict(engine.CHANNELS, ZAG_59_Polls=1))
+        problem = self.run_join(client, {"Batch58ATM": "e"})
         self.assertIn("another chat", problem)
         self.assertEqual(client.joined, [])
 
@@ -260,9 +260,9 @@ class Ready(Base):
         wk = engine.word_key("Q", ["Yes", "No"])
         self.raw("Batch58ATM", [{"msg_id": 1, "type": "text", "text": "Header\nmore", "date": "x"},
                                 self.msg(2, "Q", ["Yes", "No"])])
-        self.raw("zagpolls58", [self.msg(7, "Q", ["No", "Yes"])])
+        self.raw("ZAG_59_Polls", [self.msg(7, "Q", ["No", "Yes"])])
         self.save("Batch58ATM", 2, wk, 0, [4, 2])
-        self.save("zagpolls58", 7, wk, 1, [1, 3])
+        self.save("ZAG_59_Polls", 7, wk, 1, [1, 3])
         engine.add_own(self.c, "Batch58ATM", 2, "v1", 1, 10.0)
         self.assertEqual(self.build()["questions"], 1)
         row = self.rows()[0]
@@ -275,9 +275,9 @@ class Ready(Base):
         old, new = self.msg(2, "Q", ["Yes", "No"]), self.msg(7, "Q", ["No", "Yes"])
         old["date"], new["date"] = "2026-01-01T10:00:00+00:00", "2026-03-01T10:00:00+00:00"
         self.raw("Batch58ATM", [old])
-        self.raw("zagpolls58", [new])
+        self.raw("ZAG_59_Polls", [new])
         self.save("Batch58ATM", 2, wk, 0, [1, 0])   # Yes
-        self.save("zagpolls58", 7, wk, 0, [0, 1])   # newer repost keys its option 0 = "No"
+        self.save("ZAG_59_Polls", 7, wk, 0, [0, 1])   # newer repost keys its option 0 = "No"
         counts = self.build()
         row = self.rows()[0]
         self.assertEqual((row["key"], row["options"][row["key"]], row["key_conflict"], row["key_source"]),
@@ -287,9 +287,9 @@ class Ready(Base):
     def test_agreeing_reposts_keep_no_key_source(self):
         wk = engine.word_key("Q", ["Yes", "No"])
         self.raw("Batch58ATM", [self.msg(2, "Q", ["Yes", "No"])])
-        self.raw("zagpolls58", [self.msg(7, "Q", ["Yes", "No"])])
+        self.raw("ZAG_59_Polls", [self.msg(7, "Q", ["Yes", "No"])])
         self.save("Batch58ATM", 2, wk, 0, [1, 0])
-        self.save("zagpolls58", 7, wk, 0, [0, 1])
+        self.save("ZAG_59_Polls", 7, wk, 0, [0, 1])
         self.build()
         self.assertNotIn("key_source", self.rows()[0])
 

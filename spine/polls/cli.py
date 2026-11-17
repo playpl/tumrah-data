@@ -1,6 +1,6 @@
-"""py -m spine polls inventory"""
+"""py -m spine polls inventory | apply [--go]"""
 from spine import ROOT
-from spine.polls import registry
+from spine.polls import apply, registry
 
 
 def _inventory(a):
@@ -18,3 +18,4 @@ def register(sub):
     i = p.add_parser("inventory", help="read-only counts, and what the two ordered changes would touch")
     i.add_argument("--save", action="store_true", help="also write docs/spine/POLLS_INVENTORY.md")
     i.set_defaults(run=_inventory)
+    apply.add(p)

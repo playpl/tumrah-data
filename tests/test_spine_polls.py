@@ -71,5 +71,105 @@ class InventoryCounts(unittest.TestCase):
             self.assertIn("CHANGE A", registry.report(inv, REG))
 
 
+class Apply(unittest.TestCase):
+    """spine/polls/apply.py on a copy: dry run writes nothing; --go moves, deletes and trims as planned."""
+
+    def make(self, d):
+        import shutil
+        from spine.polls import apply
+        polls, bank = Path(d) / "polls", Path(d) / "bank"
+        (polls / "raw" / "old58").mkdir(parents=True)
+        (polls / "ready").mkdir()
+        bank.mkdir()
+        shutil.copy(apply.POLLS / "engine.py", polls / "engine.py")
+        shutil.copy(apply.POLLS / "channels.json", polls / "channels.json")
+        rows = [dict(q(*r), key=0, key_conflict=False, repetition_count=1)
+                for r in (("k1", "B58"), ("k2", "B58"), ("k3", "old58"), ("k4", "old58", "A59"), ("k5", "B58", "form"))]
+        (bank / "questions.jsonl").write_text("\n".join(map(json.dumps, rows)), encoding="utf-8")
+        labels = [{"word_key": "k1", "module": "year2-endo"}, {"word_key": "k2", "module": "year2-cns"},
+                  {"word_key": "k3", "module": "year1-msk"}, {"word_key": "k4", "module": "year1-msk"},
+                  {"word_key": "k5", "module": "year2-endo"}]
+        (bank / "labels.jsonl").write_text("\n".join(map(json.dumps, labels)), encoding="utf-8")
+        (polls / "raw" / "old58" / "messages.jsonl").write_text("{}\n", encoding="utf-8")
+        engine = apply._engine(polls)
+        ready = []
+        for wk, chats in (("k1", ["B58"]), ("k2", ["B58"]), ("k3", ["old58"]), ("k4", ["old58", "A59"])):
+            ready.append({"question": wk, "options": ["a", "b"], "key": 0,
+                          "sightings": [{"chat": c, "msg_id": 1} for c in chats]})
+        (polls / "ready" / "questions.jsonl").write_text("\n".join(map(json.dumps, ready)), encoding="utf-8")
+        labels_wk = {engine.word_key(r["question"], r["options"]): l["module"] for r, l in zip(ready, labels)}
+        (bank / "labels.jsonl").write_text("\n".join(map(json.dumps, labels + [
+            {"word_key": k, "module": m} for k, m in labels_wk.items()])), encoding="utf-8")
+        c = engine.db(polls / "polls.db")
+        c.executemany("INSERT INTO polls(chat, msg_id, word_key, status) VALUES(?,?,?,?)",
+                      [("B58", 1, "k1", "keyed"), ("B58", 2, "k2", "dupe"), ("old58", 1, "k2", "keyed"),
+                       ("old58", 2, "k3", "keyed"), ("A59", 1, "k4", "keyed")])
+        c.executemany("INSERT INTO own VALUES(?,?,?,?,?)", [("B58", 1, "v", 0, 0.0), ("B58", 2, "v", 0, 0.0),
+                                                            ("old58", 1, "v", 0, 0.0)])
+        c.execute("INSERT INTO channels VALUES('old58', 9, 9)")
+        c.close()
+        cfg = Path(d) / "config.json"
+        cfg.write_text(json.dumps({"poll_channels": {"2": ["old58", "B58"]}}), encoding="utf-8")
+        return apply, polls, bank, cfg
+
+    def test_dry_then_go(self):
+        with tempfile.TemporaryDirectory() as d:
+            apply, polls, bank, cfg = self.make(d)
+            before = (bank / "questions.jsonl").read_bytes()
+            self.assertEqual(apply.apply(False, polls, bank, REG, cfg, out=lambda *_: None), 0)
+            self.assertEqual((bank / "questions.jsonl").read_bytes(), before)
+            self.assertFalse((polls / "grade5").exists())
+            self.assertEqual(apply.apply(True, polls, bank, REG, cfg, out=lambda *_: None), 0)
+            left = [json.loads(x) for x in (bank / "questions.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([r["word_key"] for r in left], ["k2", "k4", "k5"])
+            self.assertEqual([s["chat"] for s in left[1]["sightings"]], ["A59"])     # trimmed
+            self.assertEqual([s["chat"] for s in left[2]["sightings"]], ["someone"])  # A sighting gone, form stays
+            g5 = [json.loads(x) for x in (polls / "grade5" / "questions.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([(r["word_key"], r["module"]) for r in g5], [("k3", "year1-msk")])
+            con = sqlite3.connect(polls / "polls.db")
+            self.assertEqual(sorted(con.execute("SELECT chat, msg_id, status FROM polls")),
+                             [("A59", 1, "keyed"), ("B58", 2, "need")])    # the dupe's keyed twin left: vote again
+            self.assertEqual(list(con.execute("SELECT chat, msg_id FROM own")), [("B58", 2)])
+            self.assertEqual(list(con.execute("SELECT * FROM channels")), [])
+            con.close()
+            con = sqlite3.connect(polls / "grade5" / "polls.db")
+            self.assertEqual(sorted(con.execute("SELECT chat, msg_id FROM polls")), [("old58", 1), ("old58", 2)])
+            self.assertEqual(list(con.execute("SELECT chat, msg_id FROM own")), [("old58", 1)])
+            con.close()
+            ready = [json.loads(x) for x in (polls / "ready" / "questions.jsonl").read_text(encoding="utf-8").splitlines()]
+            self.assertEqual([[s["chat"] for s in r["sightings"]] for r in ready], [["B58"], ["A59"]])
+            self.assertEqual((polls / "tombstones.jsonl").read_text(encoding="utf-8").count("\n"), 1)
+            self.assertTrue((polls / "grade5" / "raw" / "old58" / "messages.jsonl").exists())
+            self.assertFalse((polls / "raw" / "old58").exists())
+            self.assertEqual(json.loads(cfg.read_text(encoding="utf-8"))["poll_channels"], {"2": ["B58"]})
+
+    def test_refuses_while_the_job_runs(self):
+        import time
+        with tempfile.TemporaryDirectory() as d:
+            apply, polls, bank, cfg = self.make(d)
+            con = sqlite3.connect(polls / "polls.db")
+            con.execute("INSERT INTO state VALUES('beat', ?)", (str(time.time()),))
+            con.commit()
+            con.close()
+            self.assertEqual(apply.apply(True, polls, bank, REG, cfg, out=lambda *_: None), 2)
+            self.assertFalse((polls / "grade5").exists())
+
+
+class EngineRegistry(unittest.TestCase):
+    def test_channels_follow_the_registry(self):
+        import sys
+        sys.path.insert(0, str(registry.POLLS))
+        import engine
+        chans, seed = engine.load_channels()
+        self.assertEqual(list(chans), ["Batch58ATM", "ZAG_59_Polls"])
+        self.assertNotIn("zagpolls58", chans)
+        self.assertEqual(seed, {"Batch58ATM", "ZAG_59_Polls"})
+        with tempfile.TemporaryDirectory() as d:
+            t = Path(d) / "t.jsonl"
+            t.write_text('{"chat": "B", "msg_id": 3}\n', encoding="utf-8")
+            self.assertEqual(engine.tombstones(t), {("B", 3)})
+            self.assertEqual(engine.tombstones(Path(d) / "none.jsonl"), set())
+
+
 if __name__ == "__main__":
     unittest.main()

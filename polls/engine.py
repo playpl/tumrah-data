@@ -23,7 +23,27 @@ HOME = Path(__file__).resolve().parent
 DB, RAW, READY, STOP = HOME / "polls.db", HOME / "raw", HOME / "ready", HOME / "stop.flag"
 OLD = Path(r"C:\Users\Ahmed\Desktop\tumrah for med\telegram_raw_export_2026-10-12")
 TELEGRAM = Path(r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram")
-CHANNELS = {"Batch58ATM": 4447068793, "ZAG_59_Polls": 4358079396, "zagpolls58": 2502119955}  # voting order
+REGISTRY, TOMBSTONES = HOME / "channels.json", HOME / "tombstones.jsonl"
+
+
+def load_channels(path=REGISTRY):
+    """({chat: channel id} of the harvested channels in voting order, chats whose old vote-job keys are seeded).
+    polls/channels.json is the registry (owner, 2026-11-16/17): `harvest` false = not scraped or voted (zagpolls58
+    went to the grade 5 store), `vote` = voting order (Batch58ATM first), `seed_old` = seed_old_keys reads it."""
+    reg = json.loads(path.read_text(encoding="utf-8"))
+    live = sorted((c for c in reg if c.get("harvest")), key=lambda c: c.get("vote", 99))
+    return {c["chat"]: c["chat_id"] for c in live}, {c["chat"] for c in live if c.get("seed_old")}
+
+
+def tombstones(path=TOMBSTONES):
+    """{(chat, msg_id)} deleted for good (change A, owner 2026-11-17): a scrape never lists them again."""
+    if not path.exists():
+        return set()
+    with open(path, encoding="utf-8") as f:
+        return {(r["chat"], r["msg_id"]) for r in map(json.loads, filter(str.strip, f))}
+
+
+CHANNELS, SEED_OLD = load_channels()  # voting order
 SCANNER = "scraper"  # it voted the most in past rounds, so its scrape reads the most keys for free
 BATCH, MAX_INTERVAL, MAX_NO_FLAG = 20, 60.0, 100
 
@@ -145,6 +165,8 @@ def mark_dupes(c):
 def seed_old_keys(c):
     """Keys the old vote jobs already paid for. Those jobs always clicked option 0; that vote is taken out too."""
     for chat in CHANNELS:
+        if chat not in SEED_OLD:
+            continue
         f = OLD / chat / "keys_revealed.jsonl"
         if not f.exists():
             continue
@@ -242,6 +264,8 @@ class Halt(Exception):
 
 async def scrape(client, c, entities, format_raw_message):
     """Append each channel's new messages to raw/<chat>/messages.jsonl and list its quiz polls. Resumes by message id."""
+    dead = tombstones()
+
     async def one(chat):
         ent = entities[chat]
         c.execute("INSERT OR IGNORE INTO channels(chat) VALUES(?)", (chat,))
@@ -258,7 +282,7 @@ async def scrape(client, c, entities, format_raw_message):
                 record = format_raw_message(msg, ent.id)
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
                 p = record.get("poll")
-                if p and p["quiz"]:
+                if p and p["quiz"] and (chat, msg.id) not in dead:
                     got = read_results(msg.media.poll, msg.media.results)
                     c.execute("INSERT OR IGNORE INTO polls(chat, msg_id, word_key) VALUES(?,?,?)",
                               (chat, msg.id, word_key(p["question"], p["options"])))

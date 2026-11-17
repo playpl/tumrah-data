@@ -1,9 +1,9 @@
 [
  {"chat": "ZAG_59_Polls", "chat_id": 4358079396, "university": "ZU", "batch": 59, "year": 1,
-  "role": "backbone", "grade": 4, "harvest": true, "seed_old": true,
+  "role": "backbone", "grade": 4, "harvest": true, "seed_old": true, "vote": 2,
   "windows": [{"module": "year1-musculoskeletal", "from": "2026-11-04"}]},
  {"chat": "Batch58ATM", "chat_id": 4447068793, "university": "ZU", "batch": 58, "year": 2,
-  "role": "backbone", "grade": 4, "harvest": true, "seed_old": true,
+  "role": "backbone", "grade": 4, "harvest": true, "seed_old": true, "vote": 1,
   "drop_modules": ["year2-endocrine-and-reproductive", "year2-other"],
   "windows": [{"module": "year2-cns", "from": "2026-11-04"}]},
  {"chat": "zagpolls58", "chat_id": 2502119955, "university": "ZU", "batch": 58, "year": 1,

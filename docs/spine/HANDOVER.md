@@ -288,7 +288,7 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
 
 ## Owner answers and findings of 2026-11-17 (late; session moved, nothing built after this)
 
-- POLLS: the owner said GO for changes A and B as counted. Not built yet. Design read from the code:
+- POLLS: the owner said GO for changes A and B as counted. DONE 2026-11-17 night (see Left to do, item 0). Design read from the code:
   `bank/questions.jsonl` is rebuilt by `merge.build` from `polls/ready/questions.jsonl` (+ quizbot, forms, MCQ
   books); `ready/` is rebuilt by `engine.build_ready` from `polls.db` rows + `raw/`; scrape resumes by
   `channels.last_id`. So `spine/polls/apply.py` (`--dry` default) must, in one run: (1) write
@@ -327,7 +327,18 @@ edit/delete sync, segmentation, the year 1 handout graph, and the shadow-to-prim
 0. (session of 2026-11-17 night) Step 1 DONE: site ids in `trees.json`; Khaled's 12 lectures (cns-151 to cns-162,
    12 chapters, one per list item) added to `mother_lists.json` from the agent's map; `py -m spine parity mother`
    = 10 of 10 exact; `mother_check.py` prints only the known Wagih post 1848 line. Cocci (ZAG59_physio/58) and
-   ZAG59_bio/34 stay null (owner decides). Next: polls apply, Update data + site import, plan gaps.
+   ZAG59_bio/34 stay null (owner decides).
+   Step 2 DONE: polls changes A and B applied by `py -m spine polls apply --go` (`spine/polls/apply.py`; dry run
+   without `--go`). Exactly as counted: polls.db A deleted 30,264 rows + 28,287 own votes; B moved 48,582 rows +
+   49,775 own votes to `polls/grade5/polls.db`; bank 102,565 -> 35,942 (keep 34,905, trim 1,037 = 1,393 sightings
+   dropped; delete 26,669; grade 5 39,954 in `polls/grade5/questions.jsonl` with their label); ready 95,866 ->
+   28,980 (263 more than the bank count leave ready because ready holds polls only: they keep their quiz/form/book
+   source in the bank); `raw/zagpolls58` moved to `polls/grade5/raw/`; `polls/tombstones.jsonl` (30,264 A ids,
+   `engine.scrape` skips them); 120 kept dupes whose keyed twin left went back to `need` (the next polls job
+   votes them). `engine.CHANNELS` / `SEED_OLD` now come from `polls/channels.json` (`harvest`, `vote` order,
+   `seed_old`); `config.json` `poll_channels` lost zagpolls58. Inventory after: `docs/spine/POLLS_INVENTORY_AFTER.md`
+   (0 rows left to change). No backup of the A rows (owner). `polls/grade5/` and the tombstones are not tracked.
+   Next: Update data + site import, then plan gaps.
 
 1. Year 1 records: built and merged into Update data and site import. Each `py update_data.py` moves one batch;
    about 16 more runs for the 6.2 GB. YouTube posts with no captions (37): `py -m spine records download
