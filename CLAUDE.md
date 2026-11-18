@@ -58,9 +58,6 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
   A doctor's wrong link (e.g. Azouny's Medulla Part 3 linked to 1708, really post 1709) is fixed by hand in
   `sources/lists/link_fixes.json` (find the right post by its caption); Update data prints "BROKEN LINK" for a post an
   item links twice. A sync that was stopped mid-download is finished by the next sync (`auto_doctors.finish_interrupted`).
-- List PDFs (owner, 2026-11-14, evening; replaces the morning rule): ONLY THE OWNER ADDS PDFs. Update data reports "PDF post N
-  ... not in the folder"; that is information only. Never download, open, compare, file or use a list PDF. Books are only what
-  the owner put in the doctors' folders.
 - Auto doctors: `auto_doctors.py` (`plan`, `sync`, `download <lecture>`). Telegram lists: `tg_lists.py`. A doctor with no
   site doctor id (Cocci) is reported, never guessed. Aliases live in `doctors_folder.ALIASES`.
 - Backup rule: "use backup for lecture X, doctor Y till new is provided" = `py backup.py use "<lecture>" --doctor <y>`. It takes

@@ -52,7 +52,7 @@ Two sessions started from the records session were still working when this was w
 
 - Owner rules in `CLAUDE.md` and the memory index. The most used: never ask before fixing/importing (report
   after); read every changed Telegram list yourself; `mother_lists.json` by hand + `py mother_check.py` exact;
-  only the owner adds PDFs; keys only from Telegram's correct flag; no biochemistry; Year 1 = all old data;
+  keys only from Telegram's correct flag; no biochemistry; Year 1 = all old data;
   Year 2 "Old data" lists = fallback only; never click the owner's Today-screen answers; compress before upload.
 - Fleet RETIRED (`config.json` `fleet.down: true`). Code still wired to it must move to Gemini web before it runs:
   `dm.py run`, `runners.py`, `gemini_run.py` model names, `py -m spine p1 run`, `py -m spine mother flow`
