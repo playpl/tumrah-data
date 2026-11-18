@@ -54,6 +54,13 @@ commit, push to origin main, then start the "Records" workflow in the browser pa
   `auto_doctors` with `big_mb=0` never downloads, also when a post's size is unknown). Tests:
   `tests/test_cloud_year2.py`.
 
+- Measured: run #3 (cryptg, 4 blocks over one connection, WARP on) 1.5-1.7 MB/s; with WARP on the live step log
+  showed NO line (progress only in the bucket's records log), so WARP is now off by default. Run #4 opened 16 x 8
+  connections (no lock; cancelled). Run #5 (`spine/records/fast.py`, 8 connections, lock fixed): 4.9-5.3 MB/s
+  (y1-anat-113, 259 MB in about 50 s). Telegram closes idle connections many times a minute; Telethon reopens
+  them; `cloud/records.py` counts those warnings (`CLOSED`) instead of printing each.
+- Year 2: all 14 lectures of the first to-do list (cns-164..177) uploaded by the runner (runs #3/#4).
+
 ## To do (in this order)
 
 1. **Speed on the runner** (`.github/workflows/records.yml`, `cloud/requirements.txt`):
