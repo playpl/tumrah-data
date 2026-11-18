@@ -158,6 +158,104 @@ class Parallel(unittest.TestCase):
         self.assertEqual(part.read_bytes(), data[:part.stat().st_size])
 
 
+class _FakePool:
+    """fast.Pool's `get` over bytes; pieces come back out of order; `cdn_at` raises CdnRedirect from that offset."""
+
+    def __init__(self, data, n=3, cdn_at=None):
+        self.data, self.n, self.cdn_at, self.asked = data, n, cdn_at, []
+
+    async def get(self, dc_id, location, offset, limit):
+        from spine.records import fast
+        self.asked.append(offset)
+        await asyncio.sleep(0.001 * ((offset // limit) % 3))
+        if self.cdn_at is not None and offset >= self.cdn_at:
+            raise fast.CdnRedirect()
+        return self.data[offset:offset + limit]
+
+
+def _doc(size):
+    from telethon.tl import types
+    return types.MessageMediaDocument(document=types.Document(
+        id=1, access_hash=2, file_reference=b"r", date=None, mime_type="audio/mpeg", size=size, dc_id=4, attributes=[]))
+
+
+class Connections(unittest.TestCase):
+    def test_pieces_in_order_from_the_resume_offset(self):
+        from spine.records import fast
+        data = bytes(range(256)) * 40
+        pool = _FakePool(data)
+
+        async def go(off):
+            return b"".join([p async for p in fast.stream(pool, _doc(len(data)), off, len(data), 512)])
+        self.assertEqual(asyncio.run(go(0)), data)
+        self.assertEqual(asyncio.run(go(1024)), data[1024:])
+
+    def test_cdn_file_goes_on_over_the_client(self):
+        from spine.records import fast
+        data = b"q" * 5000 + b"w" * 5000
+        pool = _FakePool(data, cdn_at=4096)
+        asked = []
+
+        async def fallback(off):
+            asked.append(off)
+            for o in range(off, len(data), 512):
+                yield data[o:o + 512]
+
+        async def go():
+            return b"".join([p async for p in fast.stream(pool, _doc(len(data)), 0, len(data), 512, fallback=fallback)])
+        self.assertEqual(asyncio.run(go()), data)
+        self.assertEqual(asked, [4096])
+
+    def test_fetch_into_stops_mid_way_and_resumes(self):
+        from spine.records import fast
+        data = b"abcdefgh" * 4000
+        part = Path(tempfile.mkdtemp()) / "f.partial"
+        with mock.patch.object(machine, "CHUNK", 1024):
+            stream = lambda off: fast.stream(_FakePool(data), _doc(len(data)), off, len(data), 1024)  # noqa: E731
+            self.assertFalse(asyncio.run(machine.fetch_into(part, len(data), stream, machine.Budget(0.01))))
+            self.assertTrue(asyncio.run(machine.fetch_into(part, len(data), stream, machine.Budget(None))))
+        self.assertEqual(part.read_bytes(), data)
+
+    def test_runner_downloads_over_the_pool(self):
+        from cloud import tg as cloud_tg
+        from spine.records import fast
+        data = b"m" * 3000
+
+        class Msg:
+            media, file = _doc(3000), type("F", (), {"name": "a.mp3", "ext": ".mp3", "size": 3000})()
+
+        class Client:
+            async def get_entity(self, ch):
+                return ch
+
+            async def get_messages(self, ent, ids):
+                return Msg()
+
+            async def disconnect(self):
+                pass
+
+        async def connect():
+            return Client()
+
+        made = []
+
+        class Pool(_FakePool):
+            def __init__(self, client, n, say):
+                super().__init__(data, n)
+                made.append(n)
+
+            async def close(self):
+                made.append("closed")
+
+        tmp = Path(tempfile.mkdtemp())
+        rec = {"id": "cns-200", "module": M, "channel": "RecordsBatch58ATM", "post": 1900, "source": "telegram"}
+        with mock.patch.object(cloud_tg, "on_runner", lambda: True), mock.patch.object(cloud_tg, "connect", connect),                 mock.patch.object(fast, "Pool", Pool), mock.patch.object(machine, "SOURCES", tmp / "records"),                 mock.patch.object(machine, "ROOT", tmp), mock.patch.object(machine, "CHUNK", 1024),                 mock.patch.object(machine, "graph_dir", lambda m: tmp / "modules" / m / "graph"):
+            got = asyncio.run(machine._download_telegram([rec], machine.Budget(None), lambda s: None, connections=5))
+        self.assertEqual(got, ["cns-200"])
+        self.assertEqual(made, [5, "closed"])
+        self.assertEqual((tmp / "records" / "RecordsBatch58ATM" / "1900" / "a.mp3").read_bytes(), data)
+
+
 class UpdateDataNoTransfers(unittest.TestCase):
     def test_no_download_when_pc_transfers_is_false(self):
         import auto_doctors

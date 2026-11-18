@@ -321,11 +321,13 @@ def unlock():
     LOCK.unlink(missing_ok=True)
 
 
-async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, parallel=1):
+async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, parallel=1, connections=0, finishers=1):
     """Downloads `recs` in order until `budget` is spent. `on_done(rec)` (sync, run in a thread) is called after each
     whole file, in a worker thread beside the next download (compress and upload never hold the link idle); a run
     that is stopped (timeout, dropped link) still waits for the records already downloaded, so it keeps everything it
-    finished. `parallel` blocks of one file are fetched at once (1: one request after another)."""
+    finished. `connections` > 0: each file over that many connections at once (fast.py; Telegram limits one
+    connection's speed); else `parallel` blocks over the client's one connection (1: one request after another).
+    `finishers` records are compressed and uploaded at once."""
     from cloud import tg as cloud_tg
     runner = cloud_tg.on_runner()
     if runner:                                       # the GitHub runner: its own session (cloud/tg.py)
@@ -336,7 +338,11 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, p
         client = await connect(account)
     done, pending = [], []
     ents = {}
-    pool = ThreadPoolExecutor(1)                     # one record is compressed and uploaded at a time, in download order
+    pool = ThreadPoolExecutor(max(1, finishers))      # compress + upload beside the downloads
+    conns, conns_ok = None, False
+    if connections > 0:
+        from spine.records import fast
+        conns = fast.Pool(client, connections, say)
     loop = asyncio.get_running_loop()
 
     async def finish(rec):
@@ -368,6 +374,9 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, p
                 t0 = time.time()
 
                 def stream(off, m=m):
+                    if conns:
+                        return fast.stream(conns, m.media, off, total, CHUNK, fallback=lambda o: client.iter_download(
+                            m.media, offset=o, request_size=CHUNK, file_size=total))
                     if parallel > 1:
                         return parallel_stream(client, m.media, off, total, parallel)
                     return client.iter_download(m.media, offset=off, request_size=CHUNK, file_size=total)
@@ -380,7 +389,13 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, p
                     whole = await fetch_into(part, total, stream, budget, stall=STALL_S, beat=beat)
                 except Exception as e:     # an expired file reference, a dropped link: the next run resumes
                     say(f"  {rec['id']}: stopped at {part_mb(part)} of {total / 1e6:.0f} MB ({type(e).__name__}: {str(e)[:80]})")
+                    if conns and not conns_ok:   # the connections never worked: the rest of the run on one
+                        say("  several connections failed before any whole file: back to the client's one connection")
+                        await conns.close()
+                        conns = None
                     continue
+                if conns:
+                    conns_ok = True
                 got = (part.stat().st_size - before) / 1e6
                 rate = got / max(time.time() - t0, 1)
                 if not whole:
@@ -394,6 +409,8 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, p
             if on_done:
                 pending.append(asyncio.ensure_future(finish(rec)))
     finally:
+        if conns:
+            await conns.close()
         await client.disconnect()
         if pending:
             say(f"  waiting for {sum(not t.done() for t in pending)} record(s) still being compressed or uploaded")

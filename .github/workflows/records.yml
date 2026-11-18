@@ -14,8 +14,11 @@ on:
       warp:
         description: "Route through Cloudflare WARP (true/false)"
         default: "true"
+      connections:
+        description: "Telegram connections per file (0 = one connection, blocks as in 'parallel')"
+        default: "8"
       parallel:
-        description: "Blocks of one file fetched at once (1 = one request after another)"
+        description: "With connections 0: blocks of one file fetched at once"
         default: "4"
 
 concurrency:
@@ -42,6 +45,7 @@ jobs:
       TG_SESSION: ${{ secrets.TG_SESSION }}
       MAX_MB: ${{ github.event.inputs.max_mb || '3000' }}
       PARALLEL: ${{ github.event.inputs.parallel || '4' }}
+      CONNECTIONS: ${{ github.event.inputs.connections || '8' }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -69,6 +73,6 @@ jobs:
           curl -s https://www.cloudflare.com/cdn-cgi/trace | grep warp=
       - name: Year 2
         continue-on-error: true
-        run: python -u -m cloud.records --year 2 --max-mb "$MAX_MB" --max-minutes 30 --parallel "$PARALLEL"
+        run: python -u -m cloud.records --year 2 --max-mb "$MAX_MB" --max-minutes 30 --parallel "$PARALLEL" --connections "$CONNECTIONS"
       - name: Year 1
-        run: python -u -m cloud.records --year 1 --max-mb "$MAX_MB" --max-minutes 90 --parallel "$PARALLEL"
+        run: python -u -m cloud.records --year 1 --max-mb "$MAX_MB" --max-minutes 90 --parallel "$PARALLEL" --connections "$CONNECTIONS"

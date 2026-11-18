@@ -8,8 +8,9 @@ transfers on the PC). Each year has its own records log (cloud/state.py).
 
 1. pull the inputs (list messages, mother maps; year 2: the to-do list) and the records log from the bucket;
 2. download the next Telegram records (first lessons of every subject first) up to --max-mb or --max-minutes,
-   --parallel blocks of a file at once (one request after another is bound by the round trip, about 1.2 MB/s);
-3. after each download, in a worker thread beside the next download: compress it, upload it (only the compressed
+   each file over --connections Telegram connections at once (spine/records/fast.py: one connection stayed at
+   1.2-1.7 MB/s however many requests it carried);
+3. after each download, in --finishers worker threads beside the next download: compress it, upload it (only the compressed
    file, never the original), make its hear copy and push the records log, so a run that is stopped keeps every
    record it finished;
 4. push the records log back at the end too (merged; the PC's rows are kept).
@@ -110,6 +111,9 @@ def main(argv=None):
     a.add_argument("--year", type=int, choices=(1, 2), default=1)
     a.add_argument("--max-mb", type=float, default=3000)
     a.add_argument("--parallel", type=int, default=4, help="blocks of one file fetched at once (1: one after another)")
+    a.add_argument("--connections", type=int, default=8,
+                   help="Telegram connections per file (0: the client's one connection with --parallel blocks)")
+    a.add_argument("--finishers", type=int, default=3, help="records compressed and uploaded at once")
     a.add_argument("--max-minutes", type=float, default=120,
                    help="stop starting downloads after this many minutes (the job's timeout is 150)")
     a.add_argument("--no-inputs", action="store_true", help="use the inputs already on disk")
@@ -128,7 +132,9 @@ def main(argv=None):
     st = machine.states(module)
     tg = todo(recs, st)
     print(f"to fetch: {len(tg)} Telegram records, {sum(r['size'] or 0 for r in tg) / 1e6:.0f} MB; this run: "
-          f"{args.max_mb:.0f} MB, {args.max_minutes:.0f} min, {args.parallel} blocks at once")
+          f"{args.max_mb:.0f} MB, {args.max_minutes:.0f} min, "
+          + (f"{args.connections} connections" if args.connections > 0 else f"{args.parallel} blocks at once")
+          + f", {args.finishers} finishers")
     got = []
     try:
         if tg:
@@ -138,7 +144,8 @@ def main(argv=None):
                 budget = machine.Budget(args.max_mb, args.max_minutes * 60)
                 got = asyncio.run(machine._download_telegram(machine.priority(tg), budget, print,
                                                              on_done=functools.partial(finish, say=print),
-                                                             parallel=args.parallel))
+                                                             parallel=args.parallel, connections=args.connections,
+                                                             finishers=args.finishers))
             finally:
                 machine.unlock()
         print(f"downloaded this run: {len(got)}")
