@@ -1,0 +1,291 @@
+{
+ "source": "the ZNU handout's own index (pdf page 3), printed page + 3 = pdf page; start = the title line on its first page (built 2026-11-18)",
+ "lectures": [
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L01",
+   "title": "Pectoral region",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    6,
+    10
+   ],
+   "start": "Pectoral Region"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L02",
+   "title": "Axilla",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    10,
+    15
+   ],
+   "start": "Axilla"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L03",
+   "title": "Shoulder region",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    15,
+    21
+   ],
+   "start": "Shoulder region"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L04",
+   "title": "Muscles of the back",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    21,
+    24
+   ],
+   "start": "The muscles of the back"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L05",
+   "title": "The arm",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    24,
+    30
+   ],
+   "start": "The Arm"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L06",
+   "title": "The forearm",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    30,
+    38
+   ],
+   "start": "The Forearm"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L07",
+   "title": "The hand",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    38,
+    45
+   ],
+   "start": "The Hand"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L08",
+   "title": "Blood vessels of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    45,
+    54
+   ],
+   "start": "Blood vessels of the upper limb"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L09",
+   "title": "Nerves of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    54,
+    64
+   ],
+   "start": "Nerves of the upper limb"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L10",
+   "title": "Joints of the upper limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the upper limb",
+   "pdf_pages": [
+    64,
+    69
+   ],
+   "start": "Joints of Upper limb"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L11",
+   "title": "Anatomy of lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    69,
+    71
+   ],
+   "start": "Anatomy of Lower Limbs"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L12",
+   "title": "The thigh",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    71,
+    93
+   ],
+   "start": "Muscles of the front of thigh"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L13",
+   "title": "The leg",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    93,
+    109
+   ],
+   "start": "The leg"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L14",
+   "title": "The foot",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    109,
+    114
+   ],
+   "start": "Muscles on the dorsum of the foot (fig. 16)"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L15",
+   "title": "Nerves of lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    114,
+    123
+   ],
+   "start": "Nerves of lower limb"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L16",
+   "title": "Joints of lower limb",
+   "subject": "Anatomy",
+   "chapter": "Anatomy of the lower limb",
+   "pdf_pages": [
+    123,
+    133
+   ],
+   "start": "Hip joint"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L17",
+   "title": "Histology of Cartilage",
+   "subject": "Histology",
+   "chapter": "Histology",
+   "pdf_pages": [
+    133,
+    141
+   ],
+   "start": "Histology of the Cartilage"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L18",
+   "title": "Histology of Bone",
+   "subject": "Histology",
+   "chapter": "Histology",
+   "pdf_pages": [
+    141,
+    156
+   ],
+   "start": "Histology of Bone"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L19",
+   "title": "Muscular Tissue",
+   "subject": "Histology",
+   "chapter": "Histology",
+   "pdf_pages": [
+    156,
+    164
+   ],
+   "start": "Muscular Tissue"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L20",
+   "title": "Histology of Skin",
+   "subject": "Histology",
+   "chapter": "Histology",
+   "pdf_pages": [
+    164,
+    181
+   ],
+   "start": "HISTOLOGY OF SKIN"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L21",
+   "title": "Physiology of skin",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    181,
+    184
+   ],
+   "start": "Physiology of Skin"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L22",
+   "title": "Ca++Homeostasis",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    184,
+    187
+   ],
+   "start": "Ca++Homeostasis"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L23",
+   "title": "Nerve physiology",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    187,
+    204
+   ],
+   "start": "Neuron"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L24",
+   "title": "Chemical Transmission",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    204,
+    210
+   ],
+   "start": "Chemical Transmission"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L25",
+   "title": "Neuromuscular Transmission",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    210,
+    213
+   ],
+   "start": "Neuromuscular Transmission"
+  },
+  {
+   "lecture_id": "nu-year1-musculoskeletal:L26",
+   "title": "Muscle physiology",
+   "subject": "Physiology",
+   "chapter": "Physiology",
+   "pdf_pages": [
+    213,
+    232
+   ],
+   "start": "Muscle physiology"
+  }
+ ]
+}

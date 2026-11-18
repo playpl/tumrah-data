@@ -1,0 +1,258 @@
+{
+ "university": "ZU",
+ "year": null,
+ "module": "nu-year1-musculoskeletal",
+ "handout": {
+  "sha8": "c1b1f614",
+  "pages": 233
+ },
+ "subjects": [
+  {
+   "id": "anatomy",
+   "chapters": [
+    {
+     "id": "anatomy/c0",
+     "n": 0,
+     "title": "(no chapter)",
+     "handout_chapter": null,
+     "lessons": [
+      {
+       "id": "nu-year1-musculoskeletal:L01",
+       "title": "Pectoral region",
+       "pdf_pages": [
+        6,
+        10
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L02",
+       "title": "Axilla",
+       "pdf_pages": [
+        10,
+        15
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L03",
+       "title": "Shoulder region",
+       "pdf_pages": [
+        15,
+        21
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L04",
+       "title": "Muscles of the back",
+       "pdf_pages": [
+        21,
+        24
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L05",
+       "title": "The arm",
+       "pdf_pages": [
+        24,
+        30
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L06",
+       "title": "The forearm",
+       "pdf_pages": [
+        30,
+        38
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L07",
+       "title": "The hand",
+       "pdf_pages": [
+        38,
+        45
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L08",
+       "title": "Blood vessels of the upper limb",
+       "pdf_pages": [
+        45,
+        54
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L09",
+       "title": "Nerves of the upper limb",
+       "pdf_pages": [
+        54,
+        64
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L10",
+       "title": "Joints of the upper limb",
+       "pdf_pages": [
+        64,
+        69
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L11",
+       "title": "Anatomy of lower limb",
+       "pdf_pages": [
+        69,
+        71
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L12",
+       "title": "The thigh",
+       "pdf_pages": [
+        71,
+        93
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L13",
+       "title": "The leg",
+       "pdf_pages": [
+        93,
+        109
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L14",
+       "title": "The foot",
+       "pdf_pages": [
+        109,
+        114
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L15",
+       "title": "Nerves of lower limb",
+       "pdf_pages": [
+        114,
+        123
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L16",
+       "title": "Joints of lower limb",
+       "pdf_pages": [
+        123,
+        133
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "histology",
+   "chapters": [
+    {
+     "id": "histology/c0",
+     "n": 0,
+     "title": "(no chapter)",
+     "handout_chapter": null,
+     "lessons": [
+      {
+       "id": "nu-year1-musculoskeletal:L17",
+       "title": "Histology of Cartilage",
+       "pdf_pages": [
+        133,
+        141
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L18",
+       "title": "Histology of Bone",
+       "pdf_pages": [
+        141,
+        156
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L19",
+       "title": "Muscular Tissue",
+       "pdf_pages": [
+        156,
+        164
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L20",
+       "title": "Histology of Skin",
+       "pdf_pages": [
+        164,
+        181
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "physiology",
+   "chapters": [
+    {
+     "id": "physiology/c0",
+     "n": 0,
+     "title": "(no chapter)",
+     "handout_chapter": null,
+     "lessons": [
+      {
+       "id": "nu-year1-musculoskeletal:L21",
+       "title": "Physiology of skin",
+       "pdf_pages": [
+        181,
+        184
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L22",
+       "title": "Ca++Homeostasis",
+       "pdf_pages": [
+        184,
+        187
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L23",
+       "title": "Nerve physiology",
+       "pdf_pages": [
+        187,
+        204
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L24",
+       "title": "Chemical Transmission",
+       "pdf_pages": [
+        204,
+        210
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L25",
+       "title": "Neuromuscular Transmission",
+       "pdf_pages": [
+        210,
+        213
+       ]
+      },
+      {
+       "id": "nu-year1-musculoskeletal:L26",
+       "title": "Muscle physiology",
+       "pdf_pages": [
+        213,
+        232
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}
