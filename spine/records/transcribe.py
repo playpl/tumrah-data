@@ -1,9 +1,9 @@
-"""Transcripts of the records machine's recordings: 5-minute pieces heard on Flash-Lite (the owner's transcription
-model), outside queue.db so the year 2 flow never sees a year 1 job. Two ways to hear a piece:
+"""Transcripts of the records machine's recordings: 5-minute pieces heard on Gemini 4 Hydrogen (owner 2026-11-18;
+Flash-Lite before), outside queue.db so the year 2 flow never sees a year 1 job. Two ways to hear a piece:
 
-    --via fleet    (default) the Antigravity fleet, one worker per account, model `lite`, the year 2 piece prompt and
-                   check (flows/lecture.py PIECE_PROMPT, PieceFlow.check); job folders pieces/jobs/cNN/
-    --via browser  Gemini web in the owner's four signed-in Chrome profiles (gemini_browser.py, no cookie files): the
+    --via fleet    RETIRED (owner 2026-11-18, config fleet.down): the Antigravity fleet, one worker per account; kept
+                   only for its tests
+    --via browser  (default) Gemini web in the owner's four signed-in Chrome profiles (gemini_browser.py, no cookie files): the
                    piece pasted into the prompt box with `gemini_run.PIECE_PROMPT`, the answer through `piece_text`
                    and the 450 characters a minute floor; a failed piece moves to another account (browser.parallel)
 
@@ -77,7 +77,7 @@ def cut(rec, audio):
     return [d / f"c{i:02d}.ogg" for i in range(n)]
 
 
-def hear(piece, model="flash-lite", tries=3, ask=None, say=print):
+def hear(piece, model="hydrogen", tries=3, ask=None, say=print):
     """Text of one piece, or None after `tries` bad answers. Written next to the piece."""
     import checks
     import gemini_run
@@ -158,7 +158,7 @@ def finish(rec, pieces):
     return True
 
 
-def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, via="fleet", accounts=ACCOUNTS,
+def run(recs, limit=None, workers=4, model="hydrogen", say=print, ask=None, via="browser", accounts=ACCOUNTS,
         runner=None):
     """Hears up to `limit` pieces, record by record; reports each record that is finished. Fleet: one worker per
     account, each takes the next piece; a piece that fails twice waits for the next run."""
@@ -191,10 +191,12 @@ def run(recs, limit=None, workers=4, model="flash-lite", say=print, ask=None, vi
             r, p = job
             if STOP.exists():
                 return
+            if gemini_browser.capped_until(n, model):
+                raise RuntimeError(f"account {n} capped")
 
             def asker(prompt, model, attach, timeout):
                 return gemini_browser.ask_on(pw, n, prompt.read_text(encoding="utf-8"), [attach[0]], timeout, model), {"account": n}
-            if hear(p, tries=1, ask=asker, say=say) is None:
+            if hear(p, model, tries=1, ask=asker, say=say) is None:
                 raise RuntimeError("the answer failed the piece check")
             done(r)
         gemini_browser.driver().parallel(jobs, one, lambda j: f"{j[0]['id']}/{j[1].stem}")

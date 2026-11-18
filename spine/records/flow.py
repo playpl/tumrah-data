@@ -35,7 +35,7 @@ def bg_running():
     return pid if upload_media.alive(pid) else None
 
 
-def start_finish(via="fleet"):
+def start_finish(via="browser"):
     if (pid := bg_running()):
         return f"year 1 compress/upload/transcribe already running (pid {pid})"
     LOG.parent.mkdir(parents=True, exist_ok=True)

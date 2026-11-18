@@ -1,13 +1,15 @@
-"""py -m spine mother render | job | run | show | diff <list id ...>"""
-import subprocess
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+"""py -m spine mother render | job | run | show | diff <list id ...>
 
-from spine import ROOT, read_json
+Readers A and B are two separate Gemini web chats, 4 Hydrogen (owner 2026-11-18: the fleet is retired and Arabic
+work is Gemini's; the lists are Arabic). Each answer is kept in jobs/sp_mother/<list>-<key>-<reader>/result.json.
+"""
+from concurrent.futures import ThreadPoolExecutor
+
+from spine import ROOT, now, read_json, write_json
 from spine.tg import mother
 
-FLEET = Path(r"C:\Users\Ahmed\agy-fleet\fleet.py")
-ACCOUNT = {"A": ["zero", "work"], "B": ["personal", "other"]}       # two readers never share an account
+MODEL = "hydrogen"
+WAIT = 600
 
 
 def job_dir(lst, reader):
@@ -26,20 +28,28 @@ def make_job(lst, reader):
     return d
 
 
-def read_one(arg):
-    """Run one reader on one list (skipped when its answer is already there). Returns (list id, reader, answer or None, why)."""
+def read_one(arg, ask=None):
+    """One reader on one list, on Gemini web (skipped when its answer is already there). Two tries when a reply is
+    empty. Returns (list id, reader, answer or None, why)."""
     n, lst, reader = arg
     d = make_job(lst, reader)
     result = read_json(d / "result.json") or {}
-    for attempt in range(2):
-        if result.get("status") == "SUCCESS":
-            break
-        account = ACCOUNT[reader][(n + attempt) % 2]
-        subprocess.run(["py", str(FLEET), "run", "-a", account, "--cwd", str(d), "-f", "prompt.md",
-                        "--out", "result.json", "--timeout", "10"], capture_output=True, text=True, cwd=d)
-        result = read_json(d / "result.json") or {}
     if result.get("status") != "SUCCESS":
-        return mother.ref(lst), reader, None, f"no answer from the fleet ({result.get('failure') or result.get('status')})"
+        if ask is None:
+            import gemini_browser
+            ask = gemini_browser.ask
+        prompt = (d / "prompt.md").read_text(encoding="utf-8")
+        meta = {}
+        for _ in range(2):
+            text, meta = ask(prompt, model=MODEL, wait=WAIT)
+            if text and text.strip():
+                result = {"status": "SUCCESS", "response": text, "by": "gemini", "model": MODEL, **meta, "at": now()}
+                write_json(d / "result.json", result)
+                break
+            if meta.get("until"):                      # every account at its usage cap: no second try now
+                break
+        if result.get("status") != "SUCCESS":
+            return mother.ref(lst), reader, None, f"no answer from Gemini ({str(meta.get('error'))[:120]})"
     return mother.ref(lst), reader, result.get("response") or "", ""
 
 
@@ -77,7 +87,8 @@ def _job(a):
 
 
 def fleet_down():
-    """config.json "fleet": {"down": true} (owner 2026-11-18: the Antigravity fleet is retired)."""
+    """config.json "fleet": {"down": true} (owner 2026-11-18: the Antigravity fleet is retired). The readers here are
+    Gemini web now, so this no longer stops `mother run`; update_data.py still asks it."""
     return bool(((read_json(ROOT / "config.json", {}) or {}).get("fleet") or {}).get("down"))
 
 
@@ -93,17 +104,14 @@ def _run(a):
     for l in lists:
         if l not in todo:
             print(f"{mother.ref(l)}: unchanged since the cached map, no read")
-    if todo and fleet_down():   # owner 2026-11-18: the fleet is retired; Claude reads changed lists by hand
-        for l in todo:
-            print(f"{mother.ref(l)}: changed, NOT read (fleet retired, config.json fleet.down); read it by hand")
-        return 0
-    with ThreadPoolExecutor(max_workers=12) as pool:
+    with ThreadPoolExecutor(max_workers=4) as pool:            # one chat per Gemini account
         got = list(pool.map(read_one, [(n, l, r) for n, l in enumerate(todo) for r in ("A", "B")]))
     bad = 0
     for lst in todo:
         m, fixed, line = settle(lst, {r: text for i, r, text, why in got if i == mother.ref(lst)})
         if m is not None:
-            mother.save(lst, m, "fleetA+fleetB" + ("+fix" if fixed else ""), [mother.links(lst)[k - 1]["post"] for k in fixed])
+            mother.save(lst, m, "geminiA+geminiB" + ("+fix" if fixed else ""),
+                        [mother.links(lst)[k - 1]["post"] for k in fixed])
             print(f"{mother.ref(lst)}: {line}; map cached")
         else:
             bad += 1
@@ -150,11 +158,11 @@ def register(sub):
     r = p.add_parser("render", help="what a reader is shown")
     r.add_argument("lists", nargs="+")
     r.set_defaults(run=_render)
-    j = p.add_parser("job", help="write a reader's fleet job folder; nothing is run")
+    j = p.add_parser("job", help="write a reader's job folder; nothing is run")
     j.add_argument("lists", nargs="+")
     j.add_argument("-r", "--reader", default="A", choices=("A", "B"))
     j.set_defaults(run=_job)
-    n = p.add_parser("run", help="two fleet readers per changed list; cache the map they agree on")
+    n = p.add_parser("run", help="two Gemini web readers per changed list; cache the map they agree on")
     n.add_argument("lists", nargs="*")
     n.add_argument("--again", action="store_true", help="read even when the message is unchanged")
     n.add_argument("--year", type=int, choices=(1, 2), help="only this year's lists of the mother trees")

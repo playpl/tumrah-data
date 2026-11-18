@@ -70,6 +70,16 @@ def cmd_transcribe(args):
         print(line)
 
 
+def cmd_hear2(args):
+    """Year 2 lectures with no raw.txt, heard on Gemini web (spine/records/lectures_hear.py)."""
+    from spine.records import lectures_hear
+    if args.dry:
+        jobs = lectures_hear.plan(args.lectures or None, get=lambda key, path: False)
+        print(f"{len(jobs)} pieces to hear (dry: nothing fetched or heard)")
+        return
+    print(lectures_hear.run(args.lectures or None, limit=args.limit))
+
+
 def cmd_run(args):
     cmd_download(args)
     cmd_compress(args)
@@ -86,7 +96,7 @@ def register(sub):
                           ("download", cmd_download, "Telegram media (resumable) and YouTube captions"),
                           ("compress", cmd_compress, "AAC mono 48 kbps of every downloaded Telegram record"),
                           ("upload", cmd_upload, "compressed recordings to the site's storage"),
-                          ("transcribe", cmd_transcribe, "5-minute pieces heard by Gemini web (Flash-Lite)"),
+                          ("transcribe", cmd_transcribe, "5-minute pieces heard by Gemini web (4 Hydrogen)"),
                           ("run", cmd_run, "download, compress, upload"),
                           ("finish", cmd_finish, "compress, upload, transcribe (no Telegram)")):
         q = rs.add_parser(name, help=hlp)
@@ -100,9 +110,14 @@ def register(sub):
         if name in ("upload", "run"):
             q.add_argument("--limit", type=int, help="at most N uploads")
         if name == "finish":
-            q.add_argument("--via", choices=("fleet", "browser"), default="fleet")
+            q.add_argument("--via", choices=("fleet", "browser"), default="browser")
         if name == "transcribe":
             q.add_argument("--limit", type=int, help="at most N pieces this run")
             q.add_argument("--workers", type=int, default=4, help="unused by fleet and browser (one worker per account)")
-            q.add_argument("--via", choices=("fleet", "browser"), default="fleet")
+            q.add_argument("--via", choices=("fleet", "browser"), default="browser")
         q.set_defaults(run=fn)
+    q = rs.add_parser("hear2", help="year 2 lectures with no transcript: pieces heard on Gemini web (4 Hydrogen)")
+    q.add_argument("lectures", nargs="*")
+    q.add_argument("--limit", type=int, help="at most N pieces this run")
+    q.add_argument("--dry", action="store_true", help="what would be heard; fetches and hears nothing")
+    q.set_defaults(run=cmd_hear2)

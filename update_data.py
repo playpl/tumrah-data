@@ -213,14 +213,11 @@ def main(argv):
             step(report, "Nagib quizzes", nagib_quizzes_run)
         if tele:
             step(report, "waiting Telegram recordings", lambda: waiting_telegram(q, dry, transfers))
-            # the mother agent (spine/tg/flow.py): changed lists re-read by two fleet readers, new lectures ADDED to
-            # mother_lists.json (never edited or removed), edits/deletions reported, parity mother checked
-            if fleet_down():   # its readers were the fleet (retired 2026-11-18); Claude reads the lists by hand
-                report.append(("mother messages (agent, add only)",
-                               ["skipped: its readers were the fleet (retired); read each changed list yourself"]))
-            else:
-                from spine.tg import flow as mother_flow
-                step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
+            # the mother agent (spine/tg/flow.py): changed lists re-read by two Gemini web readers (4 Hydrogen; the
+            # fleet readers were retired 2026-11-18), new lectures ADDED to mother_lists.json (never edited or
+            # removed), edits/deletions reported, parity mother checked. Claude still reads every changed list.
+            from spine.tg import flow as mother_flow
+            step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
         if not transfers:
             step(report, "year 2 records (GitHub)", lambda: year2_cloud(dry))
         step(report, "site files", site_files)

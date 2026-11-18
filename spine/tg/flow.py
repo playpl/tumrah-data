@@ -2,7 +2,7 @@
 
     py -m spine mother flow [--dry]
 
-1. Two fleet readers re-read only the lists whose message changed (`mother run --year 2`; the cache key is the
+1. Two Gemini web readers (4 Hydrogen) re-read only the lists whose message changed (`mother run --year 2`; the cache key is the
    message's sha, so an unchanged list costs nothing).
 2. The agent's whole file in the hand file's shape: `modules/year2-cns/site/mother_lists.agent.json`.
 3. ADD ONLY: a lecture, mini lecture or revision in the agent's map that the hand file lacks is added under its
@@ -151,5 +151,5 @@ def cli_run(a):
 def add(sub):
     p = sub.add_parser("flow", help="re-read changed lists, add new items to the hand file, report the rest")
     p.add_argument("--dry", action="store_true")
-    p.add_argument("--no-read", action="store_true", help="use the cached maps only (no fleet read)")
+    p.add_argument("--no-read", action="store_true", help="use the cached maps only (no Gemini read)")
     p.set_defaults(run=cli_run)

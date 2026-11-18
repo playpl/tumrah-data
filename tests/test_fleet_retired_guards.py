@@ -1,31 +1,32 @@
-"""Owner 2026-11-18: the Antigravity fleet is retired. `mother run` must not start fleet readers when config.json says
-fleet.down; mother_check reports a list link to a post the channel does not have as a note, not a difference."""
-import argparse
-import io
+"""Owner 2026-11-18: the Antigravity fleet is retired. `mother run` reads changed lists on Gemini web, never the
+fleet; mother_check reports a list link to a post the channel does not have as a note, not a difference."""
 import unittest
-from contextlib import redirect_stdout
 from unittest import mock
 
 import mother_check
 from spine.tg import cli
 
 
-class MotherRunFleetDown(unittest.TestCase):
-    def test_changed_list_is_not_read_when_the_fleet_is_down(self):
-        lst = {"ref": 1631}
-        with mock.patch.object(cli, "wanted", return_value=[1631]), \
-             mock.patch.object(cli.mother, "load", return_value=lst), \
-             mock.patch.object(cli.mother, "links", return_value=[{"post": 1}]), \
-             mock.patch.object(cli.mother, "cache_key", return_value="k"), \
-             mock.patch.object(cli.mother, "cached", return_value=None), \
-             mock.patch.object(cli.mother, "ref", return_value=1631), \
-             mock.patch.object(cli, "fleet_down", return_value=True), \
-             mock.patch.object(cli, "read_one", side_effect=AssertionError("fleet reader started")):
-            buf = io.StringIO()
-            with redirect_stdout(buf):
-                code = cli._run(argparse.Namespace(lists=[], year=2, again=False))
-        self.assertEqual(code, 0)
-        self.assertIn("NOT read (fleet retired", buf.getvalue())
+class MotherReadersAreGemini(unittest.TestCase):
+    def test_a_changed_list_is_read_on_gemini_web_never_the_fleet(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+        tmp = Path(tempfile.mkdtemp())
+        seen = []
+
+        def ask(prompt, model=None, wait=None):
+            seen.append(model)
+            return "1 = lecture", {"account": "acct1"}
+        try:
+            with mock.patch.object(cli, "job_dir", lambda lst, r: tmp / r),                  mock.patch.object(cli.mother, "render", return_value="the list"),                  mock.patch.object(cli.mother, "ref", return_value=1631):
+                got = cli.read_one((0, {"ref": 1631}, "A"), ask=ask)
+            self.assertEqual(got, (1631, "A", "1 = lecture", ""))
+            self.assertEqual(seen, ["hydrogen"])
+            self.assertEqual(cli.read_json(tmp / "A" / "result.json")["by"], "gemini")
+            self.assertFalse(hasattr(cli, "FLEET"))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 class MotherCheckDeadLink(unittest.TestCase):

@@ -1,18 +1,20 @@
 """Phase 1 end to end for one module: votes from every reader, then the links that two readers agree on.
 
     py -m spine p1 code year2-cns              code tiers + the old links as votes (no LLM)
-    py -m spine p1 jobs year2-cns --reader A   fleet job folders for the sentences reader A has not read
-    py -m spine p1 run year2-cns --reader A    run those jobs on the fleet accounts (resumable), collect votes
+    py -m spine p1 jobs year2-cns --reader A   job folders for the sentences reader A has not read
+    py -m spine p1 run year2-cns --reader A    Gemini web (4 Hydrogen) answers those jobs (resumable), collect votes
     py -m spine p1 accept year2-cns            votes -> edges/<book>.jsonl, with the order check
     py -m spine p1 status year2-cns
 
 Readers: `code` (tiers A1 to A4), `old` (the old fleet link sitting inside the sentence), `fleetA`, `fleetB`
-(B reads windows shifted by 5, so its neighbours differ). A link is accepted when code proves it (A1 to A3) or
+(B reads windows shifted by 5, so its neighbours differ). The names stay `fleet<R>` for the votes files; since the fleet
+was retired (owner 2026-11-18) the answers come from Gemini web, 4 Hydrogen (result.json "by": "gemini"). A link is accepted when code proves it (A1 to A3) or
 when two readers name the same handout sentence. Everything lives in modules/<m>/graph/votes and /edges; the
 old scripts, ledger.db and the site are not touched (shadow mode).
 """
 import json
 import subprocess
+import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -81,7 +83,7 @@ def open_sentences(module, book, H):
     return {s["id"] for k in ("split-vote", "one-reader", "one-no", "no-reader") for s in st[k]} |         {s["id"] for s, _ in st["jump"]}            # a jump is checked by the third reader too
 
 
-def make_jobs(module, reader="A"):
+def make_jobs(module, reader="A", per_job=WINDOWS_PER_JOB):
     """Job folders for the windows this reader still has to read. Returns the folders written.
 
     Reader C (third reader) only reads windows that hold a sentence still open after A and B."""
@@ -104,10 +106,10 @@ def make_jobs(module, reader="A"):
                 d.rmdir()
         taken = {int(d.name.split("-")[1]) for d in home.glob(f"{reader}-*")} if home.exists() else set()
         n = max(taken, default=0)
-        for k in range(0, len(wins), WINDOWS_PER_JOB):
+        for k in range(0, len(wins), per_job):
             n += 1
             rendered, keys = [], []
-            for j, w in enumerate(wins[k:k + WINDOWS_PER_JOB], start=1):
+            for j, w in enumerate(wins[k:k + per_job], start=1):
                 text, key = windows.render(items, shown, w, prefilter.candidates(items, shown, w, H), H, f"W{j}")
                 key.update(ids={b: sents[i]["id"] for b, i in key["b"].items()},
                            texts={b: items[i]["text"] for b, i in key["b"].items()})
@@ -149,10 +151,65 @@ def collect(module, book, reader, H):
     return stats
 
 
-def run_jobs(module, reader="A", accounts=None, limit=None, per_account=PER_ACCOUNT):
-    """Run the unanswered job folders, `per_account` at a time on each fleet account, then collect.
+MODEL = "hydrogen"                      # Gemini web (owner 2026-11-18)
+WAIT = 900
 
-    Safe to run again: answered folders are skipped. One runner at a time (two would run a job twice)."""
+
+def ask_gemini(d, ask=None):
+    """One job folder answered on Gemini web: result.json {"status": "SUCCESS", "response", "by": "gemini"}.
+    "answered", "capped" (every account at its usage cap; meta "until" kept in CAPPED) or "failed"."""
+    if ask is None:
+        import gemini_browser
+        ask = gemini_browser.ask
+    text, meta = ask((d / "prompt.md").read_text(encoding="utf-8"), model=MODEL, wait=WAIT)
+    if text is None and meta.get("until"):
+        CAPPED["until"] = max(CAPPED["until"], float(meta["until"]))
+        return "capped"
+    if not text or not any(windows.LINE.match(x.strip()) for x in text.splitlines()):
+        write_json(d / "reply_failed.json", {"text": text, **meta, "at": now()})
+        return "failed"
+    write_json(d / "result.json", {"status": "SUCCESS", "response": text, "by": "gemini", "model": MODEL, **meta,
+                                   "at": now()})
+    return "answered"
+
+
+CAPPED = {"until": 0.0}
+
+
+def run_gemini(module, reader="A", limit=None, workers=4, wait_caps=True, ask=None, sleep=time.sleep, say=print):
+    """Gemini web answers the unanswered job folders, `workers` chats at a time (one per account), then collect.
+    With `wait_caps`, a job that finds every account capped waits for the first renewal."""
+    H = prefilter.Handout(module)
+    todo = [d for book in canonical_books(module)[0] for d in sorted(jobs_home(book).glob(f"{reader}-*"))
+            if not (d / "done").exists() and (read_json(d / "result.json") or {}).get("status") != "SUCCESS"]
+    todo = todo[:limit] if limit is not None else todo
+    stats = Counter()
+
+    def work(d):
+        while True:
+            v = ask_gemini(d, ask)
+            if v != "capped" or not wait_caps:
+                break
+            secs = max(60, CAPPED["until"] - time.time() + 60)
+            say(f"  {d.parent.name}/{d.name}: every account capped; waiting {secs / 60:.0f} min")
+            sleep(secs)
+        say(f"  {d.parent.name}/{d.name}: {v}")
+        return v
+
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, 4))) as pool:
+        for verdict in pool.map(work, todo):
+            stats[verdict] += 1
+    for book in canonical_books(module)[0]:
+        stats.update(collect(module, book, reader, H))
+    return stats
+
+
+def run_jobs(module, reader="A", accounts=None, limit=None, per_account=PER_ACCOUNT):
+    """RETIRED (fleet down 2026-11-18; `run_gemini` replaces it). Run the unanswered job folders, `per_account` at
+    a time on each fleet account, then collect. Refuses while config fleet.down is true."""
+    from spine import config
+    if (config().get("fleet") or {}).get("down"):
+        raise SystemExit("the fleet is retired (config fleet.down): py -m spine p1 run uses Gemini web")
     H = prefilter.Handout(module)
     todo = [d for book in canonical_books(module)[0] for d in sorted(jobs_home(book).glob(f"{reader}-*"))
             if not (d / "done").exists() and (read_json(d / "result.json") or {}).get("status") != "SUCCESS"]
