@@ -37,6 +37,23 @@ commit, push to origin main, then start the "Records" workflow in the browser pa
 - Polls job: not restarted. polls.db integrity ok, 120 polls still need votes. Copy `polls/engine.log` before Start
   (Start opens it with "w"). Polls use Telegram: never at the same time as an Update data Telegram step.
 
+## Done (second session, 2026-11-18)
+
+- Baseline speed (run `44202314916`, old code, no WARP, no cryptg, one 512 KB request after another): a flat
+  1180-1240 KB/s on every file (y1-anat-66 210 MB at 1200 KB/s, y1-anat-75 515 MB at 1241 KB/s), plus about 30 s
+  per record with the link idle (compress, upload, hear copy ran before the next download started).
+- Speed-up: `cryptg==0.5.0.post0` (the only release with a Linux wheel for Python 3.13; 0.6.x needs Rust),
+  pieces of 1 MB (`machine.CHUNK`), `machine.parallel_stream` (4 blocks of 4 MB in flight, `--parallel`, input
+  `parallel`), compress/upload/hear copy in a worker thread beside the next download (a stopped run still waits for
+  them), the original deleted on the runner once uploaded, pip cache, WARP step (input `warp`, default true,
+  `continue-on-error`). `spine.LOG_LOCK` guards the records log (rows appended by the download loop while the worker
+  pushes it).
+- Year 2 flow: `cloud/year2.py` (`todo`, `records`, `pull`), `cloud/records.py --year 2`, workflow "Records"
+  (Year 2 30 min, then Year 1 90 min), `upload_media.waiting` skips `cloud` rows, `update_data.py` with
+  `config.json` `"pc_transfers": false` and `"spine": {"records_cloud": true}` (step "year 2 records (GitHub)";
+  `auto_doctors` with `big_mb=0` never downloads, also when a post's size is unknown). Tests:
+  `tests/test_cloud_year2.py`.
+
 ## To do (in this order)
 
 1. **Speed on the runner** (`.github/workflows/records.yml`, `cloud/requirements.txt`):

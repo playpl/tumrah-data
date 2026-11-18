@@ -86,11 +86,17 @@ def size_of(path):
         return None
 
 
+def waiting(rows):
+    """Rows whose recording is not uploaded yet (or whose file changed since). A `cloud` row was uploaded by the GitHub
+    runner (cloud/year2.py): it has no file on this PC and is never sent from here."""
+    return [r for r in rows if r["lecture"] not in site_lessons.MEDIA and not r.get("cloud")
+            and (r.get("uploaded_size") is None or r["uploaded_size"] != size_of(r["file"]))]
+
+
 def pending(module="year2-cns"):
-    """Rows whose recording is not uploaded yet (or whose file changed since): [(lecture, why)]."""
+    """Rows whose recording is not uploaded yet (or whose file changed since)."""
     mf = ROOT / "modules" / module / "site" / "media.json"
-    rows = json.loads(mf.read_text(encoding="utf-8")) if mf.exists() else []
-    return [r for r in rows if r["lecture"] not in site_lessons.MEDIA and (r.get("uploaded_size") is None or r["uploaded_size"] != size_of(r["file"]))]
+    return waiting(json.loads(mf.read_text(encoding="utf-8")) if mf.exists() else [])
 
 
 def start_background(module="year2-cns"):
@@ -124,7 +130,7 @@ def main(module="year2-cns"):
 def run(module):
     mf = ROOT / "modules" / module / "site" / "media.json"
     rows = json.loads(mf.read_text(encoding="utf-8"))
-    todo = [r for r in rows if r["lecture"] not in site_lessons.MEDIA and (r.get("uploaded_size") is None or r["uploaded_size"] != size_of(r["file"]))]
+    todo = waiting(rows)
     from concurrent.futures import ThreadPoolExecutor
 
     def prepare(r):

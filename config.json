@@ -63,5 +63,8 @@
     "year2-endocrine-and-reproductive": "Endocrine & Reproductive (year 2)",
     "year2-cns": "CNS & Special Senses (year 2)",
     "year2-other": "Other year-2 courses (PP III and later modules)"
-  }
+  },
+  "pc_transfers": false,
+  "pc_transfers_note": "owner 2026-11-18: recordings move only on the GitHub runner (Records workflow), both years",
+  "spine": {"records_cloud": true}
 }

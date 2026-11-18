@@ -1,10 +1,15 @@
 """State shared by the PC and the GitHub runner through the private bucket (prefix `ops/tumrah-data/`).
 
-    py -m cloud.state push     PC: the inputs the runner needs (year 1 list messages, mother maps) + the records log
-    py -m cloud.state pull     PC or runner: the records log merged with the bucket's copy (and, on the runner, inputs)
+    py -m cloud.state push     PC: the inputs the runner needs (year 1 list messages, mother maps; year 2 to-do list)
+                               + both records logs
+    py -m cloud.state pull     PC or runner: the records logs merged with the bucket's copy (and, on the runner, inputs)
 
-The records log (`modules/year1-musculoskeletal/graph/records.jsonl`) is append-only and its rows carry `at`, so a merge
-is the union of both sides in time order: the PC and the runner never overwrite each other's rows.
+A records log (`modules/<module>/graph/records.jsonl`: year1-musculoskeletal, year2-cns) is append-only and its rows
+carry `at`, so a merge is the union of both sides in time order: the PC and the runner never overwrite each other's rows.
+
+Year 2 (owner, 2026-11-18: no heavy transfers on the PC): the PC makes the lectures from the Telegram lists without
+downloading; `year2_todo()` lists the ones whose recording is not on the site yet, the runner downloads, compresses and
+uploads them under the site's own key, and `cloud.year2.pull` writes the result back into each lecture (no audio moves).
 """
 import io
 import json
@@ -12,12 +17,23 @@ import sys
 import tarfile
 
 from cloud import r2
-from spine import ROOT
+from spine import LOG_LOCK, ROOT
 
 MODULE = "year1-musculoskeletal"
-LOG = ROOT / "modules" / MODULE / "graph" / "records.jsonl"
-LOG_KEY = r2.OPS + f"records/{MODULE}.jsonl"
+YEAR2 = "year2-cns"
 INPUTS_KEY = r2.OPS + "inputs/year1.tar.gz"
+YEAR2_TODO_KEY = r2.OPS + "inputs/year2_todo.json"
+
+
+def log_path(module=MODULE):
+    return ROOT / "modules" / module / "graph" / "records.jsonl"
+
+
+def log_key(module=MODULE):
+    return r2.OPS + f"records/{module}.jsonl"
+
+
+LOG, LOG_KEY = log_path(), log_key()                 # year 1 (kept for callers that name them)
 
 
 def input_files():
@@ -47,24 +63,40 @@ def _text(rows):
     return "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows)
 
 
-def pull_log():
+def pull_log(module=MODULE):
     """The bucket's log merged into the local one. Returns (rows before, rows after)."""
-    local = _rows(LOG.read_text(encoding="utf-8")) if LOG.exists() else []
-    remote = _rows((r2.get_bytes(LOG_KEY) or b"").decode("utf-8"))
-    rows = merge(local, remote)
-    LOG.parent.mkdir(parents=True, exist_ok=True)
-    LOG.write_text(_text(rows), encoding="utf-8")
+    path = log_path(module)
+    remote = _rows((r2.get_bytes(log_key(module)) or b"").decode("utf-8"))      # network first, outside the lock
+    with LOG_LOCK:                                                              # no row appended meanwhile is lost
+        local = _rows(path.read_text(encoding="utf-8")) if path.exists() else []
+        rows = merge(local, remote)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_text(rows), encoding="utf-8")
     return len(local), len(rows)
 
 
-def push_log():
+def push_log(module=MODULE):
     """The local log merged into the bucket's copy (and back, so both sides end equal). Returns rows."""
-    local = _rows(LOG.read_text(encoding="utf-8")) if LOG.exists() else []
-    remote = _rows((r2.get_bytes(LOG_KEY) or b"").decode("utf-8"))
-    rows = merge(local, remote)
-    r2.put_bytes(LOG_KEY, _text(rows).encode("utf-8"), "application/x-ndjson")
-    LOG.write_text(_text(rows), encoding="utf-8")
+    path = log_path(module)
+    remote = _rows((r2.get_bytes(log_key(module)) or b"").decode("utf-8"))
+    with LOG_LOCK:
+        local = _rows(path.read_text(encoding="utf-8")) if path.exists() else []
+        rows = merge(local, remote)
+        text = _text(rows)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    r2.put_bytes(log_key(module), text.encode("utf-8"), "application/x-ndjson")
     return len(rows)
+
+
+def push_year2_todo(rows):
+    r2.put_bytes(YEAR2_TODO_KEY, json.dumps(rows, ensure_ascii=False).encode("utf-8"), "application/json")
+    return len(rows)
+
+
+def pull_year2_todo():
+    data = r2.get_bytes(YEAR2_TODO_KEY)
+    return json.loads(data.decode("utf-8")) if data else []
 
 
 def push_inputs():
@@ -96,12 +128,15 @@ def pull_inputs():
 def main(argv):
     cmd = argv[0] if argv else ""
     if cmd == "push":
-        print(f"inputs: {push_inputs()} files; records log: {push_log()} rows")
+        from cloud import year2
+        print(f"inputs: {push_inputs()} files; year 2 to-do: {push_year2_todo(year2.todo())} lectures; "
+              f"records logs: {push_log()} + {push_log(YEAR2)} rows")
     elif cmd == "pull":
         if "--inputs" in argv:
             print(f"inputs: {pull_inputs()} files")
-        before, after = pull_log()
-        print(f"records log: {before} -> {after} rows")
+        for module in (MODULE, YEAR2):
+            before, after = pull_log(module)
+            print(f"records log {module}: {before} -> {after} rows")
     else:
         print(__doc__)
         return 2

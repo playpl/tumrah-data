@@ -19,6 +19,9 @@ What it does, in order (each step on its own: one failing step never stops the o
  6b. year 1 records (spine/records/flow.py, owner 2026-11-17): one Telegram batch (`spine.config()["records_batch_mb"]`,
     first lessons of every subject first), then compress, upload and fleet transcription in a detached background run
     (logs/records_y1.log). Year 1 is old data and lives in modules/year1-musculoskeletal/records/, never in lectures/.
+ 6c. no transfers on the PC (owner 2026-11-18, config.json "pc_transfers": false): lectures are made from the lists
+    without downloading, nothing is uploaded from here and year 1 only takes captions. Step "year 2 records (GitHub)"
+    (cloud/year2.py) writes the runner's uploads into the lectures and pushes the to-do list the runner downloads next.
  7. the ledger and the owner's cards (not in --dry): ledger.sync, decisions.refresh; "N decisions wait on the Today screen".
  8. the report: what changed, what waits (the fleet is down: transcribe, place, align, MCQ copy), what needs the owner.
 The website itself is NOT touched here: importers write production (dry run first, `--apply` writes an undo file).
@@ -60,8 +63,27 @@ def nagib_quizzes_run():
     return (res.stdout + res.stderr).strip().splitlines()[-6:]
 
 
-def waiting_telegram(q, dry):
-    """Lectures that point at a Telegram post and have no recording yet (mini lectures): download when it is small."""
+def pc_transfers():
+    """False (owner 2026-11-18): recordings move only on the GitHub runner. Default True for an old config."""
+    return json.loads((ROOT / "config.json").read_text(encoding="utf-8")).get("pc_transfers", True)
+
+
+def year2_cloud(dry):
+    """The runner's year 2 uploads into lecture.json/media.json, then the to-do list it downloads next."""
+    from cloud import state, year2
+    if dry:
+        return [f"year 2 to-do for the GitHub runner: {len(year2.todo())} lectures (not pushed: --dry)"]
+    out = year2.pull()
+    rows = year2.todo()
+    out.append(f"year 2 to-do pushed for the GitHub runner: {state.push_year2_todo(rows)} lectures"
+               + (f" ({', '.join(r['lecture'] for r in rows)[:300]})" if rows else ""))
+    out.append(f"year 2 records log pushed: {state.push_log(state.YEAR2)} rows")
+    return out
+
+
+def waiting_telegram(q, dry, transfers=True):
+    """Lectures that point at a Telegram post and have no recording yet (mini lectures): download when it is small.
+    With `transfers` False nothing is downloaded: the GitHub runner fetches them (cloud/year2.py)."""
     import auto_doctors
     import doctors_folder
     import lectures
@@ -86,7 +108,9 @@ def waiting_telegram(q, dry):
             out.append(f"{m['id']}: YouTube link from post {post}")
         elif i.get("kind") in ("audio", "video"):
             mb = (i.get("size") or 0) / 1e6
-            if mb > auto_doctors.BIG_MB:
+            if not transfers:
+                out.append(f"{m['id']}: post {post} ({mb:.0f} MB) waits for the GitHub runner")
+            elif mb > auto_doctors.BIG_MB:
                 out.append(f"{m['id']}: post {post} is {mb:.0f} MB, not downloaded: say 'download {m['id']}'")
             elif not dry:
                 got = tg_lists.download([post]).get(post)
@@ -160,7 +184,8 @@ def noise(line):
 def main(argv):
     dry = "--dry" in argv
     tele = "--no-telegram" not in argv
-    upload = "--no-upload" not in argv
+    transfers = pc_transfers()
+    upload = "--no-upload" not in argv and transfers
     sys.stdout.reconfigure(encoding="utf-8")
     import doctors_folder
     import queue_db
@@ -170,7 +195,8 @@ def main(argv):
     step(report, "paths", doctors_folder.repair_paths if not dry else lambda: [])
     if tele:
         import auto_doctors
-        step(report, "auto doctors (Telegram)", lambda: auto_doctors.sync(q, dry=dry))
+        step(report, "auto doctors (Telegram)",
+             lambda: auto_doctors.sync(q, dry=dry, big_mb=auto_doctors.BIG_MB if transfers else 0))
     if dry:
         step(report, "folder import (what would change)", lambda: [
             f"{x['action']}: {x['title']} ({x['doctor_folder']})" for x in doctors_folder.plan()[0]
@@ -181,13 +207,17 @@ def main(argv):
         if nagib_forms_changed():
             step(report, "Nagib quizzes", nagib_quizzes_run)
         if tele:
-            step(report, "waiting Telegram recordings", lambda: waiting_telegram(q, dry))
+            step(report, "waiting Telegram recordings", lambda: waiting_telegram(q, dry, transfers))
             # the mother agent (spine/tg/flow.py): changed lists re-read by two fleet readers, new lectures ADDED to
             # mother_lists.json (never edited or removed), edits/deletions reported, parity mother checked
             from spine.tg import flow as mother_flow
             step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
+        if not transfers:
+            step(report, "year 2 records (GitHub)", lambda: year2_cloud(dry))
         step(report, "site files", site_files)
-        if upload:
+        if not transfers:
+            report.append(("uploads", ["none from this PC (pc_transfers false): the GitHub runner uploads"]))
+        elif upload:
             import upload_media
             step(report, "uploads", upload_media.start_background)
     step(report, "year 1 records", lambda: year1(dry, tele, upload))

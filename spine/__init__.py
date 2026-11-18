@@ -26,6 +26,7 @@ Row shapes shared by every subpackage:
 Old scripts keep "Update data" working while a phase is in shadow mode: config.json "spine": {"p1", "p2", "mother"}.
 """
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -60,10 +61,13 @@ def write_jsonl(path, rows):
     tmp.replace(path)
 
 
+LOG_LOCK = threading.RLock()     # the runner appends rows from its download loop while a worker thread rewrites the log
+
+
 def append_jsonl(path, row):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8", newline="\n") as f:
+    with LOG_LOCK, open(path, "a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
 

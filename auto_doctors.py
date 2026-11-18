@@ -244,7 +244,7 @@ def finish_interrupted(q, lists, big_mb):
             post = posts.get(pid)
             if not pid or src.get("file") or src.get("youtube") or not post or post.get("kind") not in ("audio", "video"):
                 continue
-            if (post.get("size") or 0) <= big_mb * 1e6:
+            if big_mb and (post.get("size") or 0) <= big_mb * 1e6:    # big_mb 0: the GitHub runner fetches it
                 report += [f"interrupted download finished: {x}" for x in download_waiting(q, m["id"])]
     return report
 
@@ -297,6 +297,8 @@ def add_recording(q, d, x, lid, doctor, note, big_mb):
     meta = lectures.load(lid)
     meta["source"] = {"telegram": x["url"]}
     lectures.save(meta)
+    if not big_mb:      # owner 2026-11-18: no heavy transfers on the PC (config pc_transfers false): cloud/year2.py
+        return [f"{note}: {x['kind']} of {(x['size'] or 0) / 1e6:.0f} MB waits for the GitHub runner (Records workflow)"]
     if (x["size"] or 0) > big_mb * 1e6:
         return [f"{note}: {x['kind']} of {x['size'] / 1e6:.0f} MB not downloaded (over {big_mb} MB): say 'download {lid}'"]
     got = tg_lists.download([x["post"]])

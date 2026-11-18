@@ -29,6 +29,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from spine import ROOT, append_jsonl, graph_dir, module_dir, now, read_json, read_jsonl
@@ -40,7 +41,8 @@ SHORT = {"ZAG59_Anatomy": "anat", "ZAG59_physio": "phys", "ZAG59_Histo": "hist",
          "RecordsBatch58ATM": "rec"}
 MEDIA = ("audio", "video")
 SUFFIX = ".48k.m4a"                    # = upload_media.SUFFIX: AAC mono 48 kbps
-CHUNK = 512 * 1024                     # Telegram download piece; a resume offset is a multiple of it
+CHUNK = 1024 * 1024                    # Telegram download piece (the largest it allows); a resume offset is a multiple of it
+BLOCK_PIECES = 4                       # pieces one parallel fetch takes at once (4 MB)
 UPLOAD_TRIES = 4
 STALL_S = 120                          # no piece for this long: the download is stopped (the next run resumes)
 BEAT_S = 60                            # a progress line this often during one file
@@ -239,6 +241,32 @@ class Budget:
         return self.left is not None and self.left <= 0
 
 
+async def parallel_stream(client, media, off, total, workers=4, chunk=None, block=BLOCK_PIECES):
+    """The pieces of `media` from `off`, in order, fetched by `workers` blocks at a time. One request after another is
+    bound by the round trip to Telegram (one piece per round trip); several blocks in flight use the whole link.
+    Same contract as `client.iter_download(...)`: an async iterator of byte pieces."""
+    chunk = chunk or CHUNK
+    size = chunk * block
+    starts = list(range(off, total, size))
+
+    async def fetch(start):
+        n = -(-(min(start + size, total) - start) // chunk)
+        return [p async for p in client.iter_download(media, offset=start, limit=n, request_size=chunk, file_size=total)]
+
+    window, nxt = [], 0
+    try:
+        while nxt < len(starts) or window:
+            while nxt < len(starts) and len(window) < workers:
+                window.append(asyncio.ensure_future(fetch(starts[nxt])))
+                nxt += 1
+            for piece in await window.pop(0):
+                yield piece
+    finally:
+        for t in window:
+            t.cancel()
+        await asyncio.gather(*window, return_exceptions=True)
+
+
 async def fetch_into(part, total, stream, budget, stall=None, beat=None, clock=time.monotonic):
     """Appends the pieces of `stream(offset)` to `part` from the resume offset. True when the file is whole.
     `stall` seconds with no piece raises TimeoutError (a silent hang never eats the run); `beat(size)` is called
@@ -293,10 +321,11 @@ def unlock():
     LOCK.unlink(missing_ok=True)
 
 
-async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None):
+async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None, parallel=1):
     """Downloads `recs` in order until `budget` is spent. `on_done(rec)` (sync, run in a thread) is called after each
-    whole file, so the runner compresses and uploads every record before the next one starts: a run that is stopped
-    (timeout, dropped link) keeps everything it finished."""
+    whole file, in a worker thread beside the next download (compress and upload never hold the link idle); a run
+    that is stopped (timeout, dropped link) still waits for the records already downloaded, so it keeps everything it
+    finished. `parallel` blocks of one file are fetched at once (1: one request after another)."""
     from cloud import tg as cloud_tg
     runner = cloud_tg.on_runner()
     if runner:                                       # the GitHub runner: its own session (cloud/tg.py)
@@ -305,8 +334,16 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None):
         sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
         from tg import connect
         client = await connect(account)
-    done = []
+    done, pending = [], []
     ents = {}
+    pool = ThreadPoolExecutor(1)                     # one record is compressed and uploaded at a time, in download order
+    loop = asyncio.get_running_loop()
+
+    async def finish(rec):
+        try:
+            await loop.run_in_executor(pool, on_done, rec)
+        except Exception as e:  # noqa: BLE001 - one record's compress/upload never stops the others
+            say(f"  {rec['id']}: after download FAILED ({type(e).__name__}: {str(e)[:120]})")
     try:
         for rec in recs:                                # in the order given: priority() puts first lessons first
             if budget.spent:
@@ -331,6 +368,8 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None):
                 t0 = time.time()
 
                 def stream(off, m=m):
+                    if parallel > 1:
+                        return parallel_stream(client, m.media, off, total, parallel)
                     return client.iter_download(m.media, offset=off, request_size=CHUNK, file_size=total)
 
                 def beat(size, rid=rec["id"], t0=t0, before=before):
@@ -353,12 +392,13 @@ async def _download_telegram(recs, budget, say, account=ACCOUNT, on_done=None):
                  **({"where": "runner"} if runner else {}))
             done.append(rec["id"])
             if on_done:
-                try:
-                    await asyncio.to_thread(on_done, rec)
-                except Exception as e:  # noqa: BLE001 - one record's compress/upload never stops the others
-                    say(f"  {rec['id']}: after download FAILED ({type(e).__name__}: {str(e)[:120]})")
+                pending.append(asyncio.ensure_future(finish(rec)))
     finally:
         await client.disconnect()
+        if pending:
+            say(f"  waiting for {sum(not t.done() for t in pending)} record(s) still being compressed or uploaded")
+            await asyncio.gather(*pending)
+        pool.shutdown()
     return done
 
 
