@@ -1,4 +1,4 @@
-"""py -m spine seg prior | jobs | run | collect | audit (Phase 2 segmentation, shadow)."""
+"""py -m spine seg prior | jobs | run | collect | dry | audit (Phase 2 segmentation, shadow)."""
 from spine.seg import flow, prior
 
 
@@ -7,7 +7,8 @@ def _prior(a):
     if not p:
         print(f"{a.lecture}: no transcript or no book")
         return 1
-    sc, sl, pts = p["scope"], p["slice"], p["prior"]
+    sc, sl = p["scope"], p["slice"]
+    pts = prior.prior(p["paras"], sl)
     print(f"{a.lecture}: {len(p['paras'])} paragraphs; book {sc['book']} B{sc['lo']}-B{sc['hi']} ({sc['how']}), "
           f"pages {sl[0]['page']}-{sl[-1]['page']}; prior matched {sum(x is not None for x in pts)}")
     for i in range(0, len(pts), a.every):
@@ -28,7 +29,7 @@ def _jobs(a):
 
 
 def _run(a):
-    print(f"seg run: {flow.run(a.lectures or None, via=a.via, limit=a.limit)}")
+    print(f"seg run: {flow.run(a.lectures or None, limit=a.limit, workers=a.workers)}")
     return 0
 
 
@@ -54,7 +55,8 @@ def register(sub):
     x.add_argument("--module", default="year2-cns")
     x.add_argument("--every", type=int, default=10)
     x.set_defaults(run=_prior)
-    for name, fn, hlp in (("jobs", _jobs, "write job folders"), ("run", _run, "readers answer the job folders"),
+    for name, fn, hlp in (("jobs", _jobs, "write job folders"),
+                          ("run", _run, "Gemini web (4 Hydrogen) answers the job folders"),
                           ("collect", _collect, "judge answers, write segments.jsonl"),
                           ("dry", _dry, "what collect would decide, writing nothing")):
         x = p.add_parser(name, help=hlp)
@@ -63,9 +65,9 @@ def register(sub):
         if name == "jobs":
             x.add_argument("--handout", action="store_true",
                            help="also lectures whose doctor has no split book (read against the handout)")
-        if name == "run":
-            x.add_argument("--via", choices=["fleet", "browser"], default="fleet")
+        if name == "run":                            # Gemini web; the fleet is retired (owner 2026-11-18)
             x.add_argument("--limit", type=int)
+            x.add_argument("--workers", type=int, default=1, help="chats at a time (at most 4, one per account)")
         x.set_defaults(run=fn)
     x = p.add_parser("audit", help="one lecture's segments against its old placement")
     x.add_argument("lecture")

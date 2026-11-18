@@ -2,12 +2,12 @@
 
 A flow follows the protocol of flows/__init__.py: `lane`, `timeout`, `prepare(job, job_dir) -> prompt path`,
 `check(job, job_dir) -> list of errors`, optional `then(job, job_dir)` and `expand(job)`.
-Each flow lives with its engine: spine/align/flow.py (sp_align), spine/seg/flow.py (sp_seg), spine/tg/flow.py (sp_mother).
+Each flow lives with its engine: spine/align/flow.py (sp_align), spine/tg/flow.py (sp_mother).
 """
 import importlib
 
+# sp_seg is not a fleet flow any more (fleet retired 2026-11-18): Haiku answers it through `py -m spine seg run --go`.
 FLOWS = {"sp_align": ("spine.align.flow", "AlignFlow"),
-         "sp_seg": ("spine.seg.flow", "SegFlow"),
          "sp_mother": ("spine.tg.flow", "MotherFlow")}
 
 
