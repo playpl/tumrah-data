@@ -166,3 +166,18 @@ Two sessions started from the records session were still working when this was w
 
 ## Progress (one line per finished workstream)
 
+- 2026-11-18 04:50 local. Section 0 done: seg branch merged (`bc7734e`), pushed; worktree left (only an untracked
+  settings file); cns-164..177 all have `source.cloud.hear_key`. Records runs #5 and the 02:17 cron: success.
+- W1 (in progress): the v4 "N paragraphs not answered" was the PARSER, not Gemini: readers name several places per
+  paragraph (`P6-P7 = B25, B34`), which `segment.LINE` rejected (`f06a7f9`: lists of ranges; rows add `parts`).
+  Re-judged pilot, no new calls: 7 of 8 accepted (013 98%, 021 90%, 027 94%, 036 90%, 038 98%, 040 87%, 045 96%);
+  cns-001 B still unanswered. Owner decisions 1 and 2 are moot under v4 (no length or order rule).
+  The `Locator.click: Timeout` on all 4 accounts = Hydrogen at its usage cap (the option disappears from the mode
+  menu). `gemini_browser` now reads the renewal time, skips capped accounts, `py gemini_browser.py limits`; seg
+  `run --wait` sleeps until a renewal (`f9441a5`). All 93 jobs written (171 chats, 8 pilot lectures' answers
+  copied in); `py -m spine seg run --workers 4 --wait` running, log `jobs/sp_seg_run_2026-11-18.log`.
+- Readers moved off the fleet (`78d4bae`): `py -m spine records hear2` (year 2 transcripts; Hydrogen), year 1
+  `records transcribe` defaults to browser + Hydrogen, `p1 run` = Gemini (`--per-job` windows per chat; the fleet
+  runner refuses while `fleet.down`), `mother run` readers = two Gemini chats, Update data's mother step on again.
+  Decision 9 settled by CLAUDE.md (Arabic = Gemini). Not run yet: Hydrogen is capped and seg goes first.
+
