@@ -31,7 +31,8 @@ MAX_NONE = 0.5                    # share of paragraphs a reader may call NONE (
 MAX_CLIPPED = 0.2                 # share of paragraphs that may only restate the book lines already explained
 MAX_OFFEND = 0.2                  # share of paragraphs a reader may get wrong and still be used after repair
 AGREE_WITHIN, AGREE_SHARE = 5, 0.9
-VERSION = 2          # 2: segments of at most 12 paragraphs, NONE only for talk with no book line
+VERSION = 3          # 2: segments of at most 12 paragraphs, NONE only for talk with no book line
+# 3 (2026-11-18, Gemini web readers): no repeated range, continuing one line, tables, going back = NONE, one try only
 
 PROMPT = """You map a recorded medical lecture onto the doctor's own book.
 
@@ -45,14 +46,25 @@ Read every paragraph: the doctor's Arabic explanation of an English heading or f
 
 Rules:
 - Cover every paragraph exactly once, in order: the first segment starts at P1, the last ends at P{last}.
-- The doctor moves down the book: a segment's first B is never smaller than the previous segment's last B.
-- Use NONE only for talk that explains no book line at all (greetings, jokes, exam advice, a part the book does
-  not have). The opening of a topic belongs to that topic's first book lines, not NONE. In a normal lecture NONE
-  is under a quarter of the paragraphs.
+- The doctor moves down the book. A segment's first B is never smaller than the last B of the segment before it.
+  Never write a range you already wrote.
+  Wrong: P1-P10 = B37-B43, then P11-P20 = B37-B43.
+  Right: P1-P10 = B37-B43, then P11-P20 = B43-B49.
+- Still on the same line: when the doctor keeps talking about the line where the last segment ended, the next
+  segment starts at that line again, for example P85-P96 = B51, then P97-P104 = B51-B53. Repeating the last line
+  this way is the only time a B number appears twice.
+- Tables and figures are a few B lines and a long talk. Follow the rows or labels he explains, moving down them;
+  when you cannot tell which row, continue from the last line as above.
+- Going back: when the doctor returns to lines he already passed (a recap, a summary, "let's go back", "نرجع"),
+  write that stretch as NONE and then continue from the line where you were. Never jump back up the book.
+- Use NONE only for talk that explains no new book line: greetings, jokes, exam advice, a part the book does not
+  have, or going back as above. The opening of a topic belongs to that topic's first book lines, not NONE. In a
+  normal lecture NONE is under a quarter of the paragraphs.
 - A segment is at most 12 paragraphs and at most 120 B lines. A long explanation of one stretch is several
   segments in a row.
+- Decide before you write. Write each segment once: no draft, no correction, no second version of a stretch.
 
-Answer with these lines only, nothing else:
+Answer with these lines only, nothing else (no heading, no numbering, no explanation):
 P<a>-P<b> = B<c>-B<d>
 P<a>-P<b> = NONE
 """

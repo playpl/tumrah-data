@@ -541,13 +541,13 @@ class CollectIsSafe(unittest.TestCase):
         flow.make_jobs(["L1", "L2"], say=lambda *a: None)
         calls = []
 
-        def fake(d, account):                     # answered at once: one call per job (a failure fails over to 4 accounts)
+        def fake(d):                              # one Gemini chat per job
             calls.append((d.parent.name, d.name))
             return "answered"
-        with mock.patch.object(flow, "ask_fleet", fake):
-            flow.run(["L1", "L2"], via="fleet", limit=0, say=lambda *a: None)
+        with mock.patch.object(flow, "ask_gemini", fake):
+            flow.run(["L1", "L2"], limit=0, say=lambda *a: None)
             self.assertEqual(calls, [])
-            flow.run(["L1", "L2"], via="fleet", limit=1, say=lambda *a: None)
+            flow.run(["L1", "L2"], limit=1, say=lambda *a: None)
         self.assertEqual(len(calls), 1)
 
     def test_dry_decides_like_collect_and_writes_nothing(self):
@@ -765,6 +765,87 @@ class PropertyFuzz(unittest.TestCase):
             self.assertEqual(got[0] is None, clean[0] is None, noisy_text[:200])
             if clean[0] is not None:
                 self.assertEqual(got[0], clean[0])
+
+
+class GeminiReader(unittest.TestCase):
+    """The reader (owner 2026-11-18): Gemini web, model 4 Hydrogen; the fleet is retired and Haiku reads no Arabic."""
+
+    GOOD = "P1-P5 = B1-B3\nP6-P10 = B4-B6\n"
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from spine.seg import flow
+        self.tmp = Path(tempfile.mkdtemp())
+        self.patch = mock.patch.object(flow, "JOBS", self.tmp / "jobs")
+        self.patch.start()
+        for lid in ("L1", "L2"):
+            for r in ("A", "B"):
+                d = self.tmp / "jobs" / lid / r
+                d.mkdir(parents=True)
+                (d / "task.txt").write_text("the prompt\nBOOK\nB1 x\n\nTRANSCRIPT\nP1 [0:00] y\n", encoding="utf-8")
+
+    def tearDown(self):
+        self.patch.stop()
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def fake(self, text):
+        self.seen = []
+
+        def ask(prompt, model=None, attach=(), wait=None):
+            self.seen.append({"prompt": prompt, "model": model, "attach": list(attach)})
+            return text, {"account": "acct1", "model": "Hydrogen", "secs": 5} if text else {"error": "no account"}
+        return ask
+
+    def test_an_answer_is_written_with_its_reader(self):
+        from spine import read_json
+        from spine.seg import flow
+        d = self.tmp / "jobs" / "L1" / "A"
+        self.assertEqual(flow.ask_gemini(d, ask=self.fake(self.GOOD)), "answered")
+        self.assertEqual((d / "answer.txt").read_text(encoding="utf-8"), self.GOOD)
+        self.assertEqual(flow.answered_by(d), "gemini")
+        self.assertEqual(read_json(d / "browser.json")["account"], "acct1")
+        call = self.seen[0]
+        self.assertEqual(call["model"], "hydrogen")
+        self.assertEqual(call["attach"], [str(d / "task.txt")])
+        self.assertTrue(call["prompt"].startswith("the prompt"))
+        self.assertNotIn("P1 [0:00]", call["prompt"])             # the blocks come in the attached file
+
+    def test_a_reply_without_segments_is_not_an_answer(self):
+        from spine.seg import flow
+        d = self.tmp / "jobs" / "L1" / "A"
+        for text in ("I cannot read this.", None):
+            self.assertEqual(flow.ask_gemini(d, ask=self.fake(text)), "failed")
+        self.assertFalse((d / "answer.txt").exists())
+        self.assertTrue((d / "reply_failed.txt").exists())
+        self.assertEqual(len(flow.todo(["L1"])), 2)
+
+    def test_run_asks_each_unanswered_job_once(self):
+        from unittest import mock
+        from spine.seg import flow
+        asked = []
+        with mock.patch.object(flow, "ask_gemini", lambda d: asked.append(d) or "answered"):
+            self.assertEqual(flow.run(["L1"], say=lambda *a: None), {"answered": 2})
+        self.assertEqual(len(asked), 2)
+
+
+class PromptV3(unittest.TestCase):
+    """Prompt v3 (2026-11-18) answers what made readers fail in the Opus audit."""
+
+    def test_the_rules_are_in_the_prompt(self):
+        self.assertEqual(segment.VERSION, 3)
+        for words in ("Never write a range you already wrote", "Still on the same line", "Tables and figures",
+                      "Going back", "no second version"):
+            self.assertIn(words, segment.PROMPT)
+
+    def test_the_prompt_examples_pass_the_judge(self):
+        """The 'Right' and 'same line' examples of the prompt are a clean answer to the judge (going forward)."""
+        text = "P1-P10 = B37-B43\nP11-P20 = B43-B49\nP21-P30 = B51\nP31-P40 = B51-B53"
+        fixed, problems, share = segment.judge_segs(*segment.parse(text)[:1], 40, 60)
+        self.assertIsNotNone(fixed, problems)
+        self.assertEqual(share, 0)
 
 
 if __name__ == "__main__":

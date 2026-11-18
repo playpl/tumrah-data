@@ -2,33 +2,34 @@
 
     py -m spine seg prior <lecture>            the zero-token prior and the book slice
     py -m spine seg jobs [lecture ...]         one job folder per lecture and reader: jobs/sp_seg/<lecture>/<reader>/
-    py -m spine seg run [--via fleet|browser]  readers answer (fleet: the 4 accounts; browser: Gemini web profiles)
+    py -m spine seg run [lecture ...]          Gemini web (4 Hydrogen) answers the unanswered job folders
     py -m spine seg collect                    parse, check, repair, agree; writes lectures/<id>/segments.jsonl
     py -m spine seg dry                        the same decisions as collect, writing nothing
     py -m spine seg audit <lecture>            segments with times, book lines and handout pages, against the
                                                lecture's old placement
     py -m spine parity p2                      every segmented lecture against its old placement
 
-Two readers per lecture (A, B on different accounts). Accepted when both answers are usable (after repair under
-20% of paragraphs offending) and agree on 90% of paragraphs (within 5 book lines); then reader A's repaired
-segments are written with conf = the agreement. Else the lecture is `disputed` and its runs are listed.
+Two readers per lecture (A, B: two independent Gemini web chats, neither sees the other's answer). Accepted when both
+answers are usable (after repair under 20% of paragraphs offending) and agree on 90% of paragraphs (within 5 book
+lines); then reader A's repaired segments are written with conf = the agreement. Else the lecture is `disputed` and its runs are listed.
 """
 import hashlib
 import json
-import subprocess
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from spine import ROOT, graph_dir, now, read_json, read_jsonl, write_json, write_jsonl
 from spine.seg import prior, scope, segment
 
 JOBS = ROOT / "jobs" / "sp_seg"
-FLEET = Path(r"C:\Users\Ahmed\agy-fleet\fleet.py")
-ACCOUNTS = ["zero", "work", "personal", "other"]
-READERS = {"A": 0, "B": 1}          # reader -> account offset, so A and B of one lecture never share an account
+READERS = ("A", "B")                # two independent readers per lecture
 MAX_OFFEND = segment.MAX_OFFEND
 SHADOW = ("segments.jsonl",)        # derived files collect owns: removed when a lecture is not accepted (any more)
 SHADOW_SPINE = ("links.jsonl", "ranges.json")    # compat shapes written from segments.jsonl (lectures/<id>/spine/)
+# The reader (owner 2026-11-18): Gemini on the web, model 4 Hydrogen, through the signed-in Chrome profiles
+# (gemini_browser.py). Aligning a lecture with the book is Arabic reading: Gemini's work, never Haiku's. The
+# Antigravity fleet is retired.
+MODEL = "hydrogen"
+WAIT = 900                          # seconds for one answer (a task is up to 170 KB)
 
 
 def fingerprint(task, sents):
@@ -40,10 +41,6 @@ def fingerprint(task, sents):
     h.update(json.dumps([s["id"] for s in sents], ensure_ascii=False).encode("utf-8"))
     return h.hexdigest()
 
-FLEET_NOTE = """The task is in the file task.txt in this folder (prompt, BOOK block, TRANSCRIPT block).
-Read all of task.txt, do what it says, and give your answer as your final message: the segment lines only.
-Do not write any file. Do not run any program.
-"""
 
 
 def raw_of(lid):
@@ -105,10 +102,10 @@ def make_jobs(lids, module="year2-cns", readers=("A", "B"), say=print):
                     write_json(d / "meta.json", dict(old, fp=meta["fp"]))
                 continue
             d.mkdir(parents=True, exist_ok=True)
-            for f in ("result.json", "answer.txt", "done", "browser.json", "reader.json"):
+            for f in ("result.json", "answer.txt", "done", "browser.json", "reader.json", "reply_failed.txt"):
                 (d / f).unlink(missing_ok=True)
             (d / "task.txt").write_text(task, encoding="utf-8")
-            (d / "prompt.md").write_text(FLEET_NOTE, encoding="utf-8")
+            (d / "prompt.md").unlink(missing_ok=True)       # the retired fleet's note
             write_json(d / "meta.json", meta)
             made += 1
         say(f"  {lid}: {meta['paras']} paragraphs, book {meta['book']} B{meta['lo']}-B{meta['hi']} "
@@ -122,71 +119,57 @@ def answered(d):
 
 def answered_by(d):
     """Who wrote this job's answer.txt, for the `by` field of segments.jsonl. Any runner may write reader.json
-    {"by": "<reader>"} next to answer.txt (a Haiku runner must); else browser.json means Gemini web; else the fleet."""
+    {"by": "<reader>"} next to answer.txt (ask_gemini does); else browser.json means Gemini web; else the fleet (old
+    answers from before 2026-11-18)."""
     by = (read_json(d / "reader.json") or {}).get("by")
     if by:
         return str(by)
     return "browser" if (d / "browser.json").exists() else "fleet"
 
 
-def ask_fleet(d, account):
-    subprocess.run(["py", str(FLEET), "run", "-a", account, "--cwd", str(d), "-f", "prompt.md", "--out", "result.json",
-                    "--timeout", "25"], capture_output=True, text=True, cwd=d)
-    r = read_json(d / "result.json") or {}
-    if r.get("status") == "SUCCESS" and (r.get("response") or "").strip():
-        (d / "answer.txt").write_text(r["response"], encoding="utf-8")
-        return "answered"
-    return "quota" if r.get("failure") == "quota" else "failed"
-
-
-def ask_browser(d, account=None, model="flash-lite"):
-    import gemini_browser
+def ask_gemini(d, ask=None):
+    """One Gemini web chat on d/task.txt: the prompt in the message, task.txt attached. Answered: answer.txt,
+    reader.json {"by": "gemini"} and browser.json (account, model, seconds). A reply with no segment line is kept in
+    reply_failed.txt and the job stays unanswered. `ask` is gemini_browser.ask (tests pass a fake)."""
+    if ask is None:
+        import gemini_browser
+        ask = gemini_browser.ask
     task = (d / "task.txt").read_text(encoding="utf-8")
-    head, _, body = task.partition("\nBOOK\n")
-    text, meta = gemini_browser.ask(head + "\nThe BOOK and TRANSCRIPT blocks are in the attached file task.txt.",
-                                    model=model, attach=[str(d / "task.txt")], wait=600, account=account)
-    if text and segment.parse(text)[0]:
-        (d / "answer.txt").write_text(text, encoding="utf-8")
-        write_json(d / "browser.json", meta)
-        return "answered"
-    return "failed"
+    head = task.partition("\nBOOK\n")[0]
+    text, meta = ask(head + "\nThe BOOK and TRANSCRIPT blocks are in the attached file task.txt.",
+                     model=MODEL, attach=[str(d / "task.txt")], wait=WAIT)
+    if not text or not segment.parse(text)[0]:
+        (d / "reply_failed.txt").write_text(text or json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+        return "failed"
+    (d / "answer.txt").write_text(text, encoding="utf-8")
+    (d / "reply_failed.txt").unlink(missing_ok=True)
+    write_json(d / "browser.json", meta)
+    write_json(d / "reader.json", {"by": "gemini", "model": MODEL})
+    return "answered"
 
 
-def run(lids=None, via="fleet", accounts=None, say=print, limit=None):
-    """Answer every unanswered job folder. Fleet: one job per account at a time, A and B on different accounts."""
-    accounts = list(accounts or ACCOUNTS)
-    todo = []
-    for lid in lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir()):
-        for r in READERS:
-            d = job_dir(lid, r)
-            if (d / "task.txt").exists() and not answered(d):
-                todo.append((lid, r, d))
-    todo = todo[:limit] if limit is not None else todo      # --limit 0 asks nothing (it must never mean "all")
-    stats, resting = {}, set()
+def todo(lids=None):
+    """[(lecture, reader, job dir)] of every job with a task and no answer."""
+    lids = lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir())
+    return [(lid, r, job_dir(lid, r)) for lid in lids for r in READERS
+            if (job_dir(lid, r) / "task.txt").exists() and not answered(job_dir(lid, r))]
 
-    def work(k_job):
-        k, (lid, r, d) = k_job
-        if via == "browser":
-            verdict = ask_browser(d)
-        else:
-            verdict = "failed"
-            for attempt in range(len(accounts)):
-                acc = accounts[(k + READERS[r] + attempt) % len(accounts)]
-                if acc in resting:
-                    continue
-                verdict = ask_fleet(d, acc)
-                if verdict == "quota":
-                    resting.add(acc)
-                    continue
-                if verdict == "answered":
-                    break
-        say(f"  {lid}/{r}: {verdict}")
+
+def run(lids=None, say=print, limit=None, workers=1):
+    """Gemini web answers every unanswered job folder (one chat per job; `workers` chats at a time, at most one
+    per signed-in account)."""
+    jobs = todo(lids)
+    jobs = jobs[:limit] if limit is not None else jobs      # --limit 0 asks nothing (it must never mean "all")
+    stats = {}
+
+    def work(job):
+        verdict = ask_gemini(job[2])
+        say(f"  {job[0]}/{job[1]}: {verdict}")
         return verdict
 
-    with ThreadPoolExecutor(max_workers=1 if via == "browser" else len(accounts)) as pool:
-        for v in pool.map(work, enumerate(todo)):
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, 4))) as pool:
+        for v in pool.map(work, jobs):
             stats[v] = stats.get(v, 0) + 1
-    stats["accounts out of quota"] = len(resting)
     return stats
 
 
@@ -250,7 +233,7 @@ def _judge_lecture(lid, module, cache):
                 links = {x["id"]: [x["id"]] for x in p["slice"]}
             else:
                 links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
-            by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in READERS)    # "fleetA+fleetB"
+            by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in READERS)    # "geminiA+geminiB"
             rows = segment.record(a, p["paras"], p["slice"], links, by, round(share, 3))
         else:
             state["state"] = "disputed"
