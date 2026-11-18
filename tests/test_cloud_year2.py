@@ -255,6 +255,23 @@ class Connections(unittest.TestCase):
         self.assertEqual(made, [5, "closed"])
         self.assertEqual((tmp / "records" / "RecordsBatch58ATM" / "1900" / "a.mp3").read_bytes(), data)
 
+    def test_requests_at_once_open_the_connections_once(self):
+        from spine.records import fast
+        pool = fast.Pool(object(), n=8)
+        opened = []
+
+        async def sender(dc_id):
+            opened.append(dc_id)
+            await asyncio.sleep(0.01)
+            return object()
+
+        async def go():
+            pool._sender = sender
+            await asyncio.gather(*(pool.senders_for(4) for _ in range(16)))
+        asyncio.run(go())
+        self.assertEqual(opened, [4] * 8)                    # run #4 opened 16 x 8
+        self.assertEqual(len(pool.senders[4]), 8)
+
 
 class UpdateDataNoTransfers(unittest.TestCase):
     def test_no_download_when_pc_transfers_is_false(self):

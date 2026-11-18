@@ -27,7 +27,7 @@ class Pool:
 
     def __init__(self, client, n=8, say=None):
         self.client, self.n, self.say = client, n, say
-        self.senders, self.keys, self.next = {}, {}, {}
+        self.senders, self.keys, self.next, self.locks = {}, {}, {}, {}
 
     async def _sender(self, dc_id):
         from telethon.network import MTProtoSender
@@ -46,6 +46,13 @@ class Pool:
         return sender
 
     async def senders_for(self, dc_id):
+        if dc_id in self.senders:
+            return self.senders[dc_id]
+        # Every request in flight asks at once (run #4: 16 x 8 = 128 connections, Telegram closed them): one opens.
+        async with self.locks.setdefault(dc_id, asyncio.Lock()):
+            return await self._open(dc_id)
+
+    async def _open(self, dc_id):
         if dc_id not in self.senders:
             first = [await self._sender(dc_id)]                       # the first one exports the key if needed
             rest = await asyncio.gather(*(self._sender(dc_id) for _ in range(self.n - 1)), return_exceptions=True)
