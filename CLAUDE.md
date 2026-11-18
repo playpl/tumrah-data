@@ -14,11 +14,12 @@ and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web
 ## Readers (owner, 2026-11-18; replaces every fleet rule below)
 - The Antigravity fleet is RETIRED (`config.json` `fleet.down` true). Never queue, start or suggest fleet work, even where
   older text below or in handovers says "fleet".
-- Gemini on the web, model 4 Hydrogen (browser profiles, `gemini_browser.py`): transcription and linking.
-- Haiku (Claude): everything else (segmentation, placement, pointers, mother maps). Paid: estimate tokens, ask first.
-- Code still wired to the fleet (`dm.py run`, `py -m spine seg run`, `py -m spine mother flow`, `runners.py`,
+- Gemini on the web, model 4 Hydrogen (browser profiles, `gemini_browser.py`): transcription, linking, and aligning
+  a lecture with the book (segmentation, `py -m spine seg run`). Anything that reads Arabic is Gemini's (owner 11-18).
+- Haiku (Claude): only work that reads no Arabic (owner 11-18). Paid: estimate tokens, ask first.
+- Code still wired to the fleet (`dm.py run`, `py -m spine mother flow`, `runners.py`,
   `gemini_run.py` model names) must be moved to these readers before it runs again.
-- Segmentation: `docs/handovers/HANDOVER_2026-11-18_SEG.md` (Opus audit; prompt for the next session at its end).
+- Segmentation: `docs/handovers/HANDOVER_2026-11-18_SEG.md` (Opus audit, then the Gemini follow-up at its top).
 
 ## "Update data" (owner, 2026-11-10)
 The owner says "Update data": run `py update_data.py` and nothing else first. Do not explore. It reads the `doctors/` folder,
