@@ -22,6 +22,7 @@ the PC's fleet: it fetches the compressed file (about 21 MB an hour) from the bu
 """
 import argparse
 import functools
+import logging
 import sys
 import time
 
@@ -53,6 +54,21 @@ def hear_copies(recs, say=print):
             continue
         machine.mark(r["module"], r["id"], hear_key=hear_key(r), hear_size=out.stat().st_size)
         say(f"  {r['id']}: hear copy {out.stat().st_size / 1e6:.1f} MB")
+
+
+class _Closed(logging.Filter):
+    """Counts Telethon's "Server closed the connection" warnings instead of printing each: with several
+    connections Telegram closes idle ones and Telethon reopens them (run #5: dozens a minute at 5 MB/s)."""
+    n = 0
+
+    def filter(self, record):
+        if "Server closed the connection" in record.getMessage():
+            _Closed.n += 1
+            return False
+        return True
+
+
+CLOSED = _Closed()
 
 
 def say(msg):
@@ -119,8 +135,9 @@ def main(argv=None):
     a.add_argument("--no-inputs", action="store_true", help="use the inputs already on disk")
     args = a.parse_args(argv)
     print = say                                                    # noqa: A001 - every line timed and flushed
-    import logging                                                 # Telethon's flood waits and reconnects, in the log
+    # Telethon flood waits and other warnings stay in the log; reconnects are counted (CLOSED)
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s", stream=sys.stdout)
+    logging.getLogger("telethon.network.connection.connection").addFilter(CLOSED)
     from spine.records import machine
     module = state.YEAR2 if args.year == 2 else state.MODULE
     before, after = state.pull_log(module)
@@ -151,6 +168,8 @@ def main(argv=None):
         print(f"downloaded this run: {len(got)}")
     finally:
         print(f"records log pushed: {state.push_log(module)} rows")
+        if CLOSED.n:
+            print(f"Telegram closed a connection {CLOSED.n} times this run (Telethon reopened each; not an error)")
     st = machine.states(module)
     left = [r for r in recs if r["source"] == "telegram" and not machine.reached(st, r["id"], "uploaded")]
     print(f"left: {len(left)} Telegram records not uploaded yet")
