@@ -5,6 +5,9 @@ Finished items are deleted from "Left to do" and moved to "Done" as one line.
 
 ## Prompt for the next session (copy and paste)
 
+Superseded 2026-11-18: use the prompt in `docs/handovers/HANDOVER_2026-11-18_MEGA.md` (all open work, in order).
+The "Left to do" list below is history; the mega handover holds the current order.
+
 ```
 Read docs/spine/HANDOVER.md in tumrah-data and continue from "Left to do", item 1. The GitHub Actions setup has
 its own handover (docs/handovers/HANDOVER_2026-11-17_CLOUD.md) and waits for the owner. Rules: no Claude

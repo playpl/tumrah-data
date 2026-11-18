@@ -3,6 +3,9 @@
 Adds all data to the website, linked through the handout. Design and plan live in the tumrah repo:
 `docs/superpowers/specs/2026-11-06-data-workflow-design.md`, `docs/superpowers/plans/2026-11-06-data-workflow.md`.
 
+FINISH EVERYTHING (2026-11-18): start at `docs/handovers/HANDOVER_2026-11-18_MEGA.md` (all open work, in order;
+coverage of the owner's master prompt: `docs/spine/COVERAGE_2026-11-18.md`).
+
 Cloud (GitHub Actions, year 1 records off the PC): `docs/handovers/HANDOVER_2026-11-17_CLOUD.md`.
 Spine rebuild: `docs/spine/HANDOVER.md`.
 
