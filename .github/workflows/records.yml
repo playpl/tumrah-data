@@ -12,8 +12,8 @@ on:
         description: "MB to download from Telegram in this run (each year)"
         default: "3000"
       warp:
-        description: "Route through Cloudflare WARP (true/false)"
-        default: "true"
+        description: "Route through Cloudflare WARP (true/false; on, the live log stays blank)"
+        default: "false"
       connections:
         description: "Telegram connections per file (0 = one connection, blocks as in 'parallel')"
         default: "8"
@@ -60,7 +60,7 @@ jobs:
           pip install -q -r cloud/requirements.txt
           python -c "import cryptg, telethon; print('cryptg', cryptg.__version__ if hasattr(cryptg, '__version__') else 'ok', '- telethon', telethon.__version__)"
       - name: Cloudflare WARP
-        if: ${{ (github.event.inputs.warp || 'true') == 'true' }}
+        if: ${{ github.event.inputs.warp == 'true' }}    # run #3: with WARP on, the step log showed no line
         continue-on-error: true
         timeout-minutes: 5
         run: |
