@@ -33,7 +33,27 @@ in `jobs/sp_seg_v3_pilot/` in the main checkout, apart from the v2 jobs in `jobs
 by a scratch script that loads this branch's `segment.py`/`flow.py` over the main checkout's data and sets
 `flow.JOBS` to the pilot folder. When this note was written, all 4 Gemini accounts were held by a tumrah-book job
 (`py -m flow.images.recheck --fleet 0 --web 1`, PID 6560, since 02:17); the pilot waits for a free account.
-PILOT RESULT: see the end of this section (filled in when the run ends).
+PILOT RESULT (Gemini 4 Hydrogen, prompt v3, 16 chats; the accounts freed up and it ran the same day):
+**1 accepted, 6 rejected, 1 no answer.** Judged with `flow._judge_lecture` (same as `seg dry`):
+
+| Lecture | Result | First problem (A / B) |
+|---|---|---|
+| cns-001 (control) | accepted, agree 97% | clean / clean |
+| cns-013 (control) | rejected | A usable (4% offending); B `P6-P14 = B25-B25` goes back above B27, `P41-P53` over 12 paragraphs |
+| cns-040 (control) | rejected | both `P50-P66` over 12 paragraphs, `P67-P78 = B42` goes back above B45 (A and B identical) |
+| cns-021 | rejected | `P14-P22 = B29-B34` goes back above B43 / `P13-P21 = B30-B34` the same |
+| cns-027 | rejected | `P77-P87 = B31-B33` goes back above B41 / `P11-P23` over 12 paragraphs |
+| cns-038 | rejected | both `P26-P39` over 12 paragraphs |
+| cns-045 | rejected | both `P22-P33 = B32` goes back above B36 (A and B identical) |
+| cns-036 | no answer | both chats: Gemini said task.txt was not attached (the paste of the file failed) |
+
+What it shows: Hydrogen ignores two prompt rules most: (1) at most 12 paragraphs per segment (an unrepairable
+problem in `judge_segs`), and (2) the doctor going back = NONE (it maps the recap to the earlier lines instead, e.g.
+cns-021 A `P69-P86 = B44-B49` after `B54`). A and B often answer the same, so two Hydrogen chats are not
+independent readers (cns-040, cns-045). Not changed (owner's call): whether to let code split a long segment,
+whether going back may be mapped, and whether to retry cns-036 or attach differently (paste the task as text).
+Answers: `jobs/sp_seg_v3_pilot/<lecture>/<A|B>/answer.txt`; the script: `seg_pilot_seg.py` in the side-session
+notes folder (loads this branch's `segment.py`/`flow.py` over the main checkout's data).
 
 Still the owner's (unchanged): decisions 1-7 below. Rule 1 matters most for v3: the prompt now tells readers to
 write `= B51` again to continue one line, and `clip()` still counts that as "re-states" (MAX_CLIPPED 20%).
