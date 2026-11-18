@@ -338,6 +338,35 @@ class GeminiReader(unittest.TestCase):
             self.assertEqual(flow.run(["L1"], say=lambda *a: None), {"answered": 2})
         self.assertEqual(len(asked), 2)
 
+    def test_every_account_capped_writes_nothing_and_run_can_wait(self):
+        from unittest import mock
+        from spine.seg import flow
+        d = self.tmp / "jobs" / "L1" / "A"
+        capped = lambda prompt, model=None, attach=(), wait=None: (None, {"error": "capped", "until": 123.0})
+        self.assertEqual(flow.ask_gemini(d, ask=capped), "capped")
+        self.assertFalse((d / "reply_failed.txt").exists())
+        self.assertEqual(flow.CAPPED["until"], 123.0)
+        replies, slept = ["capped", "answered", "answered"], []
+        with mock.patch.object(flow, "ask_gemini", lambda d: replies.pop(0)):
+            self.assertEqual(flow.run(["L1"], say=lambda *a: None, wait_caps=True, sleep=slept.append),
+                             {"answered": 2})
+        self.assertEqual(len(slept), 1)
+        with mock.patch.object(flow, "ask_gemini", lambda d: "capped"):
+            self.assertEqual(flow.run(["L1"], say=lambda *a: None), {"capped": 2})
+
+
+class Renewal(unittest.TestCase):
+    def test_capped_option_text_gives_the_renewal(self):
+        from datetime import datetime
+        import gemini_browser as g
+        now = datetime(2026, 11, 18, 4, 31)
+        at = lambda t: datetime.fromtimestamp(g.renews_at(t, now))
+        self.assertEqual(at("يتم تجديد سقف ‎١٨ "
+                            "نوفمبر، ٤:٥٣ ص"),
+                         datetime(2026, 11, 18, 4, 53))
+        self.assertEqual(at("Usage limit resets Nov 18, 7:12 PM"), datetime(2026, 11, 18, 19, 12))
+        self.assertIsNone(g.renews_at("‎3.5 Flash-Lite", now))
+
 
 if __name__ == "__main__":
     unittest.main()

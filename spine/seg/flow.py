@@ -15,6 +15,7 @@ the paragraphs they agree on carry reader A's lines, the rest are written as NON
 """
 import hashlib
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from spine import ROOT, graph_dir, now, read_json, read_jsonl, write_json, write_jsonl
@@ -28,6 +29,7 @@ TRIES = 2                           # chats per job when a reply has no answer l
 ACCEPT = 0.8                        # share of paragraphs the two readers must agree on
 SHADOW = ("segments.jsonl",)        # derived files collect owns: removed when a lecture is not accepted (any more)
 SHADOW_SPINE = ("links.jsonl", "ranges.json")    # compat shapes written from segments.jsonl (lectures/<id>/spine/)
+CAPPED = {"until": 0.0}              # the latest "every account is capped" renewal seen (epoch seconds)
 ANSWER_FILES = ("answer.txt", "reader.json", "browser.json", "reply_failed.txt", "result.json", "done", "prompt.md")
 
 
@@ -113,8 +115,9 @@ def answered_by(d):
 
 def ask_gemini(d, ask=None, tries=TRIES):
     """Gemini web chats on d/task.txt (the prompt in the message, task.txt attached) until one reply has an answer
-    line, at most `tries`. Answered: answer.txt, reader.json {"by": "gemini"}, browser.json. Else the last reply is
-    kept in reply_failed.txt. `ask` is gemini_browser.ask (tests pass a fake)."""
+    line, at most `tries`. Answered: answer.txt, reader.json {"by": "gemini"}, browser.json. Every account at the
+    model's usage cap: "capped" (nothing written; CAPPED["until"] = the first renewal). Else the last reply is kept in
+    reply_failed.txt. `ask` is gemini_browser.ask (tests pass a fake)."""
     if ask is None:
         import gemini_browser
         ask = gemini_browser.ask
@@ -123,6 +126,9 @@ def ask_gemini(d, ask=None, tries=TRIES):
     text, meta = None, {}
     for _ in range(max(1, tries)):
         text, meta = ask(head, model=MODEL, attach=[str(d / "task.txt")], wait=WAIT)
+        if text is None and meta.get("until"):
+            CAPPED["until"] = max(CAPPED["until"], float(meta["until"]))
+            return "capped"
         if text and any(segment.LINE.match(segment.norm(x)) for x in text.splitlines()):
             (d / "answer.txt").write_text(text, encoding="utf-8")
             (d / "reply_failed.txt").unlink(missing_ok=True)
@@ -140,14 +146,22 @@ def todo(lids=None):
             if (job_dir(lid, r) / "task.txt").exists() and not answered(job_dir(lid, r))]
 
 
-def run(lids=None, say=print, limit=None, workers=1):
-    """Gemini web answers every unanswered job folder, `workers` chats at a time (at most 4, one per account)."""
+def run(lids=None, say=print, limit=None, workers=1, wait_caps=False, sleep=time.sleep):
+    """Gemini web answers every unanswered job folder, `workers` chats at a time (at most 4, one per account).
+    With `wait_caps`, a job that finds every account at its usage cap waits for the first renewal and is asked
+    again; without it the job is left unanswered ("capped")."""
     jobs = todo(lids)
     jobs = jobs[:limit] if limit is not None else jobs      # --limit 0 asks nothing (it must never mean "all")
     stats = {}
 
     def work(job):
-        verdict = ask_gemini(job[2])
+        while True:
+            verdict = ask_gemini(job[2])
+            if verdict != "capped" or not wait_caps:
+                break
+            secs = max(60, CAPPED["until"] - time.time() + 60)
+            say(f"  {job[0]}/{job[1]}: every account capped; waiting {secs / 60:.0f} min")
+            sleep(secs)
         say(f"  {job[0]}/{job[1]}: {verdict}")
         return verdict
 

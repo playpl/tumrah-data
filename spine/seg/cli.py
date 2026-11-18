@@ -29,7 +29,7 @@ def _jobs(a):
 
 
 def _run(a):
-    print(f"seg run: {flow.run(a.lectures or None, limit=a.limit, workers=a.workers)}")
+    print(f"seg run: {flow.run(a.lectures or None, limit=a.limit, workers=a.workers, wait_caps=a.wait)}")
     return 0
 
 
@@ -68,6 +68,7 @@ def register(sub):
         if name == "run":                            # Gemini web; the fleet is retired (owner 2026-11-18)
             x.add_argument("--limit", type=int)
             x.add_argument("--workers", type=int, default=1, help="chats at a time (at most 4, one per account)")
+            x.add_argument("--wait", action="store_true", help="when every account is capped, wait for the renewal")
         x.set_defaults(run=fn)
     x = p.add_parser("audit", help="one lecture's segments against its old placement")
     x.add_argument("lecture")
