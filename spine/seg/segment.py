@@ -5,8 +5,9 @@ answers per paragraph; a run of paragraphs with the same answer may share one li
 
     P12 = B40            P12 = B40-B42            P12-P15 = B40-B42            P16 = NONE
 
-There is no segment length rule and no forward-only rule: a doctor who goes back gets the earlier lines. Code turns
-the answer into one book range (or None) per paragraph (`parse`), checks it is a whole answer (`problems`),
+There is no segment length rule and no forward-only rule: a doctor who goes back gets the earlier lines. Readers
+also name several places for one paragraph (`P6-P7 = B25, B34`); that is kept as a list of ranges. Code turns
+the answer into a list of book ranges (or None) per paragraph (`parse`), checks it is a whole answer (`problems`),
 compares two readers paragraph by paragraph (`same`), and merges runs of paragraphs into segments (`segments`).
 """
 import re
@@ -38,12 +39,14 @@ P<a>-P<b> = B<c>-B<d>
 P<a> = NONE
 """
 
-LINE = re.compile(r"^P(\d+)(?:\s*-\s*P?(\d+))?\s*=\s*(?:B(\d+)(?:\s*-\s*B?(\d+))?|(NONE))$", re.I)
+_RNG = r"B\d+(?:\s*-\s*B?\d+)?"
+LINE = re.compile(r"^P(\d+)(?:\s*-\s*P?(\d+))?\s*=\s*(?:(" + _RNG + r"(?:\s*,\s*" + _RNG + r")*)|(NONE))$", re.I)
+ONE = re.compile(r"B(\d+)(?:\s*-\s*B?(\d+))?", re.I)
 # Formatting only, never meaning: zero-width and no-break spaces, typographic dashes, Arabic-Indic digits, ":" or an
 # arrow for "=", markdown marks, a bullet or number in front, a final period.
 _FOLD = {**{c: None for c in (0xFEFF, 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2060)}, 0xA0: " ",
          **{c: "-" for c in (0x2010, 0x2011, 0x2012, 0x2013, 0x2014, 0x2212)},
-         **{c: "=" for c in (0x3A, 0x2192)},
+         **{c: "=" for c in (0x3A, 0x2192)}, 0x60C: ",",
          **{0x660 + i: str(i) for i in range(10)}, **{0x6F0 + i: str(i) for i in range(10)}}
 _WRAP = re.compile(r"^(?:[-*•]+\s*|\d{1,3}[.)]\s+)")
 
@@ -69,7 +72,7 @@ def norm(line):
 
 
 def parse(answer, n_paras, n_book):
-    """(per, notes): per = [book range [c, d] or None] for P1..Pn (a paragraph answered twice keeps its first
+    """(per, notes): per = [list of book ranges [[c, d], ...] or None] for P1..Pn (a paragraph answered twice keeps its first
     answer); notes = counts of what was wrong: missing paragraphs, B outside the slice, paragraphs outside the
     transcript, paragraphs answered twice."""
     per = [False] * n_paras                       # False = not answered yet
@@ -79,16 +82,20 @@ def parse(answer, n_paras, n_book):
         if not m:
             continue
         notes["lines"] += 1
-        a, b, c, d, none = m.groups()
+        a, b, books, none = m.groups()
         a, b = int(a), int(b or a)
         rng = None
         if not none:
-            c, d = int(c), int(d or c)
-            c, d = min(c, d), max(c, d)
-            if not (1 <= c and d <= n_book):
-                notes["outside_book"] += 1
-                c, d = max(1, c), min(n_book, d)
-            rng = [c, d] if c <= d else None
+            rng = []
+            for c, d in ONE.findall(books):
+                c, d = int(c), int(d or c)
+                c, d = min(c, d), max(c, d)
+                if not (1 <= c and d <= n_book):
+                    notes["outside_book"] += 1
+                    c, d = max(1, c), min(n_book, d)
+                if c <= d and [c, d] not in rng:
+                    rng.append([c, d])
+            rng = sorted(rng) or None
         for p in range(min(a, b), max(a, b) + 1):
             if not 1 <= p <= n_paras:
                 notes["outside_talk"] += 1
@@ -116,10 +123,11 @@ def problems(per, notes):
 
 
 def same(x, y, near=NEAR):
-    """Two readers' answers for one paragraph agree: both NONE, ranges that overlap, or middles within `near`."""
+    """Two readers' answers for one paragraph agree: both NONE, or a range of one overlaps a range of the other or
+    their middles are within `near` book lines."""
     if x is None or y is None:
         return x is None and y is None
-    return x[0] <= y[1] and y[0] <= x[1] or abs((x[0] + x[1]) - (y[0] + y[1])) / 2 <= near
+    return any(p[0] <= q[1] and q[0] <= p[1] or abs((p[0] + p[1]) - (q[0] + q[1])) / 2 <= near for p in x for q in y)
 
 
 def agreed(a, b):
@@ -129,7 +137,7 @@ def agreed(a, b):
 
 
 def segments(per):
-    """Runs of paragraphs with the same answer: [{"p": [a, b], "b": [c, d] or None, "flag"?}]."""
+    """Runs of paragraphs with the same answer: [{"p": [a, b], "b": [[c, d], ...] or None, "flag"?}]."""
     out = []
     for i, x in enumerate(per, 1):
         if out and out[-1]["_x"] == x:
@@ -145,17 +153,20 @@ def segments(per):
 
 
 def record(segs, paras, sents, edges, by, conf=None):
-    """Rows of `lectures/<id>/segments.jsonl`: times from paragraph stamps, book sentence ids, and the handout
-    sentences the book range reaches through the Phase 1 edges."""
+    """Rows of `lectures/<id>/segments.jsonl`: times from paragraph stamps, book sentence ids ("book" = first to last
+    named line; "parts" = each named range when there are several), and the handout sentences the named lines reach
+    through the Phase 1 edges."""
     rows = []
     for n, s in enumerate(segs, 1):
         a, b = s["p"]
         row = {"n": n, "p": [a, b], "start": paras[a - 1]["start"],
                "end": paras[b]["start"] if b < len(paras) else None, "by": by}
         if s["b"]:
-            book = [x["id"] for x in sents[s["b"][0] - 1:s["b"][1]]]
-            row["book"] = [book[0], book[-1]]
-            row["handout"] = list(dict.fromkeys(h for bid in book for h in edges.get(bid, ())))
+            parts = [[x["id"] for x in sents[c - 1:d]] for c, d in s["b"]]
+            row["book"] = [parts[0][0], parts[-1][-1]]          # first to last named line
+            if len(parts) > 1:                                  # several places: only these lines, not the gap
+                row["parts"] = [[p[0], p[-1]] for p in parts]
+            row["handout"] = list(dict.fromkeys(h for p in parts for bid in p for h in edges.get(bid, ())))
         else:
             row["book"] = None
         if s.get("flag"):

@@ -70,22 +70,35 @@ class Task(unittest.TestCase):
 class Parse(unittest.TestCase):
     def test_single_ranges_runs_and_none(self):
         per, notes = segment.parse("P1 = B3\nP2-P3 = B4-B6\nP4 = NONE\nP5 = B2-B2", 5, 10)
-        self.assertEqual(per, [[3, 3], [4, 6], [4, 6], None, [2, 2]])     # going back (B2 after B6) is kept
+        self.assertEqual(per, [[[3, 3]], [[4, 6]], [[4, 6]], None, [[2, 2]]])     # going back (B2 after B6) is kept
         self.assertEqual(notes["missing"], 0)
 
     def test_formatting_is_folded_never_meaning(self):
         text = "Here are the lines:\n**P1 = B3**\n- P2 – P3 = B4 – B6.\n3) P4: NONE\n`P5 → B7`\nP٦ = B٨"
         per, notes = segment.parse(text, 6, 10)
-        self.assertEqual(per, [[3, 3], [4, 6], [4, 6], None, [7, 7], [8, 8]])
+        self.assertEqual(per, [[[3, 3]], [[4, 6]], [[4, 6]], None, [[7, 7]], [[8, 8]]])
 
     def test_a_paragraph_answered_twice_keeps_its_first_answer(self):
         per, notes = segment.parse("P1-P3 = B1-B2\nP3 = B9", 3, 10)
-        self.assertEqual(per[2], [1, 2])
+        self.assertEqual(per[2], [[1, 2]])
         self.assertEqual(notes["twice"], 1)
+
+    def test_several_places_for_one_paragraph_are_kept(self):
+        # v4 pilot (cns-013 B, cns-021 B, cns-038 B): Gemini names several places; these were "not answered" before
+        text = ("P6-P7 = B25, B34\nP8-P14 = B24-B25, B33-B34\nP3 = B26-B29, B37, B44\nP1 = B3 ، B5\n"
+                "P2 = B9, B9")
+        per, notes = segment.parse(text, 14, 50)
+        self.assertEqual(per[5], [[25, 25], [34, 34]])
+        self.assertEqual(per[7], [[24, 25], [33, 34]])
+        self.assertEqual(per[2], [[26, 29], [37, 37], [44, 44]])
+        self.assertEqual(per[0], [[3, 3], [5, 5]])              # Arabic comma
+        self.assertEqual(per[1], [[9, 9]])                      # a line named twice counts once
+        self.assertEqual(notes["missing"], 2)                   # only P4 and P5 not given
+        self.assertEqual(segment.problems(*segment.parse(text + "\nP4-P5 = NONE", 14, 50)), [])
 
     def test_numbers_outside_are_counted_and_clipped(self):
         per, notes = segment.parse("P1 = B8-B14\nP2 = B1\nP3 = B1", 2, 10)
-        self.assertEqual(per, [[8, 10], [1, 1]])
+        self.assertEqual(per, [[[8, 10]], [[1, 1]]])
         self.assertEqual((notes["outside_book"], notes["outside_talk"]), (1, 1))
 
 
@@ -112,30 +125,43 @@ class Problems(unittest.TestCase):
 
 class Agreement(unittest.TestCase):
     def test_overlap_near_and_none(self):
-        self.assertTrue(segment.same([58, 64], [58, 77]))       # nested ranges agree (cns-015)
-        self.assertTrue(segment.same([10, 10], [14, 14]))
-        self.assertFalse(segment.same([10, 10], [30, 30]))
+        self.assertTrue(segment.same([[58, 64]], [[58, 77]]))       # nested ranges agree (cns-015)
+        self.assertTrue(segment.same([[10, 10]], [[14, 14]]))
+        self.assertFalse(segment.same([[10, 10]], [[30, 30]]))
         self.assertTrue(segment.same(None, None))
-        self.assertFalse(segment.same(None, [1, 1]))
+        self.assertFalse(segment.same(None, [[1, 1]]))
+
+    def test_one_shared_place_of_several_agrees(self):
+        self.assertTrue(segment.same([[25, 25], [34, 34]], [[33, 34]]))
+        self.assertFalse(segment.same([[2, 3], [60, 61]], [[30, 31]]))
 
     def test_agreed_keeps_a_and_marks_the_rest(self):
-        per, share = segment.agreed([[1, 2], [3, 3], None, [40, 40]], [[2, 2], [3, 4], None, [3, 3]])
-        self.assertEqual(per, [[1, 2], [3, 3], None, "disputed"])
+        per, share = segment.agreed([[[1, 2]], [[3, 3]], None, [[40, 40]]], [[[2, 2]], [[3, 4]], None, [[3, 3]]])
+        self.assertEqual(per, [[[1, 2]], [[3, 3]], None, "disputed"])
         self.assertEqual(share, 0.75)
 
     def test_segments_merge_runs(self):
-        segs = segment.segments([[1, 2], [1, 2], None, "disputed", "disputed", [5, 5]])
-        self.assertEqual(segs, [{"p": [1, 2], "b": [1, 2]}, {"p": [3, 3], "b": None},
-                                {"p": [4, 5], "b": None, "flag": "disputed"}, {"p": [6, 6], "b": [5, 5]}])
+        segs = segment.segments([[[1, 2]], [[1, 2]], None, "disputed", "disputed", [[5, 5]]])
+        self.assertEqual(segs, [{"p": [1, 2], "b": [[1, 2]]}, {"p": [3, 3], "b": None},
+                                {"p": [4, 5], "b": None, "flag": "disputed"}, {"p": [6, 6], "b": [[5, 5]]}])
 
     def test_record_times_and_handout(self):
         paras = [{"n": i, "start": 30 * (i - 1), "text": ""} for i in range(1, 5)]
         sents = [{"id": f"s{j}"} for j in range(1, 6)]
-        rows = segment.record([{"p": [1, 2], "b": [2, 3]}, {"p": [3, 4], "b": None}], paras, sents,
+        rows = segment.record([{"p": [1, 2], "b": [[2, 3]]}, {"p": [3, 4], "b": None}], paras, sents,
                               {"s2": ["h1"], "s3": ["h1", "h2"]}, "geminiA+geminiB", 0.9)
         self.assertEqual(rows[0], {"n": 1, "p": [1, 2], "start": 0, "end": 60, "by": "geminiA+geminiB",
                                    "book": ["s2", "s3"], "handout": ["h1", "h2"], "conf": 0.9})
         self.assertEqual((rows[1]["book"], rows[1]["end"]), (None, None))
+
+    def test_record_several_places_reach_only_their_lines(self):
+        paras = [{"n": 1, "start": 0, "text": ""}]
+        sents = [{"id": f"s{j}"} for j in range(1, 11)]
+        rows = segment.record([{"p": [1, 1], "b": [[2, 2], [8, 9]]}], paras, sents,
+                              {"s2": ["h1"], "s5": ["h5"], "s9": ["h9"]}, "x")
+        self.assertEqual(rows[0]["book"], ["s2", "s9"])
+        self.assertEqual(rows[0]["parts"], [["s2", "s2"], ["s8", "s9"]])
+        self.assertEqual(rows[0]["handout"], ["h1", "h9"])           # s5 sits in the gap: not reached
 
 
 class Flow(unittest.TestCase):
