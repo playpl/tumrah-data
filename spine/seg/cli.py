@@ -7,7 +7,8 @@ def _prior(a):
     if not p:
         print(f"{a.lecture}: no transcript or no book")
         return 1
-    sc, sl, pts = p["scope"], p["slice"], p["prior"]
+    sc, sl = p["scope"], p["slice"]
+    pts = prior.prior(p["paras"], sl)
     print(f"{a.lecture}: {len(p['paras'])} paragraphs; book {sc['book']} B{sc['lo']}-B{sc['hi']} ({sc['how']}), "
           f"pages {sl[0]['page']}-{sl[-1]['page']}; prior matched {sum(x is not None for x in pts)}")
     for i in range(0, len(pts), a.every):

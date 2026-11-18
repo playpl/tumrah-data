@@ -1,17 +1,17 @@
-"""Phase 2 segmentation, end to end, in shadow (nothing the site or the Today screen reads is written).
+"""Phase 2 segmentation, in shadow (nothing the site or the Today screen reads is written).
 
-    py -m spine seg prior <lecture>            the zero-token prior and the book slice
-    py -m spine seg jobs [lecture ...]         one job folder per lecture and reader: jobs/sp_seg/<lecture>/<reader>/
-    py -m spine seg run [lecture ...]          Gemini web (4 Hydrogen) answers the unanswered job folders
-    py -m spine seg collect                    parse, check, repair, agree; writes lectures/<id>/segments.jsonl
-    py -m spine seg dry                        the same decisions as collect, writing nothing
-    py -m spine seg audit <lecture>            segments with times, book lines and handout pages, against the
-                                               lecture's old placement
-    py -m spine parity p2                      every segmented lecture against its old placement
+    py -m spine seg prior <lecture>        the zero-token prior and the book slice
+    py -m spine seg jobs [lecture ...]     one job folder per lecture and reader: jobs/sp_seg/<lecture>/<A|B>/
+    py -m spine seg run [lecture ...]      Gemini web (4 Hydrogen) answers the unanswered job folders
+    py -m spine seg dry [lecture ...]      what collect would decide, writing nothing
+    py -m spine seg collect [lecture ...]  writes lectures/<id>/segments.jsonl for the accepted lectures
+    py -m spine seg audit <lecture>        segments with times, book lines and handout pages vs the old placement
+    py -m spine parity p2                  every segmented lecture against its old placement
 
-Two readers per lecture (A, B: two independent Gemini web chats, neither sees the other's answer). Accepted when both
-answers are usable (after repair under 20% of paragraphs offending) and agree on 90% of paragraphs (within 5 book
-lines); then reader A's repaired segments are written with conf = the agreement. Else the lecture is `disputed` and its runs are listed.
+Rebuilt 2026-11-18 (owner: the fleet-era flow was over-engineered; Gemini web reads, the fleet is retired, Haiku
+reads no Arabic). Two readers per lecture (A, B: two separate Gemini chats). Each answers per paragraph
+(`segment.PROMPT`). A lecture is accepted when both answers are whole and they agree on `ACCEPT` of the paragraphs;
+the paragraphs they agree on carry reader A's lines, the rest are written as NONE flagged "disputed".
 """
 import hashlib
 import json
@@ -21,26 +21,21 @@ from spine import ROOT, graph_dir, now, read_json, read_jsonl, write_json, write
 from spine.seg import prior, scope, segment
 
 JOBS = ROOT / "jobs" / "sp_seg"
-READERS = ("A", "B")                # two independent readers per lecture
-MAX_OFFEND = segment.MAX_OFFEND
+READERS = ("A", "B")
+MODEL = "hydrogen"                  # Gemini web, 4 Hydrogen (owner 2026-11-18)
+WAIT = 900                          # seconds for one answer (a task is up to 170 KB)
+TRIES = 2                           # chats per job when a reply has no answer line (an attachment can fail)
+ACCEPT = 0.8                        # share of paragraphs the two readers must agree on
 SHADOW = ("segments.jsonl",)        # derived files collect owns: removed when a lecture is not accepted (any more)
 SHADOW_SPINE = ("links.jsonl", "ranges.json")    # compat shapes written from segments.jsonl (lectures/<id>/spine/)
-# The reader (owner 2026-11-18): Gemini on the web, model 4 Hydrogen, through the signed-in Chrome profiles
-# (gemini_browser.py). Aligning a lecture with the book is Arabic reading: Gemini's work, never Haiku's. The
-# Antigravity fleet is retired.
-MODEL = "hydrogen"
-WAIT = 900                          # seconds for one answer (a task is up to 170 KB)
+ANSWER_FILES = ("answer.txt", "reader.json", "browser.json", "reply_failed.txt", "result.json", "done", "prompt.md")
 
 
 def fingerprint(task, sents):
-    """What a reader's answer depends on: the exact task text (prompt, BOOK numbering, TRANSCRIPT with stamps) and
-    the sentence ids behind B1..Bk (record() writes those ids). A job is only judged against the fingerprint it was
-    written with; a moved placement, a re-split book or a new transcript makes the job stale, never silently reused."""
-    h = hashlib.sha256()
-    h.update(task.encode("utf-8"))
+    """What an answer depends on: the task text and the sentence ids behind B1..Bk."""
+    h = hashlib.sha256(task.encode("utf-8"))
     h.update(json.dumps([s["id"] for s in sents], ensure_ascii=False).encode("utf-8"))
     return h.hexdigest()
-
 
 
 def raw_of(lid):
@@ -49,8 +44,8 @@ def raw_of(lid):
 
 
 def lectures_with_books(module="year2-cns", handout=False):
-    """Lecture ids that have a transcript and whose doctor has a split book; with `handout`, also those whose doctor
-    has none but whose lecture has a handout placement (they are read against the handout itself)."""
+    """Lecture ids with a transcript whose doctor has a split book; with `handout`, also those whose doctor has none
+    but whose lecture has a handout placement (read against the handout itself)."""
     books = scope.doctor_books(module)
     out = []
     for f in sorted((ROOT / "lectures").glob("*/lecture.json")):
@@ -63,7 +58,7 @@ def lectures_with_books(module="year2-cns", handout=False):
 
 
 def prepare(lid, module="year2-cns", cache=None):
-    """{paras, scope, slice, prior} of one lecture, or None (no transcript or no book)."""
+    """{paras, scope, slice} of one lecture, or None (no transcript, no book or an empty slice)."""
     paras = prior.paragraphs(raw_of(lid))
     if not paras:
         return None
@@ -71,16 +66,16 @@ def prepare(lid, module="year2-cns", cache=None):
     if not sc:
         return None
     sl = sc["sents"][max(0, sc["lo"]):sc["hi"] + 1]
-    if not sl:                                         # an empty book or slice has nothing to read against
-        return None
-    return {"paras": paras, "scope": sc, "slice": sl, "prior": prior.prior(paras, sl)}
+    return {"paras": paras, "scope": sc, "slice": sl} if sl else None
 
 
 def job_dir(lid, reader):
     return JOBS / lid / reader
 
 
-def make_jobs(lids, module="year2-cns", readers=("A", "B"), say=print):
+def make_jobs(lids, module="year2-cns", say=print):
+    """Write task.txt + meta.json per lecture and reader. A job whose task did not change keeps its answer; a
+    changed one loses it. Returns the number of job folders written."""
     cache, made = {}, 0
     for lid in lids:
         p = prepare(lid, module, cache)
@@ -88,28 +83,21 @@ def make_jobs(lids, module="year2-cns", readers=("A", "B"), say=print):
             say(f"  {lid}: no transcript or no book")
             continue
         task = segment.render(p["paras"], p["slice"])
-        meta = {"lecture": lid, "book": p["scope"]["book"], "lo": p["scope"]["lo"], "hi": p["scope"]["hi"],
-                "how": p["scope"]["how"], "paras": len(p["paras"]), "book_lines": len(p["slice"]),
-                "version": segment.VERSION, "at": now(), "fp": fingerprint(task, p["slice"])}
-        for r in readers:
+        fp = fingerprint(task, p["slice"])
+        for r in READERS:
             d = job_dir(lid, r)
-            old = read_json(d / "meta.json") or {}
-            same = (d / "task.txt").exists() and old.get("version") == meta["version"] \
-                and (d / "task.txt").read_text(encoding="utf-8") == task \
-                and old.get("fp", meta["fp"]) == meta["fp"]
-            if same:                                         # same task text and slice: keep its answer
-                if "fp" not in old:
-                    write_json(d / "meta.json", dict(old, fp=meta["fp"]))
+            if (read_json(d / "meta.json") or {}).get("fp") == fp:
                 continue
             d.mkdir(parents=True, exist_ok=True)
-            for f in ("result.json", "answer.txt", "done", "browser.json", "reader.json", "reply_failed.txt"):
+            for f in ANSWER_FILES:
                 (d / f).unlink(missing_ok=True)
             (d / "task.txt").write_text(task, encoding="utf-8")
-            (d / "prompt.md").unlink(missing_ok=True)       # the retired fleet's note
-            write_json(d / "meta.json", meta)
+            write_json(d / "meta.json", {"lecture": lid, "book": p["scope"]["book"], "lo": p["scope"]["lo"],
+                                         "hi": p["scope"]["hi"], "paras": len(p["paras"]), "version": segment.VERSION,
+                                         "at": now(), "fp": fp})
             made += 1
-        say(f"  {lid}: {meta['paras']} paragraphs, book {meta['book']} B{meta['lo']}-B{meta['hi']} "
-            f"({meta['book_lines']} lines, {meta['how']}), {len(task):,} characters")
+        say(f"  {lid}: {len(p['paras'])} paragraphs, book {p['scope']['book']} B{p['scope']['lo']}-B{p['scope']['hi']}"
+            f" ({len(p['slice'])} lines), {len(task):,} characters")
     return made
 
 
@@ -118,34 +106,31 @@ def answered(d):
 
 
 def answered_by(d):
-    """Who wrote this job's answer.txt, for the `by` field of segments.jsonl. Any runner may write reader.json
-    {"by": "<reader>"} next to answer.txt (ask_gemini does); else browser.json means Gemini web; else the fleet (old
-    answers from before 2026-11-18)."""
+    """Who wrote this job's answer: reader.json {"by"}, else browser.json = Gemini web, else the retired fleet."""
     by = (read_json(d / "reader.json") or {}).get("by")
-    if by:
-        return str(by)
-    return "browser" if (d / "browser.json").exists() else "fleet"
+    return str(by) if by else ("browser" if (d / "browser.json").exists() else "fleet")
 
 
-def ask_gemini(d, ask=None):
-    """One Gemini web chat on d/task.txt: the prompt in the message, task.txt attached. Answered: answer.txt,
-    reader.json {"by": "gemini"} and browser.json (account, model, seconds). A reply with no segment line is kept in
-    reply_failed.txt and the job stays unanswered. `ask` is gemini_browser.ask (tests pass a fake)."""
+def ask_gemini(d, ask=None, tries=TRIES):
+    """Gemini web chats on d/task.txt (the prompt in the message, task.txt attached) until one reply has an answer
+    line, at most `tries`. Answered: answer.txt, reader.json {"by": "gemini"}, browser.json. Else the last reply is
+    kept in reply_failed.txt. `ask` is gemini_browser.ask (tests pass a fake)."""
     if ask is None:
         import gemini_browser
         ask = gemini_browser.ask
     task = (d / "task.txt").read_text(encoding="utf-8")
-    head = task.partition("\nBOOK\n")[0]
-    text, meta = ask(head + "\nThe BOOK and TRANSCRIPT blocks are in the attached file task.txt.",
-                     model=MODEL, attach=[str(d / "task.txt")], wait=WAIT)
-    if not text or not segment.parse(text)[0]:
-        (d / "reply_failed.txt").write_text(text or json.dumps(meta, ensure_ascii=False), encoding="utf-8")
-        return "failed"
-    (d / "answer.txt").write_text(text, encoding="utf-8")
-    (d / "reply_failed.txt").unlink(missing_ok=True)
-    write_json(d / "browser.json", meta)
-    write_json(d / "reader.json", {"by": "gemini", "model": MODEL})
-    return "answered"
+    head = task.partition("\nBOOK\n")[0] + "\nThe BOOK and TRANSCRIPT blocks are in the attached file task.txt."
+    text, meta = None, {}
+    for _ in range(max(1, tries)):
+        text, meta = ask(head, model=MODEL, attach=[str(d / "task.txt")], wait=WAIT)
+        if text and any(segment.LINE.match(segment.norm(x)) for x in text.splitlines()):
+            (d / "answer.txt").write_text(text, encoding="utf-8")
+            (d / "reply_failed.txt").unlink(missing_ok=True)
+            write_json(d / "browser.json", meta)
+            write_json(d / "reader.json", {"by": "gemini", "model": MODEL})
+            return "answered"
+    (d / "reply_failed.txt").write_text(text or json.dumps(meta, ensure_ascii=False), encoding="utf-8")
+    return "failed"
 
 
 def todo(lids=None):
@@ -156,8 +141,7 @@ def todo(lids=None):
 
 
 def run(lids=None, say=print, limit=None, workers=1):
-    """Gemini web answers every unanswered job folder (one chat per job; `workers` chats at a time, at most one
-    per signed-in account)."""
+    """Gemini web answers every unanswered job folder, `workers` chats at a time (at most 4, one per account)."""
     jobs = todo(lids)
     jobs = jobs[:limit] if limit is not None else jobs      # --limit 0 asks nothing (it must never mean "all")
     stats = {}
@@ -173,37 +157,13 @@ def run(lids=None, say=print, limit=None, workers=1):
     return stats
 
 
-def judge(d, n_paras, n_book):
-    """(repaired segments or None, problems, offending share) of one reader's answer."""
+def read_answer(d, n_paras, n_book):
+    """(per paragraph answer or None when unusable, problems)."""
     if not answered(d):
-        return None, ["no answer"], 1.0
-    segs, bad = segment.parse((d / "answer.txt").read_bytes().decode("utf-8", errors="replace"))
-    return segment.judge_segs(segs, n_paras, n_book, bad)
-
-
-def _drop_shadow(lid):
-    """Remove the derived files of a lecture that is not accepted now, so an old accepted output cannot outlive
-    the judgement that made it (both the segments file and the compat shapes written from it)."""
-    for f in SHADOW:
-        (ROOT / "lectures" / lid / f).unlink(missing_ok=True)
-    for f in SHADOW_SPINE:
-        (ROOT / "lectures" / lid / "spine" / f).unlink(missing_ok=True)
-
-
-def _stale(lid, task, fp):
-    """Readers whose job was written for a different task or slice than the one collect would judge now."""
-    out = []
-    for r in READERS:
-        d = job_dir(lid, r)
-        m = read_json(d / "meta.json") or {}
-        if not (d / "task.txt").exists():
-            out.append(r)
-        elif m.get("fp"):
-            if m["fp"] != fp:
-                out.append(r)
-        elif (d / "task.txt").read_text(encoding="utf-8") != task:      # a job from before fingerprints
-            out.append(r)
-    return out
+        return None, ["no answer"]
+    per, notes = segment.parse((d / "answer.txt").read_bytes().decode("utf-8", errors="replace"), n_paras, n_book)
+    why = segment.problems(per, notes)
+    return (None if why else per), why
 
 
 def _judge_lecture(lid, module, cache):
@@ -211,84 +171,85 @@ def _judge_lecture(lid, module, cache):
     p = prepare(lid, module, cache)
     if p is None:
         return {"state": "no source", "why": "no transcript, no book, or an empty slice"}, None
-    n, nb = len(p["paras"]), len(p["slice"])
-    task = segment.render(p["paras"], p["slice"])
-    fp = fingerprint(task, p["slice"])
-    stale = _stale(lid, task, fp)
+    fp = fingerprint(segment.render(p["paras"], p["slice"]), p["slice"])
+    stale = [r for r in READERS if (read_json(job_dir(lid, r) / "meta.json") or {}).get("fp") != fp]
     if stale:
         return {"state": "stale", "stale_readers": stale,
-                "why": "the book slice, placement or transcript changed since these jobs were written: "
-                       f"py -m spine seg jobs {lid}"}, None
-    got = {r: judge(job_dir(lid, r), n, nb) for r in READERS}
-    state = {"fp": fp[:12], "readers": {r: {"usable": g[0] is not None, "problems": g[1][:6],
-                                            "offending": round(g[2], 3)} for r, g in got.items()}}
+                "why": f"the slice, placement, transcript or prompt changed: py -m spine seg jobs {lid}"}, None
+    n, nb = len(p["paras"]), len(p["slice"])
+    got = {r: read_answer(job_dir(lid, r), n, nb) for r in READERS}
+    state = {"fp": fp[:12], "readers": {r: g[1][:4] for r, g in got.items()}}
     a, b = got["A"][0], got["B"][0]
-    rows = None
-    if a is not None and b is not None:
-        share = segment.agree(a, b, n)
-        state["agree"] = round(share, 3)
-        if share >= segment.AGREE_SHARE:
-            state["state"] = "accepted"
-            if p["scope"].get("target") == "handout":   # read against the handout: B lines are handout sentences
-                links = {x["id"]: [x["id"]] for x in p["slice"]}
-            else:
-                links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
-            by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in READERS)    # "geminiA+geminiB"
-            rows = segment.record(a, p["paras"], p["slice"], links, by, round(share, 3))
-        else:
-            state["state"] = "disputed"
-            state["runs"] = segment.disputed(a, b, n)
-    else:
+    if a is None or b is None:
         state["state"] = "waiting" if not all(answered(job_dir(lid, r)) for r in READERS) else "rejected"
-    return state, rows
+        return state, None
+    per, share = segment.agreed(a, b)
+    state["agree"] = round(share, 3)
+    if share < ACCEPT:
+        state["state"] = "disputed"
+        return state, None
+    state["state"] = "accepted"
+    if p["scope"].get("target") == "handout":           # read against the handout: B lines are handout sentences
+        links = {x["id"]: [x["id"]] for x in p["slice"]}
+    else:
+        links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
+    by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in READERS)
+    return state, segment.record(segment.segments(per), p["paras"], p["slice"], links, by, round(share, 3))
+
+
+def _drop_shadow(lid):
+    """Remove the derived files of a lecture that is not accepted now, so an old output cannot outlive it."""
+    for f in SHADOW:
+        (ROOT / "lectures" / lid / f).unlink(missing_ok=True)
+    for f in SHADOW_SPINE:
+        (ROOT / "lectures" / lid / "spine" / f).unlink(missing_ok=True)
+
+
+def _lids(lids):
+    return lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir() and (p / "A" / "meta.json").exists())
+
+
+def _line(lid, state):
+    return (f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%})" if "agree" in state else "")
+            + (f" {state['why']}" if state.get("why") else "")
+            + "".join(f"; {r}: {'; '.join(p[:2])}" for r, p in (state.get("readers") or {}).items() if p))
 
 
 def dry(lids=None, module="year2-cns", say=print):
-    """What `collect` would decide for each job folder, writing nothing (no segments, no shadow files, no state)."""
+    """What `collect` would decide for each lecture, writing nothing."""
     stats, cache = {}, {}
-    for lid in lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir()):
-        if not read_json(job_dir(lid, "A") / "meta.json"):
-            continue
+    for lid in _lids(lids):
         try:
             state, _ = _judge_lecture(lid, module, cache)
         except Exception as e:
             state = {"state": "error", "why": f"{type(e).__name__}: {e}"}
         stats[state["state"]] = stats.get(state["state"], 0) + 1
-        say(f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%})" if "agree" in state else "")
-            + (f" {state['why']}" if state.get("why") else ""))
+        say(_line(lid, state))
     return stats
 
 
 def collect(lids=None, module="year2-cns", say=print):
-    """Judge each lecture's answers; write segments.jsonl for the accepted ones. Returns counts.
-
-    One lecture's failure never stops the others: it is recorded as state "error" in its state.json. A lecture that
-    is not accepted loses its shadow files (see `_drop_shadow`)."""
+    """Judge each lecture; write segments.jsonl (+ the compat shadow files) for the accepted ones, remove them for
+    the rest. One lecture's error never stops the others."""
     stats, cache = {}, {}
-    for lid in lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir()):
-        if not read_json(job_dir(lid, "A") / "meta.json"):
-            continue
+    for lid in _lids(lids):
         try:
             state, rows = _judge_lecture(lid, module, cache)
-        except Exception as e:                               # recorded, visible, and the batch goes on
+        except Exception as e:
             state, rows = {"state": "error", "why": f"{type(e).__name__}: {e}"}, None
-        state = {"lecture": lid, "at": now(), **state}
         try:
             if state["state"] == "accepted":
                 write_jsonl(ROOT / "lectures" / lid / "segments.jsonl", rows)
-                from spine import compat             # shadow legacy files: lectures/<id>/spine/
+                from spine import compat
                 compat.lecture_files(lid, module, cache.setdefault("handout", compat._handout(module)))
             else:
                 _drop_shadow(lid)
-        except Exception as e:                       # a write that fails is an error on this lecture, not a crash
+        except Exception as e:
             _drop_shadow(lid)
-            state = {"lecture": lid, "at": now(), "state": "error", "why": f"write: {type(e).__name__}: {e}"}
-        write_json(JOBS / lid / "state.json", state)
+            state = {"state": "error", "why": f"write: {type(e).__name__}: {e}"}
+        write_json(JOBS / lid / "state.json", {"lecture": lid, "at": now(), **state})
         stats[state["state"]] = stats.get(state["state"], 0) + 1
-        readers = state.get("readers") or {}
-        notes = "".join(f"; {r}: {'; '.join(g['problems'][:2])}" for r, g in readers.items() if g["problems"])
-        say(f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%})" if "agree" in state else "")
-            + (f" {state['why']}" if state.get("why") else "") + notes)
+        say(_line(lid, state))
     return stats
 
 
