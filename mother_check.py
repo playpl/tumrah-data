@@ -15,6 +15,7 @@ from pathlib import Path
 import tg_lists
 
 ROOT = Path(__file__).resolve().parent
+DEAD = []   # notes, not differences: list links to posts the channel does not have (2026-11-18, Wagih's 1848)
 
 
 def norm(s):
@@ -41,6 +42,10 @@ def check_doctor(doc, lst):
             for p in it["parts"]:
                 post = lst["posts"].get(str(p["post"])) or {}
                 if not p["post"] or post.get("kind") in ("pdf", "file"):
+                    continue
+                if str(p["post"]) not in lst["posts"]:   # the channel has no such post (deleted): nothing to import
+                    DEAD.append(f"{who}: {sec[:-1]} '{it['title']}' {p['label']} links post {p['post']}, which the "
+                                f"channel does not have (deleted?); not in the hand file until the doctor fixes the link")
                     continue
                 linked.add(p["post"])
                 if p["post"] not in items:
@@ -69,3 +74,5 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
     lines = check(*sys.argv[1:])
     print("\n".join(lines) if lines else "exact")
+    for ln in DEAD:
+        print("note, dead link: " + ln)

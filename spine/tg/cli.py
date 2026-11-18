@@ -76,6 +76,11 @@ def _job(a):
     return 0
 
 
+def fleet_down():
+    """config.json "fleet": {"down": true} (owner 2026-11-18: the Antigravity fleet is retired)."""
+    return bool(((read_json(ROOT / "config.json", {}) or {}).get("fleet") or {}).get("down"))
+
+
 def _run(a):
     lists = [mother.load(i) for i in wanted(a)]
     for i, l in zip(wanted(a), lists):
@@ -88,6 +93,10 @@ def _run(a):
     for l in lists:
         if l not in todo:
             print(f"{mother.ref(l)}: unchanged since the cached map, no read")
+    if todo and fleet_down():   # owner 2026-11-18: the fleet is retired; Claude reads changed lists by hand
+        for l in todo:
+            print(f"{mother.ref(l)}: changed, NOT read (fleet retired, config.json fleet.down); read it by hand")
+        return 0
     with ThreadPoolExecutor(max_workers=12) as pool:
         got = list(pool.map(read_one, [(n, l, r) for n, l in enumerate(todo) for r in ("A", "B")]))
     bad = 0

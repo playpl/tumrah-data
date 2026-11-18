@@ -167,17 +167,6 @@
   },
   {
    "answer": null,
-   "at": 1794416078.6361427,
-   "detail": "Fleet: Not reset yet: accounts in quota rest until about 11:35 (owner, 2026-11-12). Web: the Google login is dead on every account: export the cookies again. Code steps still run; readings, pointers and alignment wait.",
-   "id": "runner",
-   "kind": "runner",
-   "options": "[\"Check again\"]",
-   "payload": "{}",
-   "state": "gone",
-   "title": "No AI can work now"
-  },
-  {
-   "answer": null,
    "at": 1794342642.8132064,
    "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
    "id": "spot:2026-11-10",
@@ -247,6 +236,17 @@
    "at": 1794833534.7279649,
    "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
    "id": "spot:2026-11-16",
+   "kind": "review",
+   "options": "[\"Start\", \"Skip today\"]",
+   "payload": "{\"n\": 10, \"review\": \"spot\"}",
+   "state": "gone",
+   "title": "Spot check: 10 links, about 2 minutes"
+  },
+  {
+   "answer": null,
+   "at": 1794899104.41847,
+   "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
+   "id": "spot:2026-11-17",
    "kind": "review",
    "options": "[\"Start\", \"Skip today\"]",
    "payload": "{\"n\": 10, \"review\": \"spot\"}",
