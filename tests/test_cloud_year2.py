@@ -295,6 +295,10 @@ class UpdateDataNoTransfers(unittest.TestCase):
             out = update_data.waiting_telegram(None, False, transfers=False)
         self.assertEqual(out, ["cns-901: post 1878 (5 MB) waits for the GitHub runner"])
 
+    def test_fleet_is_down(self):
+        import update_data
+        self.assertTrue(update_data.fleet_down())             # the mother step must not start fleet readers
+
     def test_config_says_no_transfers(self):
         import update_data
         self.assertFalse(update_data.pc_transfers())

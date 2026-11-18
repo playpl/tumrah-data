@@ -68,6 +68,11 @@ def pc_transfers():
     return json.loads((ROOT / "config.json").read_text(encoding="utf-8")).get("pc_transfers", True)
 
 
+def fleet_down():
+    """config.json fleet.down (owner 2026-11-18: the Antigravity fleet is retired). No step may start it."""
+    return bool(json.loads((ROOT / "config.json").read_text(encoding="utf-8")).get("fleet", {}).get("down"))
+
+
 def year2_cloud(dry):
     """The runner's year 2 uploads into lecture.json/media.json, then the to-do list it downloads next."""
     from cloud import state, year2
@@ -210,8 +215,12 @@ def main(argv):
             step(report, "waiting Telegram recordings", lambda: waiting_telegram(q, dry, transfers))
             # the mother agent (spine/tg/flow.py): changed lists re-read by two fleet readers, new lectures ADDED to
             # mother_lists.json (never edited or removed), edits/deletions reported, parity mother checked
-            from spine.tg import flow as mother_flow
-            step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
+            if fleet_down():   # its readers were the fleet (retired 2026-11-18); Claude reads the lists by hand
+                report.append(("mother messages (agent, add only)",
+                               ["skipped: its readers were the fleet (retired); read each changed list yourself"]))
+            else:
+                from spine.tg import flow as mother_flow
+                step(report, "mother messages (agent, add only)", lambda: mother_flow.run(dry))
         if not transfers:
             step(report, "year 2 records (GitHub)", lambda: year2_cloud(dry))
         step(report, "site files", site_files)

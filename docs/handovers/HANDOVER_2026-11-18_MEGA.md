@@ -27,10 +27,24 @@ Two sessions started from the records session were still working when this was w
   answer (attachment failed). Its branch also rewrites the CLAUDE.md "Readers" section (Arabic = Gemini, Haiku
   non-Arabic only; the memory index already says so). Merge it into `spine-rebuild` (check `git log` and the
   diff first), then push.
-- **update-data** (this checkout): ran Update data with `pc_transfers: false`, mother lists, site import, polls
-  restart. Left uncommitted: `mother_check.py`, `spine/tg/cli.py`, `tests/test_fleet_retired_guards.py`,
-  `data_backup/ledger_owner.json`. Read its last report (`mcp__ccd_session_mgmt__get_session`), check
-  `py mother_check.py` = exact, run the tests, commit what is right.
+  Its last report (00:45): the v3 pilot was 3 of 16 chats in; it will judge, change the prompt and rerun until the
+  pilot is good, then report. Wait for that report (or read its transcript) before W1.
+- **update-data** (this checkout): DONE, commit `181d321`. Update data with `pc_transfers: false` (nothing moved on
+  the PC); 14 new CNS lectures cns-164..177 (Mosafer 1870-1871, Azouny 1877-1879, Wagih 1864-1866, Zahran 1869
+  and 1876, Nageb 1872-1875) added BY HAND to `mother_lists.json` (6 new chapters), `mother_check` exact; site
+  import: 14 lessons created, 158 changed; year 1 +6 lessons (91 wait for uploads); polls restarted (old log
+  ended in "database or disk is full"; disk now 111 GB free; saved as `polls/engine.before-restart-2026-11-18.log`;
+  votes needed 643). FLEET INCIDENT: the Update data step "mother messages (agent, add only)" started fleet
+  readers (`agy.exe`) despite `fleet.down`; they were killed; `spine/tg/cli._run` and `update_data.py`
+  (`fleet_down()`) now skip that step.
+  Its Update data pulled the year 2 log before the runner had uploaded, so the 14 had no cloud key; the records
+  session ran `cloud.year2.pull()` after (14 rows `cloud: true` in `media.json`) and the site import again.
+  Open from it (owner): Wagih list 1631 has two revision items with no real post ("Basal ganglia" -> 1848 gone;
+  "limbic system" -> 1847 = the lecture itself); Elsamahy post 1880 "Stretch reflex part 2" is not linked from
+  list 1637 yet (it is imported once linked); 26 decisions wait on the Today screen; 6 changed year 2 lists
+  (1630, 1631, 1632, 1635, 1637, 1638) have no agent map now that the fleet is gone (W5).
+- After every Records run, Update data's step "year 2 records (GitHub)" (`cloud.year2.pull`) must run before the
+  site import, or new lessons go up without audio (seen 2026-11-18).
 - GitHub "Records" run #5 (`44207708010`) was running: year 1 at 4.9-5.3 MB/s, 3000 MB cap; the cron run at
   02:17 UTC takes the rest. Check with `gh run list --workflow records.yml`.
 
@@ -127,6 +141,10 @@ Two sessions started from the records session were still working when this was w
 6. Mother agent to primary (replaces the by-hand `mother_lists.json` rule).
 7. Site doctor ids: Cocci (ZAG59_physio/58), ZAG59_bio/34; Dr. Khaled's year 2 doctor id if still missing.
 8. Seg handover's other open decisions (`HANDOVER_2026-11-18_SEG.md`).
+9. The mother agent's new reader: Gemini web or Haiku (CLAUDE.md said Haiku for mother maps; the owner later
+   said all Arabic work is Gemini's, and the lists are Arabic). Until then Claude reads changed lists by hand.
+10. Wagih list 1631: the "Basal ganglia" revision links post 1848 (gone) and "limbic system" links 1847 (the
+    lecture itself): what are the real posts? Elsamahy post 1880 waits for the list to link it.
 
 ## 4. Where things are
 
