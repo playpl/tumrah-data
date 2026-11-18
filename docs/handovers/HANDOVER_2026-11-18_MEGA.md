@@ -27,8 +27,11 @@ Two sessions started from the records session were still working when this was w
   answer (attachment failed). Its branch also rewrites the CLAUDE.md "Readers" section (Arabic = Gemini, Haiku
   non-Arabic only; the memory index already says so). Merge it into `spine-rebuild` (check `git log` and the
   diff first), then push.
-  Its last report (00:45): the v3 pilot was 3 of 16 chats in; it will judge, change the prompt and rerun until the
-  pilot is good, then report. Wait for that report (or read its transcript) before W1.
+  It then ran a v4 pilot (prompt changed again in its worktree, not committed as far as seen) and stopped: the
+  account hit its 5-hour limit, then a cache-cost hook dropped "Try again". v4 result (its task output, judged):
+  2 of 8 accepted (cns-036 87%, cns-040 87%); rejected cns-013, 021, 027, 038, 045, mostly "N paragraphs not
+  answered" (cns-038 B left 229 of 267, NONE for 89%); cns-001 B no answer. Before W1: commit what its worktree
+  holds (`git -C .claude/worktrees/seg-followup-3f2305 status`), read its v4 prompt, then go on from there.
 - **update-data** (this checkout): DONE, commit `181d321`. Update data with `pc_transfers: false` (nothing moved on
   the PC); 14 new CNS lectures cns-164..177 (Mosafer 1870-1871, Azouny 1877-1879, Wagih 1864-1866, Zahran 1869
   and 1876, Nageb 1872-1875) added BY HAND to `mother_lists.json` (6 new chapters), `mother_check` exact; site
