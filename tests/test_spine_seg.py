@@ -1,5 +1,6 @@
 """Phase 2 segmentation (rebuilt 2026-11-18): per-paragraph answers from two Gemini web readers."""
 import unittest
+from unittest import mock
 
 import numpy as np
 
@@ -366,6 +367,37 @@ class Renewal(unittest.TestCase):
                          datetime(2026, 11, 18, 4, 53))
         self.assertEqual(at("Usage limit resets Nov 18, 7:12 PM"), datetime(2026, 11, 18, 19, 12))
         self.assertIsNone(g.renews_at("‎3.5 Flash-Lite", now))
+
+
+class CapFallback(unittest.TestCase):
+    """Owner 2026-11-20: a capped account answers with its free model (Flash-Lite) until the renewal."""
+
+    def test_known_cap_uses_flash_lite(self):
+        import gemini_browser as g
+        calls = []
+        with mock.patch.object(g, "capped_until", lambda n, m: 9e12 if m == "hydrogen" else None), \
+                mock.patch.object(g, "ask_on", lambda pw, n, p, a, w, m: calls.append(m) or "ok"):
+            self.assertEqual(g.ask_on_fallback(None, 1, "p", model="hydrogen"), ("ok", "Flash-Lite"))
+        self.assertEqual(calls, ["flash-lite"])
+
+    def test_cap_found_now_retries_with_flash_lite(self):
+        import gemini_browser as g
+        calls = []
+
+        def ask_on(pw, n, p, a, w, m):
+            calls.append(m)
+            if m == "hydrogen":
+                raise g.Capped(n, "Hydrogen", 9e9)
+            return "ok"
+        with mock.patch.object(g, "capped_until", lambda n, m: None), mock.patch.object(g, "ask_on", ask_on):
+            self.assertEqual(g.ask_on_fallback(None, 2, "p", model="hydrogen"), ("ok", "Flash-Lite"))
+        self.assertEqual(calls, ["hydrogen", "flash-lite"])
+
+    def test_ready_account_keeps_hydrogen(self):
+        import gemini_browser as g
+        with mock.patch.object(g, "capped_until", lambda n, m: None), \
+                mock.patch.object(g, "ask_on", lambda pw, n, p, a, w, m: m):
+            self.assertEqual(g.ask_on_fallback(None, 3, "p", model="hydrogen"), ("hydrogen", "Hydrogen"))
 
 
 if __name__ == "__main__":

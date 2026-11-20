@@ -191,11 +191,9 @@ def run(recs, limit=None, workers=4, model="hydrogen", say=print, ask=None, via=
             r, p = job
             if STOP.exists():
                 return
-            if gemini_browser.capped_until(n, model):
-                raise RuntimeError(f"account {n} capped")
-
-            def asker(prompt, model, attach, timeout):
-                return gemini_browser.ask_on(pw, n, prompt.read_text(encoding="utf-8"), [attach[0]], timeout, model), {"account": n}
+            def asker(prompt, model, attach, timeout):   # a capped account answers with its free model (owner 11-20)
+                text, used = gemini_browser.ask_on_fallback(pw, n, prompt.read_text(encoding="utf-8"), [attach[0]], timeout, model)
+                return text, {"account": n, "model": used}
             if hear(p, model, tries=1, ask=asker, say=say) is None:
                 raise RuntimeError("the answer failed the piece check")
             done(r)

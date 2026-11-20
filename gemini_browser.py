@@ -34,6 +34,8 @@ ACCOUNTS = (1, 2, 3, 4)
 # The owner's names -> the text of Gemini's mode menu option (the option holds the model's Latin name in every UI language).
 MODELS = {"flash-lite": "Flash-Lite", "gemini-flash-lite": "Flash-Lite", "flash": "Flash", "gemini-flash": "Flash",
           "hydrogen": "Hydrogen"}
+# A capped account answers with its free model until the renewal (owner, 2026-11-20).
+FALLBACK = {"hydrogen": "flash-lite"}
 TYPES = {".ogg": "audio/ogg", ".opus": "audio/ogg", ".m4a": "audio/mp4", ".mp3": "audio/mpeg", ".wav": "audio/wav",
          ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/plain", ".jsonl": "text/plain",
          ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
@@ -197,6 +199,20 @@ def ask_on(pw, n, prompt, attach=(), wait=300, model="flash-lite"):
         lock.unlink(missing_ok=True)
 
 
+def ask_on_fallback(pw, n, prompt, attach=(), wait=300, model="hydrogen"):
+    """ask_on with the owner's cap rule (2026-11-20): when account n is capped for `model` (known, or found now) it
+    answers with FALLBACK[model] until the renewal. Returns (text, model name that answered)."""
+    alt = FALLBACK.get((model or "").lower())
+    if alt and capped_until(n, model):
+        return ask_on(pw, n, prompt, attach, wait, alt), model_name(alt)
+    try:
+        return ask_on(pw, n, prompt, attach, wait, model), model_name(model)
+    except Capped:
+        if not alt:
+            raise
+        return ask_on(pw, n, prompt, attach, wait, alt), model_name(alt)
+
+
 def _open(b, pg, n, model):
     """The driver's _open on a page already open: signed in, then the model; a model at its cap raises Capped."""
     if not b.signed_in(pg):
@@ -223,25 +239,38 @@ def free_first(accounts=ACCOUNTS):
     return sorted(accounts, key=busy)
 
 
-def ask(prompt, model="flash-lite", attach=(), wait=300, account=None):
+def ask(prompt, model="flash-lite", attach=(), wait=300, account=None, fallback=True):
     """(text, meta) with the first account that answers; text None when every account failed (meta["error"] says why,
-    "no account ready" when none could take it). `account` = 1..4 or "acct<n>" to use only that one."""
+    "no account ready" when none could take it). `account` = 1..4 or "acct<n>" to use only that one.
+
+    Owner, 2026-11-20: "use hydrogen; when [it] hit cap on an acc use the free model till reset". An account whose
+    model is capped answers with FALLBACK[model] (Hydrogen -> Flash-Lite) until its renewal; meta["model"] names the
+    model that answered and meta["fallback"] is True then. `fallback=False` keeps the old wait-for-renewal behaviour."""
     from playwright.sync_api import sync_playwright
     if account:
         order = [int(str(account).replace("acct", ""))]
     else:
         order = free_first()
+    alt = FALLBACK.get((model or "").lower()) if fallback else None
     caps = {n: capped_until(n, model) for n in order}
-    order = [n for n in order if not caps[n]]
-    errors = [f"acct{n}: capped" for n, u in caps.items() if u]
+    # accounts with the model first; a capped account still answers with the fallback model, after them
+    tries = [(n, model) for n in order if not caps[n]] + ([(n, alt) for n in order if caps[n]] if alt else [])
+    errors = [f"acct{n}: capped" for n, u in caps.items() if u and not alt]
     t0 = time.time()
     with sync_playwright() as pw:
-        for n in order:
+        i = 0
+        while i < len(tries):
+            n, m = tries[i]
+            i += 1
             try:
-                text = ask_on(pw, n, prompt, attach, wait, model)
-                return text, {"account": f"acct{n}", "model": model_name(model), "secs": round(time.time() - t0)}
+                text = ask_on(pw, n, prompt, attach, wait, m)
+                return text, {"account": f"acct{n}", "model": model_name(m), "secs": round(time.time() - t0),
+                              **({"fallback": True} if m != model else {})}
             except Capped as e:
-                caps[n] = e.until
+                if m == model:
+                    caps[n] = e.until
+                    if alt:
+                        tries.append((n, alt))          # capped just now: this account answers with the fallback
                 errors.append(f"acct{n}: {e}")
             except Exception as e:  # noqa: BLE001 - sign-in, not sent, timeout: the next account takes it
                 errors.append(f"acct{n}: {str(e).splitlines()[0][:120]}")
