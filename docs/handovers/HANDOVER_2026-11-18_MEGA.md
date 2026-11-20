@@ -190,4 +190,24 @@ Two sessions started from the records session were still working when this was w
   (`books/year1-musculoskeletal/handout.pdf`), 7,273 handout lines, Tumrah book 75 pages (second bundle, 421 blocks).
   ZNU Tumrah book NOT uploaded: no site module, no university field (website W5). `page.py` accepts clicks from
   `localhost` as well as `127.0.0.1` (the Today screen gave 403 when opened as localhost).
+- 2026-11-20 evening, PAUSED by the owner (session limits). Owner: "work on MSK and CNS; MSK is MORE important".
+  Done: Gemini cap fallback (`856ec7f`: capped account -> Flash-Lite until renewal, also in the transcribers);
+  Update data (`logs/update_2026-11-20.log`): cns-178..191 imported (10 wait for the Records runner, Khaled's 4 are
+  YouTube); `auto_doctors.plan` fix: a second lecture of the same title counts only when the list links both posts
+  (Nagib "Internal capsule" 1895 = new; Elsamahy 1807 = re-upload of cns-107's 1793, NOT new). A sync for 1895 was
+  left running at the pause: check `lectures/` for it, run `py auto_doctors.sync` again if missing.
+  NEXT, in this order:
+  1. MSK first: site import (`py site_import.py`; year 1 said 91 waiting for uploads before the 639-row pull);
+     MSK lesson ranges onto the handout graph (L01-L39, `reference.json`) so MSK questions (ZAG_59_Polls 5,018)
+     reach MSK lessons; transcribe the 104 year 1 Telegram records (`py -m spine records transcribe --via browser`);
+     split and align year 1 doctors' books.
+  2. CNS mother lists: agent failed on Zahran 1635 and Nagib 1638 (no agreed map). Add BY HAND to
+     `mother_lists.json`: Zahran "Outer fibers layer (eye)" (cns-182, post 1889) as its own chapter; Nagib
+     "Internal capsule" (1895, second item of that name), "Speech" (cns-190), "Aphasia" (cns-191) as chapters in
+     list order. Mosafer 1632: post 1870 (cns-164) belongs under "Blood supply of brain stem + cerebrum" per the
+     list's link; cns-179/180 are revisions. Then `py mother_check.py` exact, then `py site_import.py`.
+  3. Place the new CNS lectures (cns-178..191 + 1895) like the 54 (`claude-coarse`), site import.
+  4. Restart the polls job (Polls.bat); then `py -m spine seg run --workers 4` (93 lectures; Flash-Lite fallback
+     now), `py -m spine records hear2` (year 2 transcripts), P1 tail, Phase 3 grades (CLAUDE.md owner answers).
+  Owner still to give: ZNU Telegram sources, MSK poll channels. ZNU Tumrah book waits for website W5.
 

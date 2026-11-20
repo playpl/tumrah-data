@@ -155,6 +155,7 @@ def plan(lists=None):
         row = {"doctor": d, "new": [], "have": 0, "pdfs": [], "revisions": [], "minis": [], "convert": []}
         sizes = local_pdf_sizes(d["folder"])
         kinds = {m["id"]: m.get("kind", "lecture") for m in lectures.all_lectures(d["module"])}
+        linked = {p["post"] for s in ("lectures", "minis", "revisions") for *_, p, _ in parts_of(lst, s) if p.get("post")}
         for section in ("lectures", "minis", "revisions"):
             for item, n, count, part, post in parts_of(lst, section):
                 if post and post.get("kind") in ("pdf", "file") and section in ("lectures", "minis"):
@@ -170,6 +171,11 @@ def plan(lists=None):
                 want = {"lectures": "lecture", "minis": "summary", "revisions": "revision"}[section]
                 if same and same.get("kind", "lecture") != want:
                     same = None  # a lecture of the same name ("Nerve fiber", "Diencephalon") is not its mini lecture or revision
+                own = tg_lists.message_id((same or {}).get("source", {}).get("telegram")) if same else None
+                if same and own and own != part["post"] and own in linked and not same.get("backup"):
+                    # the list links both posts: a second lecture of the same name (Nagib "Internal capsule" 1821, 1895).
+                    # An old post the list no longer links is a re-upload of the same lecture (Elsamahy 1793 -> 1807).
+                    same = None
                 if same and not same.get("backup"):
                     row["have"] += 1
                     continue
