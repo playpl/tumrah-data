@@ -180,4 +180,9 @@ Two sessions started from the records session were still working when this was w
   `records transcribe` defaults to browser + Hydrogen, `p1 run` = Gemini (`--per-job` windows per chat; the fleet
   runner refuses while `fleet.down`), `mother run` readers = two Gemini chats, Update data's mother step on again.
   Decision 9 settled by CLAUDE.md (Arabic = Gemini). Not run yet: Hydrogen is capped and seg goes first.
+- 2026-11-20. Student complaints: 54 of 137 live CNS lectures (cns-112..177, all of Khaled's 12) had no ranges, so no
+  questions. Placed by title onto handout sections (`placed_by: claude-coarse`, backups
+  `backups_pre_update/place54_2026-11-20/`), site import (`logs/site_import_2026-11-20_place54b.log`): 1,692
+  questions inserted, live CNS questions 9,043 -> 10,941, every lecture 12..312 questions. The seg run of
+  2026-11-18 had stopped (Hydrogen cap; `seg dry` 15 accepted, 78 waiting); only 11 of 172 lessons have LectureLinks.
 
