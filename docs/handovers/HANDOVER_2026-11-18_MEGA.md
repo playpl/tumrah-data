@@ -194,8 +194,8 @@ Two sessions started from the records session were still working when this was w
   Done: Gemini cap fallback (`856ec7f`: capped account -> Flash-Lite until renewal, also in the transcribers);
   Update data (`logs/update_2026-11-20.log`): cns-178..191 imported (10 wait for the Records runner, Khaled's 4 are
   YouTube); `auto_doctors.plan` fix: a second lecture of the same title counts only when the list links both posts
-  (Nagib "Internal capsule" 1895 = new; Elsamahy 1807 = re-upload of cns-107's 1793, NOT new). A sync for 1895 was
-  left running at the pause: check `lectures/` for it, run `py auto_doctors.sync` again if missing.
+  (Nagib "Internal capsule" 1895 = new; Elsamahy 1807 = re-upload of cns-107's 1793, NOT new). `py auto_doctors.py sync`
+  exited 0 but made NO lecture for 1895 (silent): find why (`plan` lists it as new) and import it.
   NEXT, in this order:
   1. MSK first: site import (`py site_import.py`; year 1 said 91 waiting for uploads before the 639-row pull);
      MSK lesson ranges onto the handout graph (L01-L39, `reference.json`) so MSK questions (ZAG_59_Polls 5,018)
