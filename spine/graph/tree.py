@@ -13,7 +13,7 @@ import outline
 from spine import graph_dir, module_dir, read_json, read_jsonl, write_json
 from spine.graph import handout
 
-UNIVERSITY = {"year2-cns": ("ZU", 2)}      # NU modules will be named nu-year1-<name>; ZU keeps the bare codes
+UNIVERSITY = {"year2-cns": ("ZU", 2), "year1-musculoskeletal": ("ZU", 1), "nu-year1-musculoskeletal": ("ZNU", 1)}  # NU modules will be named nu-year1-<name>; ZU keeps the bare codes
 CONTENTS_PAGES = range(1, 10)
 _CHAPTER = re.compile(r"^Chapter\s+([IVX]+)\s*:\s*(.+)$", re.I)
 _ROMAN = {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6, "VII": 7, "VIII": 8, "IX": 9, "X": 10}

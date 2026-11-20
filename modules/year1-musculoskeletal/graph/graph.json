@@ -1,6 +1,6 @@
 {
  "university": "ZU",
- "year": null,
+ "year": 1,
  "module": "year1-musculoskeletal",
  "handout": {
   "sha8": "c112ea0b",
@@ -11,10 +11,10 @@
    "id": "anatomy",
    "chapters": [
     {
-     "id": "anatomy/c0",
-     "n": 0,
-     "title": "(no chapter)",
-     "handout_chapter": null,
+     "id": "anatomy/c1",
+     "n": 1,
+     "title": "Anatomy of the upper limb",
+     "handout_chapter": "year1-musculoskeletal:C1",
      "lessons": [
       {
        "id": "year1-musculoskeletal:L01",
@@ -95,7 +95,15 @@
         78,
         84
        ]
-      },
+      }
+     ]
+    },
+    {
+     "id": "anatomy/c2",
+     "n": 2,
+     "title": "Anatomy of the lower limb",
+     "handout_chapter": "year1-musculoskeletal:C2",
+     "lessons": [
       {
        "id": "year1-musculoskeletal:L11",
        "title": "Superficial veins of the lower limb",
@@ -184,10 +192,10 @@
    "id": "histology",
    "chapters": [
     {
-     "id": "histology/c0",
-     "n": 0,
-     "title": "(no chapter)",
-     "handout_chapter": null,
+     "id": "histology/c3",
+     "n": 3,
+     "title": "Histology of the musculoskeletal system and skin",
+     "handout_chapter": "year1-musculoskeletal:C3",
      "lessons": [
       {
        "id": "year1-musculoskeletal:L21",
@@ -229,10 +237,10 @@
    "id": "physiology",
    "chapters": [
     {
-     "id": "physiology/c0",
-     "n": 0,
-     "title": "(no chapter)",
-     "handout_chapter": null,
+     "id": "physiology/c4",
+     "n": 4,
+     "title": "Physiology of skin, nerve and muscle",
+     "handout_chapter": "year1-musculoskeletal:C4",
      "lessons": [
       {
        "id": "year1-musculoskeletal:L25",

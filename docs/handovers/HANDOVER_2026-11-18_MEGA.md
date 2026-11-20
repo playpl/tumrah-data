@@ -185,4 +185,9 @@ Two sessions started from the records session were still working when this was w
   `backups_pre_update/place54_2026-11-20/`), site import (`logs/site_import_2026-11-20_place54b.log`): 1,692
   questions inserted, live CNS questions 9,043 -> 10,941, every lecture 12..312 questions. The seg run of
   2026-11-18 had stopped (Hydrogen cap; `seg dry` 15 accepted, 78 waiting); only 11 of 172 lessons have LectureLinks.
+- 2026-11-20. Owner answers recorded in CLAUDE.md "Owner answers (2026-11-20)" (section 3 items 3, 6, 7, 10 settled;
+  Gemini cap fallback = 3.5 Flash-Lite; grade 3 = other doctors' MCQ files). ZU MSK on the site: handout
+  (`books/year1-musculoskeletal/handout.pdf`), 7,273 handout lines, Tumrah book 75 pages (second bundle, 421 blocks).
+  ZNU Tumrah book NOT uploaded: no site module, no university field (website W5). `page.py` accepts clicks from
+  `localhost` as well as `127.0.0.1` (the Today screen gave 403 when opened as localhost).
 

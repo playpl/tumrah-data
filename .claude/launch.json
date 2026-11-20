@@ -4,8 +4,20 @@
     {
       "name": "admin-test",
       "runtimeExecutable": "py",
-      "runtimeArgs": ["-c", "import page; page.PORT = 8771; page.serve()"],
+      "runtimeArgs": [
+        "-c",
+        "import page; page.PORT = 8771; page.serve()"
+      ],
       "port": 8771
+    },
+    {
+      "name": "admin",
+      "runtimeExecutable": "py",
+      "runtimeArgs": [
+        "dm.py",
+        "page"
+      ],
+      "port": 8770
     }
   ]
 }

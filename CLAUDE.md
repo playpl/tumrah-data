@@ -19,6 +19,18 @@ and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web
   older text below or in handovers says "fleet".
 - Gemini on the web, model 4 Hydrogen (browser profiles, `gemini_browser.py`): transcription, linking, and aligning
   a lecture with the book (segmentation, `py -m spine seg run`). Anything that reads Arabic is Gemini's (owner 11-18).
+  When an account hits its Hydrogen cap, use that account's free model (3.5 Flash-Lite) until the renewal, then
+  Hydrogen again (owner 2026-11-20).
+
+## Owner answers (2026-11-20)
+- Mother agent is PRIMARY: it replaces writing `mother_lists.json` by hand (the by-hand sections below are history).
+  Claude still reads every changed list message itself; `py mother_check.py` must print "exact". No chapters in a
+  list = one big chapter. Wrong links in a doctor's list: wait for the doctor (Wagih 1631, Elsamahy 1880).
+- Today screen cards stay the owner's (he answers them; Claude never clicks them).
+- Question grades: 1 own quizzes, 2 own MCQ files (1 when that lecture has no quiz from him), 3 other doctors' MCQ
+  files, 4 polls, 5 archive. Every quiz/file question matched to its poll for votes.
+- Year 1 ZU MSK chapters = the book's four (`reference.json` `chapter`). Cocci stays off the site.
+- Tumrah book uploads approved; ZNU waits for a site module with a university field (website W5).
 - Haiku (Claude): only work that reads no Arabic (owner 11-18). Paid: estimate tokens, ask first.
 - Code still wired to the fleet (`dm.py run`, `py -m spine mother flow`, `runners.py`,
   `gemini_run.py` model names) must be moved to these readers before it runs again.
