@@ -234,4 +234,15 @@ Two sessions started from the records session were still working when this was w
   20 pieces heard again agree on content in 18 (2 old copies have ~42% repeated text); 13 of 83 heard transcripts
   have 40+ word repeats (cns-010, cns-037 serious); YouTube captions (28) drop English terms. Five pieces wait for
   the owner's ear in `listen_2026-11-20/` (not in git).
+  Site import (`logs/site_import_2026-11-20_c.log`): CNS 19 lessons created, 172 changed; 18 MSK lessons created
+  (YouTube); 21 MSK Telegram records wait for the runner; tiers: cns-070 timed out once (next import redoes it).
+  PAUSED (owner, limits). NEXT, in order:
+  1. `py update_data.py` was STOPPED mid-run (`logs/update_2026-11-21.log`): run it again (pushes the MSK to-do for
+     the runner), then `gh workflow run records.yml`, then `py site_import.py` after the run.
+  2. cns-178 (post 1888) still has no audio: Telegram timeouts on both connection modes; check the next run's log.
+  3. Owner: listen to `listen_2026-11-20/` (README inside); decide the 170 first-term lessons on the site.
+  4. Fixes from the quality report (REPORT.md "Fixes"): re-hear the 13 repeat transcripts + worst YouTube captions,
+     strip `[cite: N]`, a gold-set check besides A=B agreement; then resume `py -m spine seg run --workers 4 --wait`
+     (stopped; 25 accepted, 65 waiting).
+  5. Ammar "Cartilage 2" (232) wrong video: wait for the doctor. Polls job finished (restart with Polls.bat).
 
