@@ -1,0 +1,402 @@
+[
+ {
+  "lec": "cns-001",
+  "p": 57,
+  "A": "B75-B77",
+  "B": "B75-B77",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-001",
+  "p": 67,
+  "A": "B71-B86",
+  "B": "B71-B85",
+  "verdict": "broad",
+  "note": "recap of transport + inclusions; A gives B71-B86 (16 lines), right but wide"
+ },
+ {
+  "lec": "cns-002",
+  "p": 50,
+  "A": "B7-B9",
+  "B": "B7-B9",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-002",
+  "p": 38,
+  "A": "B6",
+  "B": "NONE",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-003",
+  "p": 55,
+  "A": "B65, B69-B70",
+  "B": "B64-B65, B68-B70",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-003",
+  "p": 36,
+  "A": "B63-B68",
+  "B": "B65-B68",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-004",
+  "p": 54,
+  "A": "B50",
+  "B": "B49-B50",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-004",
+  "p": 14,
+  "A": "B30-B33",
+  "B": "B31-B33",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-005",
+  "p": 109,
+  "A": "B13",
+  "B": "B11-B13",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-005",
+  "p": 35,
+  "A": "B7",
+  "B": "B7",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-006",
+  "p": 111,
+  "A": "B69-B70",
+  "B": "B69-B70",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-006",
+  "p": 17,
+  "A": "B23-B25",
+  "B": "B18-B24",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-007",
+  "p": 3,
+  "A": "B45-B48",
+  "B": "B45-B48",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-007",
+  "p": 2,
+  "A": "B39-B44",
+  "B": "B39-B44",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-008",
+  "p": 58,
+  "A": "B57",
+  "B": "B57",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-008",
+  "p": 30,
+  "A": "B31-B33",
+  "B": "B33",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-010",
+  "p": 189,
+  "A": "B75, B83, B92, B94",
+  "B": "B92, B94-B95",
+  "verdict": "wrong",
+  "note": "\"pia stuck to the cord\" = B92 right, but A adds B75 and B83 (dura/arachnoid extension to S2): wrong extras"
+ },
+ {
+  "lec": "cns-010",
+  "p": 170,
+  "A": "B93-B97",
+  "B": "B94-B97",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-013",
+  "p": 21,
+  "A": "NONE",
+  "B": "NONE",
+  "verdict": "wrong",
+  "note": "end of intro, then starts the definition of a receptor: NONE misses the definition line"
+ },
+ {
+  "lec": "cns-013",
+  "p": 75,
+  "A": "B41-B42",
+  "B": "B41-B42",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-014",
+  "p": 141,
+  "A": "B132-B133",
+  "B": "B130-B133",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-014",
+  "p": 77,
+  "A": "B83-B86",
+  "B": "B75-B86",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-015",
+  "p": 12,
+  "A": "B35-B36",
+  "B": "B35-B36",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-015",
+  "p": 39,
+  "A": "B72-B73",
+  "B": "B72-B73",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-017",
+  "p": 7,
+  "A": "B45-B47",
+  "B": "B45-B47",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-017",
+  "p": 15,
+  "A": "B47-B50",
+  "B": "B47-B50",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-018",
+  "p": 89,
+  "A": "NONE",
+  "B": "NONE",
+  "verdict": "unsure",
+  "note": "TRP/ASIC channels of chemical nociceptors: NONE; the slice may have no such line (not checked)"
+ },
+ {
+  "lec": "cns-018",
+  "p": 148,
+  "A": "B75-B79",
+  "B": "B75-B79",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-019",
+  "p": 52,
+  "A": "B29",
+  "B": "B29",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-019",
+  "p": 48,
+  "A": "B61-B62",
+  "B": "B59-B63",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-020",
+  "p": 41,
+  "A": "B69-B71",
+  "B": "B69-B71",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-020",
+  "p": 49,
+  "A": "B46-B69",
+  "B": "B45-B69",
+  "verdict": "broad",
+  "note": "summary table sensory vs autonomic ganglia: B46-B69, right but wide"
+ },
+ {
+  "lec": "cns-021",
+  "p": 177,
+  "A": "B74-B76",
+  "B": "B68-B69, B75-B76",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-021",
+  "p": 94,
+  "A": "B45-B46",
+  "B": "B46",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-022",
+  "p": 48,
+  "A": "B44",
+  "B": "B44",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-022",
+  "p": 2,
+  "A": "NONE",
+  "B": "NONE",
+  "verdict": "unsure",
+  "note": "opening: names CSF; NONE probably fine (slice starts in another chapter)"
+ },
+ {
+  "lec": "cns-023",
+  "p": 199,
+  "A": "B54",
+  "B": "B54",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-023",
+  "p": 141,
+  "A": "B34",
+  "B": "B34",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-024",
+  "p": 62,
+  "A": "B33-B34",
+  "B": "B31-B34",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-024",
+  "p": 91,
+  "A": "B44",
+  "B": "B42-B45",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-027",
+  "p": 59,
+  "A": "B29-B30",
+  "B": "B29",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-027",
+  "p": 111,
+  "A": "B37-B38",
+  "B": "B36-B38",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-036",
+  "p": 127,
+  "A": "B294",
+  "B": "B294",
+  "verdict": "broad",
+  "note": "microglia from monocytes: B294 is the whole \"Shape\" row of the table (one line for all cells)"
+ },
+ {
+  "lec": "cns-036",
+  "p": 14,
+  "A": "B290",
+  "B": "B290",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-038",
+  "p": 216,
+  "A": "B41-B44",
+  "B": "B37, B41, B43-B44",
+  "verdict": "broad",
+  "note": "Pacinian loses myelin: B41-B44 table rows; the book text of that table is scrambled by the PDF extraction"
+ },
+ {
+  "lec": "cns-038",
+  "p": 189,
+  "A": "B41-B44",
+  "B": "B37, B41, B43-B44",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-040",
+  "p": 12,
+  "A": "B31-B32",
+  "B": "B32-B39",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-040",
+  "p": 81,
+  "A": "B43",
+  "B": "B43",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-045",
+  "p": 213,
+  "A": "NONE",
+  "B": "NONE",
+  "verdict": "right",
+  "note": ""
+ },
+ {
+  "lec": "cns-045",
+  "p": 123,
+  "A": "B34",
+  "B": "B34",
+  "verdict": "right",
+  "note": ""
+ }
+]

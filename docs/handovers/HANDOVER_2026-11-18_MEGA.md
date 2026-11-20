@@ -225,4 +225,13 @@ Two sessions started from the records session were still working when this was w
   transport, body fluids, ANS, blood, general anatomy: bones/joints/muscles/terms of movement), NOT the ZU MSK
   handout (limbs L01-L20, cartilage/bone/muscle/skin histology L21-L24, skin/nerve/muscle physiology L25-L39). They
   cannot be placed on MSK handout ranges; MSK questions cannot reach them. Asked the owner where they belong.
+- 2026-11-21. Owner pasted the MSK lists: `trees.json` `year1` = ZAG59_Anatomy 137-141, ZAG59_physio 241-243,
+  ZAG59_Histo 212/214/219/220/221 (old lists kept as `year1_first_term`). MSK maps built on Gemini (13 of 13 agree):
+  42 records. The 170 first-term lessons stay on the site until the owner decides. Ammar "Cartilage 2" (232) holds
+  the same YouTube as his revision (231): doctor's wrong link.
+  QUALITY CHECK (owner: "measure first"; seg run stopped): `docs/spine/quality_2026-11-20/REPORT.md`. Seg on
+  accepted lectures 46 of 50 right (2 wrong, 2 unsure); A=B agreement does not catch shared errors. Transcripts:
+  20 pieces heard again agree on content in 18 (2 old copies have ~42% repeated text); 13 of 83 heard transcripts
+  have 40+ word repeats (cns-010, cns-037 serious); YouTube captions (28) drop English terms. Five pieces wait for
+  the owner's ear in `listen_2026-11-20/` (not in git).
 
