@@ -121,8 +121,10 @@ only queue) and what needs a decision. Details: `update_data.py` docstring. Flag
 - Both years' doctor lists are in `spine/tg/trees.json` (the trees the owner pasted). Start: `docs/spine/HANDOVER.md`.
 - Year 2 "Old data" lists are FALLBACK only: never imported unless the owner names lecture and doctor
   (`backup.py use`). A doctor's `old data.txt` only tells `backup.py` where the old list is.
-- Year 1 (channels `ZAG59_Anatomy`, `ZAG59_physio`, `ZAG59_Histo`, `ZAG59_bio`; 20 lists): ALL of it is old data
-  and all of it is to be imported; the website needs a note that says so. Lists: `py tg_lists.py fetch -c <channel>
+- Year 1 = the Musculoskeletal lists (owner 2026-11-20): `ZAG59_Anatomy` 137-141, `ZAG59_physio` 241-243,
+  `ZAG59_Histo` 212, 214, 219, 220, 221 (`trees.json` `year1`). ALL of it is old data and is imported; the website
+  needs a note that says so. The 2026-11-17 lists (39-45, 54-59, 40-43, bio) are the first-term module, kept as
+  `year1_first_term`, never imported again (their 170 lessons went to the MSK module by mistake). Lists: `py tg_lists.py fetch -c <channel>
   <ids>` -> `sources/lists/<channel>/`; maps: `py -m spine mother run --year 1`. Never put a `ZAG59_*` link in
   `doctors/`: the old flow reads only the number and would open a `RecordsBatch58ATM` post.
 - A lecture whose doctor has no site doctor id stays off the site (`site_lessons.py` prints "NO SITE DOCTOR").

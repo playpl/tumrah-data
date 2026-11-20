@@ -83,8 +83,9 @@ class YearOneMother(unittest.TestCase):
         for old in (1205, 1267, 1335, 1598, 1538, 1373, 1457):
             self.assertNotIn(old, two)
         one = mother.tree_lists(1)
-        self.assertEqual(len(one), 20)
-        self.assertIn("ZAG59_Anatomy/39", one)
+        self.assertEqual(len(one), 13)                # the MSK lists (owner 2026-11-20)
+        self.assertIn("ZAG59_Anatomy/137", one)
+        self.assertNotIn("ZAG59_Anatomy/39", one)     # first term: not MSK, never imported again
 
     def test_chapter_is_the_group_and_a_bare_lecture_number_gets_its_chapter(self):
         lst = parsed()

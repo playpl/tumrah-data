@@ -210,4 +210,19 @@ Two sessions started from the records session were still working when this was w
   4. Restart the polls job (Polls.bat); then `py -m spine seg run --workers 4` (93 lectures; Flash-Lite fallback
      now), `py -m spine records hear2` (year 2 transcripts), P1 tail, Phase 3 grades (CLAUDE.md owner answers).
   Owner still to give: ZNU Telegram sources, MSK poll channels. ZNU Tumrah book waits for website W5.
+- 2026-11-20 night. Update data again (`logs/update_2026-11-20_b.log`): post 1895 imported (cns-193; the earlier
+  silent miss did not repeat), plus Mosafer "4th ventricle" cns-192 (1913) and Nagib Thalamus/Limbic
+  system/Hypothalamus cns-194..196 (1910-1912). `mother_lists.json` by hand: Mosafer cns-164 moved under "Blood supply
+  of brain stem + cerebrum" (the list's link; the extra "Blood supply of cerebrum" chapter removed), Zahran "Outer
+  fibers layer (eye)" cns-182, Nagib Internal capsule (2nd)/Speech/Aphasia/Thalamus/Limbic system/Hypothalamus as
+  chapters; `mother_check` exact. 17 new lectures placed by title (`claude-coarse`, backups
+  `backups_pre_update/place17_2026-11-20/`; Khaled "ECG" put on Brain waves/EEG pp. 253-256). Records runs
+  44800264347 + 44801289095 uploaded all new CNS audio except cns-178 (post 1888: Telegram timeout twice on 8
+  connections; run 44802371341 retries with connections 0). Site import `logs/site_import_2026-11-20_c.log`.
+  Polls job restarted (313 new ZAG_59_Polls polls to vote). Seg: 8 stale jobs rewritten, `seg run --workers 4 --wait`
+  started (`logs/seg_run_2026-11-20.log`).
+  FINDING (owner): the 198 year 1 records are first-term topics (cytology, cytogenetics, epithelium, membrane
+  transport, body fluids, ANS, blood, general anatomy: bones/joints/muscles/terms of movement), NOT the ZU MSK
+  handout (limbs L01-L20, cartilage/bone/muscle/skin histology L21-L24, skin/nerve/muscle physiology L25-L39). They
+  cannot be placed on MSK handout ranges; MSK questions cannot reach them. Asked the owner where they belong.
 
