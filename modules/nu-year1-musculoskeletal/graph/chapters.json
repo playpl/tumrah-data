@@ -1,1 +1,84 @@
-[]
+[
+ {
+  "n": 1,
+  "title": "Anatomy of the upper limb",
+  "printed_from": null,
+  "units": [],
+  "source": "reference.json chapter (same rule as ZU MSK, owner 2026-11-20)",
+  "id": "nu-year1-musculoskeletal:C1",
+  "pdf_pages": [
+   6,
+   69
+  ],
+  "lessons": [
+   "nu-year1-musculoskeletal:L01",
+   "nu-year1-musculoskeletal:L02",
+   "nu-year1-musculoskeletal:L03",
+   "nu-year1-musculoskeletal:L04",
+   "nu-year1-musculoskeletal:L05",
+   "nu-year1-musculoskeletal:L06",
+   "nu-year1-musculoskeletal:L07",
+   "nu-year1-musculoskeletal:L08",
+   "nu-year1-musculoskeletal:L09",
+   "nu-year1-musculoskeletal:L10"
+  ]
+ },
+ {
+  "n": 2,
+  "title": "Anatomy of the lower limb",
+  "printed_from": null,
+  "units": [],
+  "source": "reference.json chapter (same rule as ZU MSK, owner 2026-11-20)",
+  "id": "nu-year1-musculoskeletal:C2",
+  "pdf_pages": [
+   69,
+   133
+  ],
+  "lessons": [
+   "nu-year1-musculoskeletal:L11",
+   "nu-year1-musculoskeletal:L12",
+   "nu-year1-musculoskeletal:L13",
+   "nu-year1-musculoskeletal:L14",
+   "nu-year1-musculoskeletal:L15",
+   "nu-year1-musculoskeletal:L16"
+  ]
+ },
+ {
+  "n": 3,
+  "title": "Histology",
+  "printed_from": null,
+  "units": [],
+  "source": "reference.json chapter (same rule as ZU MSK, owner 2026-11-20)",
+  "id": "nu-year1-musculoskeletal:C3",
+  "pdf_pages": [
+   133,
+   181
+  ],
+  "lessons": [
+   "nu-year1-musculoskeletal:L17",
+   "nu-year1-musculoskeletal:L18",
+   "nu-year1-musculoskeletal:L19",
+   "nu-year1-musculoskeletal:L20"
+  ]
+ },
+ {
+  "n": 4,
+  "title": "Physiology",
+  "printed_from": null,
+  "units": [],
+  "source": "reference.json chapter (same rule as ZU MSK, owner 2026-11-20)",
+  "id": "nu-year1-musculoskeletal:C4",
+  "pdf_pages": [
+   181,
+   232
+  ],
+  "lessons": [
+   "nu-year1-musculoskeletal:L21",
+   "nu-year1-musculoskeletal:L22",
+   "nu-year1-musculoskeletal:L23",
+   "nu-year1-musculoskeletal:L24",
+   "nu-year1-musculoskeletal:L25",
+   "nu-year1-musculoskeletal:L26"
+  ]
+ }
+]

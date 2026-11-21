@@ -91,3 +91,5 @@ def register(sub):
     s.add_argument("--subject")
     s.add_argument("--joined", action="store_true", help="only sentences made by a join or a split")
     s.set_defaults(run=_sample)
+    from spine.graph import twin
+    twin.add(p)
