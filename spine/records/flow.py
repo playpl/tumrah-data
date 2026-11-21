@@ -140,6 +140,25 @@ def ranges_of(lessons, spans):
     return [{k: v for k, v in r.items() if k != "_next"} for r in out]
 
 
+def placed_ranges(rid, covers=(), module="year1-musculoskeletal", spans=None, places=None):
+    """A record's handout ranges from site/placement.json (its own lessons, else those of what it covers). The
+    segmentation slice reads these (`spine.seg.scope`), never the segment ranges, so a seg answer cannot make
+    its own slice stale."""
+    spans = spans if spans is not None else lesson_spans(module)
+    places = places if places is not None else placement(module)
+    return [{"from": x["from"], "to": x["to"]} for x in ranges_of(
+        places.get(rid) or [k for c in covers for k in places.get(c) or []], spans)]
+
+
+def segment_ranges(rid, module="year1-musculoskeletal"):
+    """The handout ranges the record's accepted segments reach (records/<id>/spine/ranges.json, `seg collect`),
+    or [] when it has none."""
+    got = read_json(module_dir(module) / "records" / rid / "spine" / "ranges.json") or {}
+    if not (module_dir(module) / "records" / rid / "segments.jsonl").exists():
+        return []
+    return [{"from": x["from"], "to": x["to"]} for x in got.get("ranges") or []]
+
+
 def site_rows(recs, st):
     """(rows for importHubData lessons, report lines). Chapters and order follow the doctor's list."""
     keep, out, why = [], [], {}
@@ -187,8 +206,9 @@ def site_rows(recs, st):
                "chapter": {"title": r["chapter"] or r["name"], "order": chapters[r["doctor"]][r["chapter"]]},
                "name": r["name"], "order": order[ck], "kind": kind, "doctorId": r["site"], "covers": covers if kind != "lesson" else [],
                "oldData": True,
-               "ranges": [{"from": x["from"], "to": x["to"]} for x in ranges_of(
-                   places.get(r["id"]) or [k for c in r["covers"] for k in places.get(c) or []], spans)]}
+               "ranges": segment_ranges(r["id"], r["module"])
+                   or placed_ranges(r["id"], r["covers"], r["module"], spans, places),
+               "placedRanges": placed_ranges(r["id"], r["covers"], r["module"], spans, places)}
         if not row["ranges"]:
             why.setdefault("no handout placement (site/placement.json)", set()).add(r["id"])
         if r["source"] == "youtube":

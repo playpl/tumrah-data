@@ -67,7 +67,7 @@ def _read_record_lessons():
         for r in read_jsonl(ROOT / "modules" / m / "site" / "lessons.jsonl"):
             lid = r["key"].split(":", 1)[-1]
             out[lid] = {"id": lid, "module": m, "doctor": r.get("doctorId"), "title": r.get("name"),
-                        "ranges": r.get("ranges") or [], "covers": [c.split(":", 1)[-1] for c in r.get("covers") or []]}
+                        "ranges": r.get("placedRanges", r.get("ranges")) or [], "covers": [c.split(":", 1)[-1] for c in r.get("covers") or []]}
     return out
 
 

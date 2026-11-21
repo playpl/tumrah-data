@@ -237,6 +237,27 @@ class Site(Base):
         self.assertNotIn("lecture:y1-bio-41", {r["key"] for r in rows})
         self.assertTrue(any("same video" in x and "y1-bio-41" in x for x in out))
 
+    def test_accepted_segments_give_the_ranges_and_the_placement_stays_for_the_slice(self):
+        from spine.records import flow
+        placed = [{"from": "m:h:p6:l1", "to": "m:h:p10:l1"}]
+        seg = [{"from": "m:h:p7:l2", "to": "m:h:p7:l9"}]
+        machine.mark("year1-test", "y1-bio-40", "uploaded", key="lectures/year1-test/y1-bio-40/recording.48k.m4a")
+        with mock.patch.object(flow, "placed_ranges", lambda *a, **k: placed),                 mock.patch.object(flow, "segment_ranges", lambda rid, module: seg if rid == "y1-bio-38" else []):
+            rows, _ = self.rows()
+        by = {r["key"]: r for r in rows}
+        self.assertEqual((by["lecture:y1-bio-38"]["ranges"], by["lecture:y1-bio-38"]["placedRanges"]), (seg, placed))
+        self.assertEqual(by["lecture:y1-bio-40"]["ranges"], placed)
+
+    def test_segment_ranges_need_accepted_segments(self):
+        from spine.records import flow
+        d = self.tmp / "modules" / "year1-test" / "records" / "y1-bio-38"
+        (d / "spine").mkdir(parents=True)
+        (d / "spine" / "ranges.json").write_text(json.dumps({"ranges": [{"from": "a", "to": "b", "pages": [1, 1]}]}))
+        with mock.patch.object(flow, "module_dir", lambda m: self.tmp / "modules" / m):
+            self.assertEqual(flow.segment_ranges("y1-bio-38", "year1-test"), [])        # no segments.jsonl: not accepted
+            (d / "segments.jsonl").write_text("{}")
+            self.assertEqual(flow.segment_ranges("y1-bio-38", "year1-test"), [{"from": "a", "to": "b"}])
+
     def test_update_dry_only_reports(self):
         from spine.records import flow
         with mock.patch.object(machine, "download", side_effect=AssertionError("downloaded in a dry run")), \
