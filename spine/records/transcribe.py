@@ -1,8 +1,9 @@
 """Transcripts of the records machine's recordings: 5-minute pieces heard on Gemini 4 Hydrogen (owner 2026-11-18;
 Flash-Lite before), outside queue.db so the year 2 flow never sees a year 1 job. Two ways to hear a piece:
 
-    --via fleet    RETIRED (owner 2026-11-18, config fleet.down): the Antigravity fleet, one worker per account; kept
-                   only for its tests
+    --via fleet    the Antigravity fleet, one worker per account (back on, owner 2026-11-21: "burn the fleet"; it is
+                   weak, so only checkable work: a piece passes the transcript check and the loop check, gets a
+                   cNN.fleet marker and stays marked for a later Hydrogen re-hearing)
     --via browser  (default) Gemini web in the owner's four signed-in Chrome profiles (gemini_browser.py, no cookie files): the
                    piece pasted into the prompt box with `gemini_run.PIECE_PROMPT`, the answer through `piece_text`
                    and the 450 characters a minute floor; a failed piece moves to another account (browser.parallel)
@@ -104,16 +105,44 @@ def hear(piece, model="hydrogen", tries=3, ask=None, say=print):
     return None
 
 
+LOOP_WORDS, LOOP_GAP, LOOP_MAX = 12, 60, 40   # docs/spine/quality_2026-11-20/dup_scan.py: a 12-word run again 60+ words on
+
+
+def looped(text):
+    """Longest repeated passage (words) inside one piece: a reader looping or a part heard twice (the fleet-era
+    cns-010/cns-037 defect). A piece with one of LOOP_MAX+ words fails."""
+    w = re.sub(r"\[\d+:\d+(?::\d+)?\]|\[cite[^\]]*\]", " ", text or "")
+    w = re.sub(r"[^\w\s]", " ", w.lower()).split()
+    seen, runs = {}, []
+    for i in range(len(w) - LOOP_WORDS + 1):
+        k = tuple(w[i:i + LOOP_WORDS])
+        j = seen.get(k)
+        if j is not None and i - j > LOOP_GAP:
+            runs.append(i)
+        else:
+            seen.setdefault(k, i)
+    best, start, prev = 0, None, None
+    for i in runs:
+        if prev is None or i - prev > 1:
+            start = i
+        prev = i
+        best = max(best, i - start + LOOP_WORDS)
+    return best
+
+
 def check_piece(text, seconds):
     """The year 2 piece check (PieceFlow.check): [] when the text is a whole transcript of `seconds`."""
     import checks
     if not text.strip():
         return []                      # a silent piece
     errors = checks.check_transcript(text, seconds, end_slack=90)
-    return [e for e in errors if "before the end" not in e or seconds > 120]
+    errors = [e for e in errors if "before the end" not in e or seconds > 120]
+    if (n := looped(text)) >= LOOP_MAX:
+        errors.append(f"a passage of {n} words is repeated (loop)")
+    return errors
 
 
-def hear_fleet(piece, account, runner=None, say=print):
+def hear_fleet(piece, account, runner=None, say=print, model="flash"):
     """One fleet worker hears one piece. Text, or None (the piece stays for the next run)."""
     import lectures
     from flows.lecture import PIECE_PROMPT
@@ -123,7 +152,7 @@ def hear_fleet(piece, account, runner=None, say=print):
     (d / "piece.txt").unlink(missing_ok=True)
     (d / "prompt.md").write_text(PIECE_PROMPT.format(minutes=PIECE // 60), encoding="utf-8")
     cmd = FLEET + ["run", "-a", account, "--cwd", str(d), "-f", str(d / "prompt.md"), "--out", str(d / "result.json"),
-                   "--timeout", "20", "--model", "lite"]
+                   "--timeout", "20", "--model", model]
     (runner or (lambda c: subprocess.run(c, cwd=d, capture_output=True, text=True, encoding="utf-8", errors="replace")))(cmd)
     name = f"{piece.parent.parent.name}/{piece.stem}"
     if not (d / "piece.txt").exists():
@@ -135,6 +164,9 @@ def hear_fleet(piece, account, runner=None, say=print):
     if errors:
         say(f"    {name} on {account}: check: {'; '.join(errors)[:150]}")
         return None
+    import gemini_run
+    text = gemini_run.strip_cite(text)
+    piece.with_suffix(".fleet").write_text(json.dumps({"account": account, "model": model}), encoding="utf-8")
     piece.with_suffix(".txt").write_text(text, encoding="utf-8")
     return text
 

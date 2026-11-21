@@ -77,7 +77,8 @@ def cmd_hear2(args):
         jobs = lectures_hear.plan(args.lectures or None, get=lambda key, path: False)
         print(f"{len(jobs)} pieces to hear (dry: nothing fetched or heard)")
         return
-    print(lectures_hear.run(args.lectures or None, limit=args.limit))
+    accounts = args.accounts.split(",") if args.accounts else None
+    print(lectures_hear.run(args.lectures or None, limit=args.limit, via=args.via, accounts=accounts))
 
 
 def cmd_run(args):
@@ -120,4 +121,6 @@ def register(sub):
     q.add_argument("lectures", nargs="*")
     q.add_argument("--limit", type=int, help="at most N pieces this run")
     q.add_argument("--dry", action="store_true", help="what would be heard; fetches and hears nothing")
+    q.add_argument("--via", choices=("browser", "fleet"), default="browser")
+    q.add_argument("--accounts", help="fleet accounts, comma separated (default all four)")
     q.set_defaults(run=cmd_hear2)

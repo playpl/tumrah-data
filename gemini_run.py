@@ -64,6 +64,13 @@ def ask(prompt_file, model, attach=(), timeout=1500, account=None):
     return gemini_browser.ask(prompt, model, list(attach), wait=timeout, account=account)
 
 
+CITE = re.compile(r"[ \t]*\[cite[^\]\n]*\]")   # Gemini web's "[cite: 1]" source tags: junk in a transcript
+
+
+def strip_cite(text):
+    return CITE.sub("", text)
+
+
 def strip_fence(text):
     m = re.search(r"```(?:json|jsonl)?\s*\n(.*?)```", text, re.S)
     return m.group(1) if m else text
@@ -88,7 +95,7 @@ def piece_text(answer, seconds):
     re-cut by words into ~30-second ones; each start time is the piece length times the share of text before it."""
     if answer.strip().upper().strip(".") == "SILENT":
         return ""
-    paras = [" ".join(p.split()) for p in re.split(r"\n\s*\n|\n", strip_fence(answer)) if p.strip()]
+    paras = [" ".join(p.split()) for p in re.split(r"\n\s*\n|\n", strip_cite(strip_fence(answer))) if p.strip()]
     want = max(1, round(seconds / PARA_SECONDS))
     if len(paras) < want / 2 or max(len(p) for p in paras) > 0.25 * sum(len(p) for p in paras):
         words = " ".join(paras).split()

@@ -109,15 +109,19 @@ def plan(lids=None, module="year2-cns", say=print, get=None):
     return jobs
 
 
-def run(lids=None, module="year2-cns", limit=None, say=print):
-    """Hear the pieces on the four accounts at once; each lecture's raw.txt is written when its last piece is in."""
-    import gemini_browser
+def run(lids=None, module="year2-cns", limit=None, say=print, via="browser", accounts=None, runner=None):
+    """Hear the pieces on the four accounts at once; each lecture's raw.txt is written when its last piece is in.
+    `via` "fleet": the Antigravity fleet (owner 2026-11-21), one worker per account; a piece passes
+    transcribe.check_piece (length, loop) or waits; heard pieces get a cNN.fleet marker for a later re-hearing."""
     from spine.records import transcribe
     jobs = plan(lids, module, say)
     jobs = jobs[:limit] if limit is not None else jobs
     say(f"  {len(jobs)} pieces to hear now")
     if not jobs:
         return {}
+    if via == "fleet":
+        return _run_fleet(jobs, accounts or transcribe.ACCOUNTS, runner, say)
+    import gemini_browser
 
     def one(pw, n, job):              # raising hands the piece to another account (browser.parallel)
         lid, p = job
@@ -133,3 +137,55 @@ def run(lids=None, module="year2-cns", limit=None, say=print):
             say(f"  {lid}: " + ("transcript ready" if done else f"check: {'; '.join(errors)[:150]}"))
 
     return gemini_browser.driver().parallel(jobs, one, lambda j: f"{j[0]}/{j[1].stem}")
+
+
+def _run_fleet(jobs, accounts, runner, say):
+    """Fleet workers take pieces from one queue; a piece that fails twice waits for the next run."""
+    import queue
+    import threading
+    from spine.records import transcribe
+    work, lock, out = queue.Queue(), threading.Lock(), {"heard": 0, "failed": 0, "ready": []}
+    for j in jobs:
+        work.put((j, 0))
+
+    def worker(account):
+        while not transcribe.STOP.exists():
+            try:
+                (lid, p), tries = work.get_nowait()
+            except queue.Empty:
+                return
+            if p.with_suffix(".txt").exists():
+                continue
+            if transcribe.hear_fleet(p, account, runner=runner, say=say) is None:
+                if tries + 1 < 2:
+                    work.put(((lid, p), tries + 1))
+                else:
+                    with lock:
+                        out["failed"] += 1
+                continue
+            with lock:
+                out["heard"] += 1
+                if not any(not q.with_suffix(".txt").exists() for q in p.parent.glob("c[0-9][0-9].ogg")):
+                    done, errors = finish(lid)
+                    if done:
+                        mark_fleet(lid)
+                        out["ready"].append(lid)
+                    say(f"  {lid}: " + ("transcript ready (fleet)" if done else f"check: {'; '.join(errors)[:150]}"))
+
+    threads = [threading.Thread(target=worker, args=(a,)) for a in accounts]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return out
+
+
+def mark_fleet(lid):
+    """lecture.json source.heard_by_fleet = pieces heard by the fleet (re-hear on Hydrogen later)."""
+    from flows.lecture import pieces_dir
+    n = len(list(pieces_dir(lid).glob("c[0-9][0-9].fleet")))
+    m = _meta(lid)
+    if n and m:
+        import lectures
+        m.setdefault("source", {})["heard_by_fleet"] = n
+        lectures.save(m)

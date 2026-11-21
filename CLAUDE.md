@@ -15,12 +15,19 @@ and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web
 `docs/handovers/HANDOVER_2026-11-10.md`, then `docs/handovers/HANDOVER_2026-11-07.md`, then `docs/handovers/HANDOVER_2026-11-06.md` for the polls job.
 
 ## Readers (owner, 2026-11-18; replaces every fleet rule below)
-- The Antigravity fleet is RETIRED (`config.json` `fleet.down` true). Never queue, start or suggest fleet work, even where
-  older text below or in handovers says "fleet".
+- The Antigravity fleet is RETIRED for the old flows (`config.json` `fleet.down` true): never restart them on it.
+  Since 2026-11-21 it runs again only for checkable work (see "Fleet back" below).
 - Gemini on the web, model 4 Hydrogen (browser profiles, `gemini_browser.py`): transcription, linking, and aligning
   a lecture with the book (segmentation, `py -m spine seg run`). Anything that reads Arabic is Gemini's (owner 11-18).
   When an account hits its Hydrogen cap, use that account's free model (3.5 Flash-Lite) until the renewal, then
   Hydrogen again (owner 2026-11-20).
+
+## Fleet back, for checkable work only (owner, 2026-11-21)
+- "Burn the fleet", run it on all accounts in parallel with Gemini web; Haiku stays for the very last. But "the fleet
+  is very stupid" (question linking went wrong): give it only work a code check can judge. Now: year 2 transcription
+  pieces (`py -m spine records hear2 --via fleet --accounts zero,work,personal`; the length check and a loop check,
+  `cNN.fleet` markers, `source.heard_by_fleet` in lecture.json, re-hear on Hydrogen later). Never placement,
+  linking, alignment or questions. `config.json` `fleet.down` stays true so the old fleet flows never restart.
 
 ## Owner answers (2026-11-20)
 - Mother agent is PRIMARY: it replaces writing `mother_lists.json` by hand (the by-hand sections below are history).

@@ -101,6 +101,45 @@ def site_key(rid):
     return f"lecture:{safe}"
 
 
+def lesson_spans(module="year1-musculoskeletal"):
+    """{handout lesson (L01..): (first line id, last line id, first page, last page)} from the graph's lesson cuts
+    (graph/sentences.jsonl `lesson`); only text lines (":l"), never figures, as range ends."""
+    f = module_dir(module) / "graph" / "sentences.jsonl"
+    out = {}
+    if not f.exists():
+        return out
+    for line in f.read_text(encoding="utf-8").splitlines():
+        s = json.loads(line)
+        k = (s.get("lesson") or "").rpartition(":")[2]
+        rows = [r for r in s.get("rows") or [] if r.rpartition(":")[2].startswith("l")]
+        if not k or not rows:
+            continue
+        if k not in out:
+            out[k] = [rows[0], rows[-1], s["page"], s["page"]]
+        out[k][1], out[k][3] = rows[-1], s["page"]
+    return {k: tuple(v) for k, v in out.items()}
+
+
+def placement(module="year1-musculoskeletal"):
+    """{record id: [L01, ...]} from site/placement.json (written by hand, coarse, by title)."""
+    return (read_json(module_dir(module) / "site" / "placement.json") or {}).get("records") or {}
+
+
+def ranges_of(lessons, spans):
+    """Handout ranges of a record's lessons: neighbours (L01+L02) join into one range."""
+    out = []
+    for k in sorted(set(lessons)):
+        if k not in spans:
+            continue
+        a, b, pa, pb = spans[k]
+        if out and out[-1]["_next"] == k:
+            out[-1].update(to=b, pages=[out[-1]["pages"][0], pb])
+        else:
+            out.append({"from": a, "to": b, "pages": [pa, pb]})
+        out[-1]["_next"] = f"L{int(k[1:]) + 1:02d}"
+    return [{k: v for k, v in r.items() if k != "_next"} for r in out]
+
+
 def site_rows(recs, st):
     """(rows for importHubData lessons, report lines). Chapters and order follow the doctor's list."""
     keep, out, why = [], [], {}
@@ -122,6 +161,7 @@ def site_rows(recs, st):
             continue
         keep.append(r)
     keys = {site_key(r["id"]) for r in keep}
+    spans, places = lesson_spans(recs[0]["module"]) if recs else {}, placement(recs[0]["module"]) if recs else {}
     chapters, order = {}, {}
     rows = []
     for r in sorted(keep, key=lambda r: (r["doctor_order"], r["rank"])):
@@ -138,7 +178,11 @@ def site_rows(recs, st):
         row = {"key": site_key(r["id"]), "subject": r["subject"],
                "chapter": {"title": r["chapter"] or r["name"], "order": chapters[r["doctor"]][r["chapter"]]},
                "name": r["name"], "order": order[ck], "kind": kind, "doctorId": r["site"], "covers": covers if kind != "lesson" else [],
-               "oldData": True, "ranges": []}
+               "oldData": True,
+               "ranges": [{"from": x["from"], "to": x["to"]} for x in ranges_of(
+                   places.get(r["id"]) or [k for c in r["covers"] for k in places.get(c) or []], spans)]}
+        if not row["ranges"]:
+            why.setdefault("no handout placement (site/placement.json)", set()).add(r["id"])
         if r["source"] == "youtube":
             row["videoUrl"] = youtube_url(r["youtube"])
         else:

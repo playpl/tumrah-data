@@ -34,7 +34,7 @@
   "backend_env": "C:/Users/Ahmed/Desktop/tumrah/backend/.env",
   "db_name": "tumrah",
   "lecture_audio_kbps": 16,
-  "fleet": {"down": true, "since": "2026-11-18", "note": "Retired by the owner (2026-11-18): readers are Haiku and Gemini web (Hydrogen)"},
+  "fleet": {"down": true, "since": "2026-11-18", "note": "Retired 2026-11-18 for the old flows (place, links, questions stay off it). Owner 2026-11-21: use the fleet again, only for checkable work run explicitly (py -m spine records hear2 --via fleet); down stays true so no old flow restarts on it"},
   "module_windows": {
     "year1-musculoskeletal": [
       {

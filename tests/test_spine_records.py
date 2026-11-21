@@ -276,10 +276,10 @@ class Transcribe(Base):
         p = self.tmp / "pieces" / "c00.ogg"
         p.parent.mkdir()
         p.write_bytes(b"ogg")
-        body = "\n".join(f"[{m:02d}:00] " + "kalam " * 120 for m in range(5)) + "\n"
+        body = "\n".join(f"[{m:02d}:00] " + " ".join(f"kalam{m}x{i}" for i in range(120)) for m in range(5)) + "\n"
 
         def runner(cmd):
-            self.assertIn("lite", cmd)
+            self.assertIn("flash", cmd)
             (Path(cmd[cmd.index("--cwd") + 1]) / "piece.txt").write_text(body, encoding="utf-8")
 
         def short(cmd):
