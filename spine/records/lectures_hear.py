@@ -13,6 +13,8 @@ A lecture with no raw.txt is heard piece by piece, the same way as the year 1 re
 A piece that fails goes back for another account; an account at its usage cap is skipped. Nothing is uploaded.
 """
 import json
+import os
+import time
 
 from spine import ROOT
 
@@ -45,6 +47,28 @@ def todo(module="year2-cns", lids=None):
         if (f.parent / "audio.ogg").exists() or (f.parent / "hear.16k.ogg").exists() or hear_key(m):
             out.append(lid)
     return out
+
+
+CLAIM_MINUTES = 40   # a claim older than this is a crashed run's: taken over
+
+
+def claim(piece):
+    """True when this run may hear the piece: cNN.claim made atomically (the fleet and Gemini web hear the same
+    queue at once, owner 2026-11-21: "you can do both. So it's 8 accounts")."""
+    f = piece.with_suffix(".claim")
+    try:
+        if f.exists() and time.time() - f.stat().st_mtime > CLAIM_MINUTES * 60:
+            f.unlink(missing_ok=True)
+        fd = os.open(f, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        os.write(fd, str(os.getpid()).encode())
+        os.close(fd)
+        return True
+    except FileExistsError:
+        return False
+
+
+def release(piece):
+    piece.with_suffix(".claim").unlink(missing_ok=True)
 
 
 def audio(lid, get=None):
@@ -125,17 +149,22 @@ def run(lids=None, module="year2-cns", limit=None, say=print, via="browser", acc
 
     def one(pw, n, job):              # raising hands the piece to another account (browser.parallel)
         lid, p = job
-        if transcribe.STOP.exists():
-            return
+        if transcribe.STOP.exists() or p.with_suffix(".txt").exists() or not claim(p):
+            return                    # heard already, or the fleet has it now
         def asker(prompt, model, attach, timeout):   # a capped account answers with its free model (owner 11-20)
             text, used = gemini_browser.ask_on_fallback(pw, n, prompt.read_text(encoding="utf-8"), [attach[0]], timeout, model)
             return text, {"account": n, "model": used}
-        if transcribe.hear(p, model=MODEL, tries=1, ask=asker, say=say) is None:
+        try:
+            heard = transcribe.hear(p, model=MODEL, tries=1, ask=asker, say=say)
+        finally:
+            release(p)
+        if heard is None:
             raise RuntimeError("the answer failed the piece check")
         if not any(not q.with_suffix(".txt").exists() for q in p.parent.glob("c[0-9][0-9].ogg")):
             done, errors = finish(lid)
             say(f"  {lid}: " + ("transcript ready" if done else f"check: {'; '.join(errors)[:150]}"))
 
+    jobs = jobs[::-1]                 # from the end of the queue: the fleet starts at the front
     return gemini_browser.driver().parallel(jobs, one, lambda j: f"{j[0]}/{j[1].stem}")
 
 
@@ -154,9 +183,13 @@ def _run_fleet(jobs, accounts, runner, say):
                 (lid, p), tries = work.get_nowait()
             except queue.Empty:
                 return
-            if p.with_suffix(".txt").exists():
-                continue
-            if transcribe.hear_fleet(p, account, runner=runner, say=say) is None:
+            if p.with_suffix(".txt").exists() or not claim(p):
+                continue              # heard already, or Gemini web has it now
+            try:
+                heard = transcribe.hear_fleet(p, account, runner=runner, say=say)
+            finally:
+                release(p)
+            if heard is None:
                 if tries + 1 < 2:
                     work.put(((lid, p), tries + 1))
                 else:

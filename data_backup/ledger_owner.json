@@ -285,6 +285,17 @@
    "payload": "{\"n\": 10, \"review\": \"spot\"}",
    "state": "gone",
    "title": "Spot check: 10 links, about 2 minutes"
+  },
+  {
+   "answer": null,
+   "at": 1795189086.1188369,
+   "detail": "Right or wrong on each. This is what makes the error figure a measured one.",
+   "id": "spot:2026-11-20",
+   "kind": "review",
+   "options": "[\"Start\", \"Skip today\"]",
+   "payload": "{\"n\": 10, \"review\": \"spot\"}",
+   "state": "gone",
+   "title": "Spot check: 10 links, about 2 minutes"
   }
  ],
  "gold": [],
