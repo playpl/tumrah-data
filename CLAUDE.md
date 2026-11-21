@@ -20,7 +20,8 @@ and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web
 - Gemini on the web, model 4 Hydrogen (browser profiles, `gemini_browser.py`): transcription, linking, and aligning
   a lecture with the book (segmentation, `py -m spine seg run`). Anything that reads Arabic is Gemini's (owner 11-18).
   When an account hits its Hydrogen cap, use that account's free model (3.5 Flash-Lite) until the renewal, then
-  Hydrogen again (owner 2026-11-20). Linking (seg, book links, any alignment) NEVER uses the light model: it waits
+  Hydrogen again (owner 2026-11-20). Since 2026-11-21 Gemini's mode menu has no Flash-Lite (Hydrogen, Neon, Carbon,
+  Adaptive only): a capped account waits for its renewal; never Carbon, Neon/Adaptive not approved. Linking (seg, book links, any alignment) NEVER uses the light model: it waits
   for the renewal (owner 2026-11-21; `fallback=False` in `spine/seg/flow.py`, `spine/align/engine.py`).
 
 ## Fleet back, for checkable work only (owner, 2026-11-21)
