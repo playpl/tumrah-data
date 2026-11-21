@@ -84,19 +84,21 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 ### S6. Website asks (another session, `C:\Users\Ahmed\Desktop\tumrah`; `docs/spine/WEBSITE_ASKS.md`)
 - W1 importer honours `status` and `--only-keys`; W2 lessons draft + undo; W3 whiteboard/file section
   (`lesson_files.jsonl` and the MSK smart-board PDFs 224, 234, 247 wait for it); W4 lectures batch by `sourceRef`;
-  W5 `AcademicModule.university` (ZNU waits for it); the year 1 "old data" note.
+  W5 `AcademicModule.university` (ZNU waits for it); the year 1 "old data" note; review and commit
+  `backend/src/scripts/hideLessons.ts` (written by tumrah-data 2026-11-21, used once); grade 5 as the AI-questions
+  reservoir (`docs/handovers/TO_TAMRAH_BOOK_HELPER_2026-11-21.md`).
 
 ### S7. ZNU year 1 (master prompt 2)
 - `modules/nu-year1-musculoskeletal/`: handout + lines only. `py -m spine graph build nu-year1-musculoskeletal`,
-  check the splitter as the MSK note did. Doctors, lists, polls, records, site module: section 3 Q5.
+  check the splitter as the MSK note did. Sources = the same as ZU (owner Q5): map the ZU lessons and questions onto
+  the ZNU handout (books -> ZNU handout, lessons' ranges, questions' pointers). Site module waits for website W5.
 
 ### S8. Tumrah book -> handout
 - Waits for the tumrah-book session's export (READY.jsonl bundles). Same window engine as S3.
 
 ### S9. Cleanup the plan asked for (master prompt 1: "rebuild, fix, delete legacy")
 - Old fleet flows still in code (`dm.py run`, `runners.py`, queue.db `place`/`lecture_links`/`transcribe` lanes): move
-  what is still needed to the spine, put the rest in `legacy/`. The 170 first-term lessons on the MSK module
-  (section 3 Q6).
+  what is still needed to the spine, put the rest in `legacy/`.
 
 ## 2. Owner tasks (things only the owner can do)
 - T1. Listen to the five pieces in `listen_2026-11-20/` (README inside) and say which transcript is right.
@@ -112,7 +114,13 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   questions, real AI questions after he finishes them. Website session "Tamra book helper".
 - Q3. Elazouny -> ANSWERED: always skipped, all modules and years; his books are pictures.
 - Q4. Fleet re-hearing -> ANSWERED: none.
-- Q5. ZNU: its Telegram sources (doctor lists, polls, quiz channels) and when its site module comes.
-- Q6. The 170 first-term lessons put on the MSK module by mistake (2026-11-17): hide (draft), move, or delete?
+- Q5. ZNU sources -> ANSWERED "It's the same": ZNU uses the same Telegram sources as ZU (same doctors' lists, polls).
+  So ZNU = the same lectures and questions placed on the ZNU handout (its own graph); the site module waits for W5.
+- Q6. The first-term lessons on MSK -> ANSWERED "remove them" (S&F is next year's work). DONE 2026-11-21: the 80 still
+  published were set to draft with `C:/Users/Ahmed/Desktop/tumrah/backend/src/scripts/hideLessons.ts` (new, not
+  committed in the tumrah repo); undo file
+  `modules/year1-musculoskeletal/backups/hide_lessons_undo_2026-11-21T02-23-33-609Z.json`
+  (`hideLessons.ts --undo <file> --apply`). MSK now shows its 39 lessons. Permanent deletion only if the owner asks.
+- Q7. The rest of the MSK lectures -> ANSWERED "That's all I got": the 42 records are all; ~500 MSK questions wait.
 
 ## Progress
