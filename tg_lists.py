@@ -217,13 +217,13 @@ def fetch_many(ids, save=True, channel=None):
     return got
 
 
-async def _download(ids, out_dir, account="voter2"):
+async def _download(ids, out_dir, account="voter2", channel=None):
     sys.path.insert(0, r"C:\Users\Ahmed\Desktop\tumrah\scripts\telegram\quizbot")
     from tg import connect
     client = await connect(account)
     got = {}
     try:
-        ent = await client.get_entity(CHANNEL)
+        ent = await client.get_entity(channel or CHANNEL)
         for m in await client.get_messages(ent, ids=list(ids)):
             if m is None or not m.media:
                 continue
@@ -236,9 +236,12 @@ async def _download(ids, out_dir, account="voter2"):
     return got
 
 
-def download(ids, out_dir=ROOT / "sources" / "records"):
-    """{post id: local file}: the posts' media (audio, video, pdf), read only. Already downloaded: kept."""
-    return asyncio.run(_download(sorted(set(ids)), out_dir)) if ids else {}
+def download(ids, out_dir=ROOT / "sources" / "records", channel=None):
+    """{post id: local file}: the posts' media (audio, video, pdf), read only. Already downloaded: kept. Another
+    channel's posts (year 1 books, `-c ZAG59_Histo`) go to sources/lists_pdf/<channel>/<post>/."""
+    if channel and channel != CHANNEL and out_dir == ROOT / "sources" / "records":
+        out_dir = ROOT / "sources" / "lists_pdf" / channel
+    return asyncio.run(_download(sorted(set(ids)), out_dir, channel=channel)) if ids else {}
 
 
 def load(i, channel=None):
@@ -299,7 +302,7 @@ if __name__ == "__main__":
             for k, p in d["posts"].items():
                 print(f"{k} {p['kind']} {p.get('size') or ''} {p.get('file_name') or ''} | {(p.get('caption') or '').strip()[:120]}".replace("\n", " "))
     elif cmd == "download":  # post ids: the posts' files into sources/records/<post>/ (a list PDF the agent inspects by hand)
-        for k, v in download(ids).items():
+        for k, v in download(ids, channel=channel).items():
             print(k, v)
     elif cmd == "show":
         for i in ids:
