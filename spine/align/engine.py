@@ -246,10 +246,14 @@ def run_jobs(module, reader="A", accounts=None, limit=None, per_account=PER_ACCO
     return stats
 
 
-def jumps(targets):
-    """Numbers of the entries whose handout position is far from the median of their neighbours' positions."""
+def jumps(targets, order=True):
+    """Numbers of the entries whose handout position is far from the median of their neighbours' positions. An entry
+    in order between its two direct neighbours is never a jump: at a section boundary the median sits on one side
+    (Zahran's receptor table, p36 -> table p37 -> meninges p42, was flagged)."""
     out = []
     for k, (_, pos) in enumerate(targets):
+        if order and 0 < k < len(targets) - 1 and targets[k - 1][1] <= pos <= targets[k + 1][1]:
+            continue
         near = sorted(p for _, p in targets[max(0, k - 5):k] + targets[k + 1:k + 6])
         if len(near) >= 4 and abs(pos - near[len(near) // 2]) > JUMP:
             out.append(k)
@@ -293,6 +297,31 @@ def cell_links(s, dsts, H):
     return [d for d in dict.fromkeys(out) if d not in dsts]
 
 
+ROW_NEAR = 3                            # book sentences to look back and ahead for an open row's neighbours
+
+
+def open_row_cells(sents, linked, H):
+    """[(sentence, handout ids)]: a table row no reader settled (a row of three columns read as one sentence:
+    "Pear-shaped structure  Spherical body  It is a fusiform structure") borrows the links of its nearest linked
+    book sentences before and after (within ROW_NEAR, landing within 2 * CELL_NEAR of each other) as the anchor for
+    `cell_links`."""
+    out = []
+    for k, s in enumerate(sents):
+        if s["id"] in linked:
+            continue
+        before = next((linked[x["id"]] for x in reversed(sents[max(0, k - ROW_NEAR):k]) if x["id"] in linked), None)
+        after = next((linked[x["id"]] for x in sents[k + 1:k + 1 + ROW_NEAR] if x["id"] in linked), None)
+        if not before or not after:
+            continue
+        pos = [H.pos[d] for d in before | after if d in H.pos]
+        if not pos or max(pos) - min(pos) > 2 * CELL_NEAR:
+            continue
+        more = cell_links(s, before | after, H)
+        if more:
+            out.append((s, more))
+    return out
+
+
 def accept(module):
     """Votes -> edges/<book>.jsonl. Returns {book: counts}."""
     H = prefilter.Handout(module)
@@ -303,7 +332,7 @@ def accept(module):
         for f in sorted((graph_dir(module) / "votes").glob(f"{book}.*.jsonl")):
             for v in read_jsonl(f):
                 votes.setdefault(v["src"], {})[v["reader"]] = v
-        edges, counts, chain = [], Counter(), []
+        edges, counts, chain, linked = [], Counter(), [], {}
         for s in sents:
             mine = votes.get(s["id"], {})
             code = mine.get("code")
@@ -325,6 +354,7 @@ def accept(module):
                     edges.append({"src": s["id"], "dst": d, "rel": rel, "grp": s["i"], "conf": conf, "by": by,
                                   "state": "accepted", "at": now()})
                 chain.append((s["id"], min(H.pos[d] for d in dst)))
+                linked[s["id"]] = set(dst)
                 counts["accepted"] += 1
                 more = cell_links(s, dst, H)
                 for d in sorted(more, key=H.pos.get):
@@ -339,16 +369,26 @@ def accept(module):
                 counts["one reader only"] += 1
             else:
                 counts["no reader yet"] += 1
-        odd = {chain[k][0] for k in jumps(chain)}
+        for s, more in open_row_cells(sents, linked, H):
+            for d in sorted(more, key=H.pos.get):
+                edges.append({"src": s["id"], "dst": d, "rel": "P", "grp": s["i"], "conf": 0.95,
+                              "by": "spine-code:cell", "state": "accepted", "at": now()})
+            counts["open table rows linked by their cells"] += 1
+        odd = {chain[k][0] for k in jumps(chain, order=False)}
         confirmed = {sid for sid in odd if three_agree(votes.get(sid, {}))}   # a jump three readers back is real
         counts["jump confirmed by 3 readers"] = len(confirmed)
         odd -= confirmed
         unique = {e["src"] for e in edges if e["src"] in odd and e["by"] in ("spine-code:A1", "spine-code:A2")}
         counts["jump kept: text found only there (A1/A2)"] = len(unique)    # the book orders it differently
         odd -= unique
-        for e in edges:
+        in_order = odd - {chain[k][0] for k in jumps(chain)}
+        counts["jump kept: in order between its neighbours"] = len(in_order)
+        odd -= in_order
+        for e in edges:        # kept: the seg slices (built without kept edges) do not change under the readers
             if e["src"] in unique:
                 e["kept"] = "jump, text found only there"
+            elif e["src"] in in_order:
+                e["kept"] = "jump, in order between its neighbours"
         for e in edges:
             if e["src"] in odd:
                 e["state"] = "flagged"

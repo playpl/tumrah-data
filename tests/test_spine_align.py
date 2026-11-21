@@ -122,6 +122,16 @@ class Windows(unittest.TestCase):
         self.assertEqual((verdicts[1][2], verdicts[1][3]), ("R", True))
 
 
+class Jumps(unittest.TestCase):
+    def test_an_entry_in_order_between_its_neighbours_is_not_a_jump(self):
+        from spine.align import engine
+        chain = [(f"s{k}", p) for k, p in enumerate([10, 11, 12, 13, 14, 15, 100, 400, 401, 402, 403, 404, 405])]
+        self.assertNotIn(6, engine.jumps(chain))
+        self.assertIn(6, engine.jumps(chain, order=False))
+        far = [(f"s{k}", p) for k, p in enumerate([10, 11, 12, 13, 14, 15, 900, 16, 17, 18, 19, 20])]
+        self.assertEqual(engine.jumps(far), [6])
+
+
 class Cells(unittest.TestCase):
     """A table row of several cells links each cell that the handout says word for word near the row's own link."""
     def setUp(self):
@@ -138,6 +148,15 @@ class Cells(unittest.TestCase):
         row = {"text": "Meninges | The red nucleus is an oval mass of grey matter in the tegmentum of the midbrain."}
         self.assertEqual(engine.cell_links(row, {"m:h:p2:s1"}, self.H), [])        # p8 is lesson L3, the link L1
         self.assertEqual(engine.cell_links({"text": TEXTS[3]}, {"m:h:p3:s1"}, self.H), [])
+
+    def test_an_open_row_borrows_its_neighbours_links(self):
+        from spine.align import engine
+        row = {"id": "b2", "text": "Pyramidal: |  The pyramidal cells are multipolar nerve cells of the cerebral cortex. "
+                                    "2. Stellate cells are small"}
+        sents = [{"id": "b1", "text": "x"}, row, {"id": "b3", "text": "y"}]
+        got = engine.open_row_cells(sents, {"b1": {"m:h:p3:s1"}, "b3": {"m:h:p3:s1"}}, self.H)
+        self.assertEqual([(s["id"], m) for s, m in got], [("b2", ["m:h:p4:s1"])])
+        self.assertEqual(engine.open_row_cells(sents, {"b1": {"m:h:p3:s1"}}, self.H), [])     # one side only
 
 
 if __name__ == "__main__":
