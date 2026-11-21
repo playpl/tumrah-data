@@ -263,3 +263,16 @@ Two sessions started from the records session were still working when this was w
   MSK doctors' books: none in `doctors/msk`; the lists carry them (Elazouny 157-160/172-175, Mosafer 179/184, Nagib
   249 "full book" 16 MB, Mahmoud 213/225, Zahran 240 module book 33 MB, Ammar 228): not fetched (no heavy transfers
   on the PC); W4 books wait for them (owner adds, or a runner step for PDFs).
+- 2026-11-21 01:20 UTC. Owner: the PC download rule is for recordings only (PDFs fine); "just run" the MSK questions.
+  MSK books: 24 list PDFs in `sources/lists_pdf/<channel>/<post>/` (`py tg_lists.py download -c <channel> ...`); 7 books
+  in `modules/year1-musculoskeletal/books/` (Mosafer 179, Nagib 249, Cocci 252, Mahmoud 225 + part 1 213, Zahran 240
+  (+229 alias), Ammar 228), split: 5,985 sentences; `p1 code`: 2,883 accepted; 121 Gemini jobs written
+  (`py -m spine p1 run year1-musculoskeletal` after the seg run frees the browsers). Elazouny's 8 parts (157-160,
+  172-175) are scans with no text layer and no OCR on the PC: Gemini must read them (not done).
+  MSK questions: `msk_questions.py` (ZAG_59_Polls since 2026-11-14 under topic headers -> handout lessons -> best line
+  -> least loaded live MSK lesson); 388 published on 35 MSK lessons, 296 with handout pointers; ~600 wait because
+  their handout lesson has no doctor lecture yet (forearm..lower limb, muscle/skin histology, nerve/muscle physiology);
+  `site_import.py` step 8 files them as lessons appear. Spot check 8 of 8 right. Not done: the zagpolls58 archive
+  (grade 5) for MSK, doctors' MCQ files for MSK (none in the lists).
+  Records: 20 of 21 MSK recordings uploaded, 38 MSK lessons live; cns-197 (84 MB) and y1-hist-245 time out on Telegram
+  (8 connections and fallback); a run with connections 0 started.
