@@ -113,10 +113,15 @@ def handout_in_ranges(module, ranges, index=None):
     return out
 
 
-def edges(module, book):
-    """{book sentence id: [handout sentence ids]} of the accepted Phase 1 links."""
+def edges(module, book, cells=True):
+    """{book sentence id: [handout sentence ids]} of the accepted Phase 1 links. `cells=False` (the slice) leaves
+    out the per-cell links of table rows and the jumps kept because their text is found only there (2026-11-21):
+    they add handout facts to rows already placed, and a slice that moved with them would make answered seg jobs
+    stale."""
     out = {}
     for e in read_jsonl(graph_dir(module) / "edges" / f"{book}.jsonl"):
+        if not cells and (e.get("by") == "spine-code:cell" or e.get("kept")):
+            continue
         if e.get("state") == "accepted" and e.get("dst"):
             out.setdefault(e["src"], []).append(e["dst"])
     return out
@@ -198,7 +203,7 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
         if hand or not book:
             return hand
     if book not in cache:
-        cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book),
+        cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book, cells=False),
                        "index": _handout_index(module)}
     c = cache[book]
     sents = c["sents"]

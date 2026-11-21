@@ -13,6 +13,7 @@ when two readers name the same handout sentence. Everything lives in modules/<m>
 old scripts, ledger.db and the site are not touched (shadow mode).
 """
 import json
+import re
 import subprocess
 import time
 from collections import Counter
@@ -22,6 +23,7 @@ from pathlib import Path
 from spine import ROOT, graph_dir, now, read_json, read_jsonl, write_json, write_jsonl
 from spine.align import old, prefilter, recall, windows
 from spine.books import split
+from spine import text as T
 
 CONF = {"A1": 0.99, "A2": 0.98, "A3": 0.95, "A4": 0.93}
 PROVEN = ("A1", "A2", "A3")             # accepted on code alone; A4 needs one more reader
@@ -265,6 +267,32 @@ def three_agree(mine):
     return False
 
 
+CELL_SPLIT = re.compile(r"\s*(?:\||[\uf000-\uf0ff\u2022\u25aa\u25fe\u25cf\u27a2]|(?<![\d.])\d{1,2}[.)-]\s|^[a-zA-Z][.)-]\s)\s*")
+CELL_NEAR = 40                          # handout sentences around the row's own link
+
+
+def cell_links(s, dsts, H):
+    """Handout sentences that one cell of a table row (or one bullet of a list line) says word for word, close to the
+    row's accepted link, in the same lesson: a row of three cells is three handout facts, but the readers' agreed set
+    often holds one (Zahran's tables, parity p1 2026-11-21). Code-proven: the cell's letters (>= LONG) occur exactly
+    once inside that window."""
+    parts = [x for x in CELL_SPLIT.split(s["text"]) if x and x.strip()]
+    anchor = [H.pos[d] for d in dsts if d in H.pos]
+    if len(parts) < 2 or not anchor:
+        return []
+    lo, hi = min(anchor) - CELL_NEAR, max(anchor) + CELL_NEAR
+    lessons = {H.lesson[a] for a in anchor}
+    out = []
+    for part in parts:
+        k = T.word_key(part)
+        if len(k) < prefilter.LONG:
+            continue
+        hits = [h for h in H.exact(k) if lo <= h[0] <= hi and H.lesson[h[0]] in lessons]
+        if len(hits) == 1:
+            out += [H.sents[n]["id"] for n in hits[0]]
+    return [d for d in dict.fromkeys(out) if d not in dsts]
+
+
 def accept(module):
     """Votes -> edges/<book>.jsonl. Returns {book: counts}."""
     H = prefilter.Handout(module)
@@ -298,6 +326,11 @@ def accept(module):
                                   "state": "accepted", "at": now()})
                 chain.append((s["id"], min(H.pos[d] for d in dst)))
                 counts["accepted"] += 1
+                more = cell_links(s, dst, H)
+                for d in sorted(more, key=H.pos.get):
+                    edges.append({"src": s["id"], "dst": d, "rel": "P", "grp": s["i"], "conf": 0.95,
+                                  "by": "spine-code:cell", "state": "accepted", "at": now()})
+                counts["cell links added"] += len(more)
             elif len(nos) >= 2 or (nos and not links):
                 counts["not in the handout or not content" if len(nos) >= 2 else "one reader says no"] += 1
             elif len(links) >= 2:
@@ -310,6 +343,12 @@ def accept(module):
         confirmed = {sid for sid in odd if three_agree(votes.get(sid, {}))}   # a jump three readers back is real
         counts["jump confirmed by 3 readers"] = len(confirmed)
         odd -= confirmed
+        unique = {e["src"] for e in edges if e["src"] in odd and e["by"] in ("spine-code:A1", "spine-code:A2")}
+        counts["jump kept: text found only there (A1/A2)"] = len(unique)    # the book orders it differently
+        odd -= unique
+        for e in edges:
+            if e["src"] in unique:
+                e["kept"] = "jump, text found only there"
         for e in edges:
             if e["src"] in odd:
                 e["state"] = "flagged"

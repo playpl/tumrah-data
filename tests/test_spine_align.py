@@ -122,5 +122,23 @@ class Windows(unittest.TestCase):
         self.assertEqual((verdicts[1][2], verdicts[1][3]), ("R", True))
 
 
+class Cells(unittest.TestCase):
+    """A table row of several cells links each cell that the handout says word for word near the row's own link."""
+    def setUp(self):
+        self.H = handout()
+
+    def test_each_cell_found_near_the_row_link(self):
+        from spine.align import engine
+        row = {"text": "Pyramidal: |  The pyramidal cells are multipolar nerve cells of the cerebral cortex. "
+                       "2. Stellate cells are small", "kind": "table_row"}
+        self.assertEqual(engine.cell_links(row, {"m:h:p3:s1"}, self.H), ["m:h:p4:s1"])
+
+    def test_a_cell_in_another_lesson_or_a_one_cell_row_adds_nothing(self):
+        from spine.align import engine
+        row = {"text": "Meninges | The red nucleus is an oval mass of grey matter in the tegmentum of the midbrain."}
+        self.assertEqual(engine.cell_links(row, {"m:h:p2:s1"}, self.H), [])        # p8 is lesson L3, the link L1
+        self.assertEqual(engine.cell_links({"text": TEXTS[3]}, {"m:h:p3:s1"}, self.H), [])
+
+
 if __name__ == "__main__":
     unittest.main()
