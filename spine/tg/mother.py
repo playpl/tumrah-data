@@ -193,6 +193,9 @@ def finish(m, lst):
         l = ls.get(k) or {"item": "", "label": "", "group": None, "section": ""}
         part = re.fullmatch(r"(?i)part\s*(\d+)", l["label"])
         name = f"{l['item']} part {part.group(1)}" if part else (l["label"] or l["item"])
+        more = re.match(r"(?i)part\s*(\d+)(?!\d)\s*(.+)", l["label"])
+        if more and not part and l["item"]:        # "Cerebrum" + "Part 2 + lat. Ventricle" = "Cerebrum part 2 + lat. Ventricle"
+            name = f"{l['item']} part {more.group(1)} {more.group(2)}"
         lead = first.get((l["section"], l["group"], l["item"]), l["label"])
         if not part and lead != l["label"] and lead in l["item"]:
             name = f"{lead} {l['label']}"          # the second link of "Lect1 -> mini" is "Lect1 mini"

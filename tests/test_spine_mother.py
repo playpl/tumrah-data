@@ -72,6 +72,12 @@ class Finish(unittest.TestCase):
         self.assertEqual((self.m[3]["chapter"], self.m[3]["name"]), ("Spinal cord", "Spinal cord part 2"))
         self.assertEqual((self.m[5]["chapter"], self.m[5]["name"]), ("Pons", "Pons"))
 
+    def test_a_part_label_with_more_words_keeps_the_item(self):
+        lst = make_list()
+        lst["sections"]["lectures"][1]["parts"] = [part("Part 2 + lat. Ventricle", 13)]
+        m, _ = mother.parse(answer(GOOD), lst)
+        self.assertEqual(m[4]["name"], "CSF part 2 + lat. Ventricle")
+
     def test_a_mini_or_revision_that_reads_like_a_lecture_gets_its_kind(self):
         self.assertEqual((self.m[6]["chapter"], self.m[6]["name"]), ("Spinal cord", "Spinal part 1 (mini lecture)"))
         self.assertEqual((self.m[7]["chapter"], self.m[7]["name"]), ("CSF", "CSF revision"))
