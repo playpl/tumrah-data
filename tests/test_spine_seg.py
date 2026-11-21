@@ -184,6 +184,7 @@ class Flow(unittest.TestCase):
         self.slice = self.book[:]
         self.patches = [
             mock.patch.object(flow, "ROOT", self.root), mock.patch.object(flow, "JOBS", self.tmp / "jobs"),
+            mock.patch.object(scope, "home", lambda lid: self.root / "lectures" / lid),
             mock.patch.object(scope, "edges", lambda module, book: {}),
             mock.patch.object(compat, "lecture_files", lambda *a, **k: None),
             mock.patch.object(compat, "_handout", lambda module: ({}, {})),
@@ -398,6 +399,56 @@ class CapFallback(unittest.TestCase):
         with mock.patch.object(g, "capped_until", lambda n, m: None), \
                 mock.patch.object(g, "ask_on", lambda pw, n, p, a, w, m: m):
             self.assertEqual(g.ask_on_fallback(None, 3, "p", model="hydrogen"), ("hydrogen", "Hydrogen"))
+
+
+class Widen(unittest.TestCase):
+    """A rejection for a missed slice steps the lecture up the ladder: whole book, then the handout, then the owner."""
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from spine.seg import flow
+        self.tmp = tempfile.TemporaryDirectory()
+        self.flow = flow
+        self.patches = [mock.patch.object(flow, "JOBS", Path(self.tmp.name)),
+                        mock.patch.object(scope, "WIDEN", Path(self.tmp.name)),
+                        mock.patch.object(scope, "lecture", lambda lid: {"doctor": "dr-x", "ranges": [{"from": "a", "to": "b"}]}),
+                        mock.patch.object(scope, "doctor_books", lambda module: {"dr-x": "x-book"})]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
+
+    def missed(self, fp):
+        return {"state": "rejected", "fp": fp, "readers": {"A": ["NONE for 90% of paragraphs"], "B": ["NONE for 85% of paragraphs"]}}
+
+    def test_the_ladder_steps_once_per_answer_pair_and_ends_with_the_owner(self):
+        f = self.flow
+        self.assertEqual(f.widen("L1", self.missed("fp1")), 1)
+        self.assertIsNone(f.widen("L1", self.missed("fp1")))            # the same answers never step twice
+        self.assertEqual(scope.widen_step("L1"), 1)
+        self.assertEqual(f.widen("L1", self.missed("fp2")), 2)
+        self.assertIsNone(f.widen("L1", self.missed("fp3")))            # top of the ladder: the owner's card
+        from pathlib import Path
+        (Path(self.tmp.name) / "L1" / "A").mkdir(parents=True)
+        (Path(self.tmp.name) / "L1" / "A" / "meta.json").write_text('{"lecture": "L1"}')
+        self.assertEqual(f.for_owner(), ["L1"])
+
+    def test_one_reader_with_answers_is_not_a_missed_slice(self):
+        st = {"state": "rejected", "fp": "x", "readers": {"A": ["NONE for 90% of paragraphs"], "B": []}}
+        self.assertIsNone(self.flow.widen("L2", st))
+
+    def test_step_one_reads_the_whole_book_and_step_two_the_handout(self):
+        sents = [{"id": f"s{i}", "text": "t", "kind": "sentence"} for i in range(100)]
+        cache = {"x-book": {"sents": sents, "links": {}, "index": []}}
+        self.flow.widen("L3", self.missed("a"))
+        got = scope.pick("L3", "year2-cns", None, cache)
+        self.assertEqual((got["book"], got["lo"], got["hi"]), ("x-book", 0, 99))
+        self.flow.widen("L3", self.missed("b"))
+        with mock.patch.object(scope, "handout_target", lambda lec, module, cache, margin: {"book": None, "margin": margin}):
+            self.assertEqual(scope.pick("L3", "year2-cns", None, cache), {"book": None, "margin": scope.WIDE})
 
 
 if __name__ == "__main__":

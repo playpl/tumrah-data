@@ -79,7 +79,8 @@ def lecture_files(lid, module="year2-cns", handout=None, write=True):
     the segment starts under) and lectures/<id>/spine/ranges.json (the handout rows the segments reach, merged per
     page into {from, to, pages}). Returns (links, ranges) or None when the lecture has no segments."""
     from spine import ROOT, ids, write_json
-    segs = read_jsonl(ROOT / "lectures" / lid / "segments.jsonl")
+    from spine.seg import scope
+    segs = read_jsonl(scope.home(lid) / "segments.jsonl")
     if not segs:
         return None
     sents, _ = handout or _handout(module)
@@ -128,7 +129,8 @@ def lecture_files(lid, module="year2-cns", handout=None, write=True):
         by_page.setdefault(ids.parse(r)["page"], []).append(r)
     ranges = [{"from": v[0], "to": v[-1], "pages": [p, p]} for p, v in sorted(by_page.items())]
     if write:
-        d = ROOT / "lectures" / lid / "spine"
+        from spine.seg import scope
+        d = scope.home(lid) / "spine"
         write_jsonl(d / "links.jsonl", links)
         write_json(d / "ranges.json", {"ranges": ranges, "placed_by": "spine"})
     return links, ranges

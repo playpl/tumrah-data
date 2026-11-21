@@ -41,7 +41,7 @@ def fingerprint(task, sents):
 
 
 def raw_of(lid):
-    f = ROOT / "lectures" / lid / "raw.txt"
+    f = scope.home(lid) / "raw.txt"
     return f.read_text(encoding="utf-8") if f.exists() else ""
 
 
@@ -50,13 +50,13 @@ def lectures_with_books(module="year2-cns", handout=False):
     but whose lecture has a handout placement (read against the handout itself)."""
     books = scope.doctor_books(module)
     out = []
-    for f in sorted((ROOT / "lectures").glob("*/lecture.json")):
-        d = read_json(f)
-        if d.get("module") != module or d.get("hold") or not (f.parent / "raw.txt").exists():
+    recs = [(d, scope.home(lid)) for lid, d in scope._record_lessons().items()]
+    for d, folder in [(read_json(f), f.parent) for f in sorted((ROOT / "lectures").glob("*/lecture.json"))] + recs:
+        if d.get("module") != module or d.get("hold") or not (folder / "raw.txt").exists():
             continue
         if d.get("doctor") in books or (handout and (d.get("ranges") or d.get("covers"))):
             out.append(d["id"])
-    return out
+    return sorted(out)
 
 
 def prepare(lid, module="year2-cns", cache=None):
@@ -214,16 +214,53 @@ def _judge_lecture(lid, module, cache):
     return state, segment.record(segment.segments(per), p["paras"], p["slice"], links, by, round(share, 3))
 
 
+def slice_missed(state):
+    """Both readers answered and both found (almost) nothing of the lecture in the slice."""
+    readers = state.get("readers") or {}
+    return state.get("state") == "rejected" and all(
+        any(x.startswith("NONE for") for x in readers.get(r) or []) for r in READERS)
+
+
+def widen(lid, state, module="year2-cns"):
+    """One step up the slice ladder (`scope` docstring) after a rejection for a missed slice, once per answer pair.
+    Returns the new step, or None (not a missed slice, already widened for this pair, or at the top: owner)."""
+    if not slice_missed(state):
+        return None
+    f = JOBS / lid / "widen.json"
+    w = read_json(f) or {}
+    if w.get("after") == state.get("fp"):
+        return None
+    step = w.get("step", 0)
+    if step >= scope.last_step(lid, module):
+        if not w.get("owner"):
+            write_json(f, {**w, "owner": True, "after": state.get("fp"), "at": now()})
+        return None
+    write_json(f, {"step": step + 1, "after": state.get("fp"), "at": now(),
+                   "why": "; ".join(f"{r}: {', '.join(p)}" for r, p in state["readers"].items())})
+    return step + 1
+
+
+def for_owner(module="year2-cns"):
+    """Lectures rejected at the top of the ladder: the readers found nothing even in the widest slice."""
+    return sorted(f.parent.name for f in JOBS.glob("*/widen.json") if (read_json(f) or {}).get("owner")
+                  and (read_json(f.parent / "state.json") or {}).get("state") != "accepted"
+                  and (read_json(f.parent / "A" / "meta.json") or {}).get("lecture") is not None
+                  and scope.lecture(f.parent.name).get("module", module) == module)
+
+
 def _drop_shadow(lid):
     """Remove the derived files of a lecture that is not accepted now, so an old output cannot outlive it."""
     for f in SHADOW:
-        (ROOT / "lectures" / lid / f).unlink(missing_ok=True)
+        (scope.home(lid) / f).unlink(missing_ok=True)
     for f in SHADOW_SPINE:
-        (ROOT / "lectures" / lid / "spine" / f).unlink(missing_ok=True)
+        (scope.home(lid) / "spine" / f).unlink(missing_ok=True)
 
 
-def _lids(lids):
-    return lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir() and (p / "A" / "meta.json").exists())
+def _lids(lids, module="year2-cns"):
+    """The lectures asked for, else every lecture of this module with job folders (another module's jobs are
+    never judged against this module's books: that would drop their segments)."""
+    return lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir() and (p / "A" / "meta.json").exists()
+                          and scope.lecture(p.name).get("module", module) == module)
 
 
 def _line(lid, state):
@@ -235,7 +272,7 @@ def _line(lid, state):
 def dry(lids=None, module="year2-cns", say=print):
     """What `collect` would decide for each lecture, writing nothing."""
     stats, cache = {}, {}
-    for lid in _lids(lids):
+    for lid in _lids(lids, module):
         try:
             state, _ = _judge_lecture(lid, module, cache)
         except Exception as e:
@@ -249,18 +286,21 @@ def collect(lids=None, module="year2-cns", say=print):
     """Judge each lecture; write segments.jsonl (+ the compat shadow files) for the accepted ones, remove them for
     the rest. One lecture's error never stops the others."""
     stats, cache = {}, {}
-    for lid in _lids(lids):
+    for lid in _lids(lids, module):
         try:
             state, rows = _judge_lecture(lid, module, cache)
         except Exception as e:
             state, rows = {"state": "error", "why": f"{type(e).__name__}: {e}"}, None
         try:
             if state["state"] == "accepted":
-                write_jsonl(ROOT / "lectures" / lid / "segments.jsonl", rows)
+                write_jsonl(scope.home(lid) / "segments.jsonl", rows)
                 from spine import compat
                 compat.lecture_files(lid, module, cache.setdefault("handout", compat._handout(module)))
             else:
                 _drop_shadow(lid)
+                step = widen(lid, state, module)
+                if step:
+                    state["why"] = f"the slice missed: widened to step {step}, run py -m spine seg jobs {lid}"
         except Exception as e:
             _drop_shadow(lid)
             state = {"state": "error", "why": f"write: {type(e).__name__}: {e}"}
@@ -286,7 +326,7 @@ def page_of(hid):
 
 
 def audit(lid, out=print):
-    rows = read_jsonl(ROOT / "lectures" / lid / "segments.jsonl")
+    rows = read_jsonl(scope.home(lid) / "segments.jsonl")
     if not rows:
         st = read_json(JOBS / lid / "state.json") or {}
         out(f"{lid}: no segments ({st.get('state', 'no job')})")

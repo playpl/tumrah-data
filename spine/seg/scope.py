@@ -5,12 +5,33 @@ The slice comes, in this order, from:
    (accepted book -> handout links), and the lectures it covers when it is a revision or mini lecture;
 2. else the densest run of book sentences the prior's scores point at (a window of `DENSE` sentences).
 The slice is widened by `MARGIN` sentences each side, so a doctor who strays a little stays inside it.
+
+When both readers find (almost) nothing of the lecture in its slice (`flow.collect`: both answers rejected for
+NONE), the slice missed: the doctor's book has no such chapter (a partial book), the prior pointed elsewhere, or the
+placement is off. `jobs/sp_seg/<lecture>/widen.json` then steps the lecture up the ladder, one step per rejection:
+    step 1  the whole book (a book over WHOLE_MAX lines: the slice +- WIDE); no book: the handout +- WIDE
+    step 2  a lecture with a book and a placement: the handout +- WIDE (the book does not have it)
+A lecture still rejected at its last step goes to the owner (a Today card, `decisions.py`).
 """
 from spine import ROOT, graph_dir, read_json, read_jsonl
 from spine import ids
 from spine.books import split
 
 MARGIN, DENSE, TRIM = 30, 160, 0.1
+WIDE, WHOLE_MAX = 300, 1500
+WIDEN = ROOT / "jobs" / "sp_seg"
+
+
+def widen_step(lid):
+    """0 = the normal slice; 1, 2 = the ladder steps above (written by `flow.collect`)."""
+    return (read_json(WIDEN / lid / "widen.json") or {}).get("step", 0)
+
+
+def last_step(lid, module="year2-cns"):
+    """The top of the ladder for this lecture: 2 with a book and a placement, else 1."""
+    lec = lecture(lid)
+    has_book = lec.get("doctor") in doctor_books(module)
+    return 2 if has_book and (lec.get("ranges") or lec.get("covers")) else 1
 
 
 def doctor_books(module):
@@ -24,9 +45,45 @@ def doctor_books(module):
     return out
 
 
+RECORD_MODULES = ("year1-musculoskeletal",)       # their lessons are records, not lectures/<id> folders
+
+
+_RECORDS = {}
+
+
+def _record_lessons():
+    """{record id: lecture-shaped dict} from the site lessons of the record modules (year 1: no lecture.json).
+    Read again only when a lessons file changes."""
+    files = [ROOT / "modules" / m / "site" / "lessons.jsonl" for m in RECORD_MODULES]
+    stamp = tuple(f.stat().st_mtime if f.exists() else 0 for f in files)
+    if _RECORDS.get("stamp") != stamp:
+        _RECORDS.update(stamp=stamp, rows=_read_record_lessons())
+    return _RECORDS["rows"]
+
+
+def _read_record_lessons():
+    out = {}
+    for m in RECORD_MODULES:
+        for r in read_jsonl(ROOT / "modules" / m / "site" / "lessons.jsonl"):
+            lid = r["key"].split(":", 1)[-1]
+            out[lid] = {"id": lid, "module": m, "doctor": r.get("doctorId"), "title": r.get("name"),
+                        "ranges": r.get("ranges") or [], "covers": [c.split(":", 1)[-1] for c in r.get("covers") or []]}
+    return out
+
+
+def home(lid):
+    """The folder that holds a lecture's raw.txt and segments: lectures/<id>, or a year 1 record's folder."""
+    d = ROOT / "lectures" / lid
+    if (d / "lecture.json").exists():
+        return d
+    rec = _record_lessons().get(lid)
+    return ROOT / "modules" / rec["module"] / "records" / lid if rec else d
+
+
 def lecture(lid):
-    """The lecture record, or {} when there is none (a `covers` id with no record must not stop the batch)."""
-    return read_json(ROOT / "lectures" / lid / "lecture.json") or {}
+    """The lecture record, or {} when there is none (a `covers` id with no record must not stop the batch). A year 1
+    record has no lecture.json: its site lesson stands in (doctor, ranges, covers)."""
+    return read_json(ROOT / "lectures" / lid / "lecture.json") or _record_lessons().get(lid) or {}
 
 
 def book_sentences(module, book):
@@ -104,7 +161,7 @@ def densest(m, width=DENSE, margin=MARGIN):
 HANDOUT_MARGIN = 15
 
 
-def handout_target(lec, module="year2-cns", cache=None):
+def handout_target(lec, module="year2-cns", cache=None, margin=HANDOUT_MARGIN):
     """No split book (Azouny, Khaled, Mahmoud Elhusseiny): the reader maps the transcript straight onto the handout
     sentences of the lecture's placement (and its covered lectures'), +- HANDOUT_MARGIN sentences, in handout order.
     `book` is None and `target` is "handout"; the B numbers then stand for handout sentences. None without ranges."""
@@ -124,9 +181,9 @@ def handout_target(lec, module="year2-cns", cache=None):
     pts = [i for i, s in enumerate(sents) if s["id"] in want]
     if not pts:
         return None
-    lo, hi = max(0, min(pts) - HANDOUT_MARGIN), min(len(sents) - 1, max(pts) + HANDOUT_MARGIN)
+    lo, hi = max(0, min(pts) - margin), min(len(sents) - 1, max(pts) + margin)
     return {"book": None, "target": "handout", "sents": sents, "lo": lo, "hi": hi,
-            "how": f"handout placement ({len(pts)} sentences)"}
+            "how": f"handout placement ({len(pts)} sentences)" + (f", widened +-{margin}" if margin != HANDOUT_MARGIN else "")}
 
 
 def pick(lid, module="year2-cns", paras=None, cache=None):
@@ -134,9 +191,12 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
     from spine.seg import prior
     cache = cache if cache is not None else {}
     lec = lecture(lid)
+    step = widen_step(lid)
     book = doctor_books(module).get(lec.get("doctor"))
-    if not book:
-        return handout_target(lec, module, cache)
+    if not book or step >= 2:
+        hand = handout_target(lec, module, cache, WIDE if step else HANDOUT_MARGIN)
+        if hand or not book:
+            return hand
     if book not in cache:
         cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book),
                        "index": _handout_index(module)}
@@ -144,6 +204,11 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
     sents = c["sents"]
     pts = from_placement(lec, sents, module, book, c["index"], c["links"])
     span = trimmed(pts, len(sents))
+    if step >= 1:
+        if len(sents) <= WHOLE_MAX or not span:
+            return {"book": book, "sents": sents, "lo": 0, "hi": len(sents) - 1, "how": "whole book (the slice missed)"}
+        return {"book": book, "sents": sents, "lo": max(0, span[0] - WIDE), "hi": min(len(sents) - 1, span[1] + WIDE),
+                "how": f"placement ({len(pts)} linked), widened +-{WIDE}"}
     if span:
         return {"book": book, "sents": sents, "lo": span[0], "hi": span[1], "how": f"placement ({len(pts)} linked)"}
     if paras is None:

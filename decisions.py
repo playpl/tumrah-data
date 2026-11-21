@@ -82,6 +82,15 @@ def cards(module, db):
                         "detail": "Type the site doctor id (like dr-name-subj). Asked once: it becomes a rule for every "
                                   "later file. Until then this doctor's files stay held.",
                         "options": ["Set site doctor", "Keep held"], "payload": {"key": key, "input": "site doctor id"}})
+    from spine.seg import flow as seg
+    lost = seg.for_owner(module)
+    if lost:
+        out.append({"id": "seg_lost:" + ",".join(lost), "kind": "open",
+                    "title": f"{len(lost)} lectures the readers could not find in the book or the handout",
+                    "detail": "Two Gemini readers found nothing of these lectures even in the whole book and then the "
+                              "handout around their placement (" + ", ".join(lost) + "). Usually the placement is wrong or "
+                              "the recording is not this lecture. They keep their old placement; no segments are made.",
+                    "options": ["Open", "Keep held"], "payload": {"tab": "Lectures", "lectures": lost}})
     open_keys = module_key_conflicts(module)
     if open_keys:
         out.append({"id": "keys", "kind": "open", "title": f"{open_keys} answer-key conflicts",
