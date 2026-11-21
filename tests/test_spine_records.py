@@ -230,6 +230,13 @@ class Site(Base):
         rev = next(r for r in rows if r["kind"] == "revision")
         self.assertEqual(rev["covers"], ["lecture:y1-bio-38"])
 
+    def test_a_revision_with_a_lectures_video_is_left_out(self):
+        rev = self.recs[2]
+        rev.update(source="youtube", youtube="https://youtu.be/AbCdEfGhIjK?si=other")
+        rows, out = self.rows()
+        self.assertNotIn("lecture:y1-bio-41", {r["key"] for r in rows})
+        self.assertTrue(any("same video" in x and "y1-bio-41" in x for x in out))
+
     def test_update_dry_only_reports(self):
         from spine.records import flow
         with mock.patch.object(machine, "download", side_effect=AssertionError("downloaded in a dry run")), \

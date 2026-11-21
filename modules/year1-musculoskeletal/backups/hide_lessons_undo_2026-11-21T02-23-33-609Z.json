@@ -1,0 +1,402 @@
+[
+ {
+  "id": "6afc7aab6df4150b077ae227",
+  "sourceRef": "lecture:y1-anat-46",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae228",
+  "sourceRef": "lecture:y1-anat-47",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae229",
+  "sourceRef": "lecture:y1-anat-60",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae22a",
+  "sourceRef": "lecture:y1-anat-53",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae22b",
+  "sourceRef": "lecture:y1-anat-57",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae22c",
+  "sourceRef": "lecture:y1-anat-91",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aab6df4150b077ae22d",
+  "sourceRef": "lecture:y1-anat-92",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae22e",
+  "sourceRef": "lecture:y1-anat-114",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae22f",
+  "sourceRef": "lecture:y1-anat-54",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae230",
+  "sourceRef": "lecture:y1-anat-74",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae231",
+  "sourceRef": "lecture:y1-anat-93",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae232",
+  "sourceRef": "lecture:y1-anat-94",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae233",
+  "sourceRef": "lecture:y1-anat-115",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae234",
+  "sourceRef": "lecture:y1-anat-62",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae235",
+  "sourceRef": "lecture:y1-anat-120",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae236",
+  "sourceRef": "lecture:y1-anat-65",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aac6df4150b077ae237",
+  "sourceRef": "lecture:y1-anat-86",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae238",
+  "sourceRef": "lecture:y1-anat-87",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae239",
+  "sourceRef": "lecture:y1-anat-107",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23a",
+  "sourceRef": "lecture:y1-anat-73",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23b",
+  "sourceRef": "lecture:y1-phys-62",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23c",
+  "sourceRef": "lecture:y1-phys-63",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23d",
+  "sourceRef": "lecture:y1-phys-64",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23e",
+  "sourceRef": "lecture:y1-phys-78",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae23f",
+  "sourceRef": "lecture:y1-phys-83",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae240",
+  "sourceRef": "lecture:y1-phys-180",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae241",
+  "sourceRef": "lecture:y1-phys-65",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aad6df4150b077ae242",
+  "sourceRef": "lecture:y1-phys-117",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae243",
+  "sourceRef": "lecture:y1-phys-77",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae244",
+  "sourceRef": "lecture:y1-phys-118",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae245",
+  "sourceRef": "lecture:y1-phys-119",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae247",
+  "sourceRef": "lecture:y1-phys-120",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae248",
+  "sourceRef": "lecture:y1-phys-121",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae249",
+  "sourceRef": "lecture:y1-phys-122",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae24b",
+  "sourceRef": "lecture:y1-phys-123",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae24c",
+  "sourceRef": "lecture:y1-phys-73",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aae6df4150b077ae24d",
+  "sourceRef": "lecture:y1-phys-79",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae24e",
+  "sourceRef": "lecture:y1-phys-88",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae24f",
+  "sourceRef": "lecture:y1-phys-91",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae250",
+  "sourceRef": "lecture:y1-phys-107",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae251",
+  "sourceRef": "lecture:y1-phys-110",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae252",
+  "sourceRef": "lecture:y1-phys-112",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae253",
+  "sourceRef": "lecture:y1-phys-132",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae254",
+  "sourceRef": "lecture:y1-phys-139",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae255",
+  "sourceRef": "lecture:y1-phys-226",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae256",
+  "sourceRef": "lecture:y1-phys-228",
+  "status": "published"
+ },
+ {
+  "id": "6afc7aaf6df4150b077ae257",
+  "sourceRef": "lecture:y1-phys-74",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae258",
+  "sourceRef": "lecture:y1-phys-82",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae259",
+  "sourceRef": "lecture:y1-phys-229",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25a",
+  "sourceRef": "lecture:y1-phys-230",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25b",
+  "sourceRef": "lecture:y1-phys-231",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25c",
+  "sourceRef": "lecture:y1-hist-46",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25d",
+  "sourceRef": "lecture:y1-hist-73",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25e",
+  "sourceRef": "lecture:y1-hist-59",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae25f",
+  "sourceRef": "lecture:y1-hist-91",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae260",
+  "sourceRef": "lecture:y1-hist-92",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab06df4150b077ae262",
+  "sourceRef": "lecture:y1-hist-93",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae263",
+  "sourceRef": "lecture:y1-hist-56",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae264",
+  "sourceRef": "lecture:y1-hist-60",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae265",
+  "sourceRef": "lecture:y1-hist-65",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae266",
+  "sourceRef": "lecture:y1-hist-71",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae267",
+  "sourceRef": "lecture:y1-hist-82",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae269",
+  "sourceRef": "lecture:y1-hist-84",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae26a",
+  "sourceRef": "lecture:y1-hist-48",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae26c",
+  "sourceRef": "lecture:y1-hist-70",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae26d",
+  "sourceRef": "lecture:y1-hist-85",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab16df4150b077ae26e",
+  "sourceRef": "lecture:y1-hist-72",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae26f",
+  "sourceRef": "lecture:y1-hist-76",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae270",
+  "sourceRef": "lecture:y1-hist-61",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae271",
+  "sourceRef": "lecture:y1-hist-68",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae272",
+  "sourceRef": "lecture:y1-hist-95",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae273",
+  "sourceRef": "lecture:y1-hist-ytduuslklku70-0fb7da",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae274",
+  "sourceRef": "lecture:y1-hist-97",
+  "status": "published"
+ },
+ {
+  "id": "6afc7ab26df4150b077ae275",
+  "sourceRef": "lecture:y1-hist-98",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3946df4150b077b395f",
+  "sourceRef": "lecture:y1-anat-75",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3946df4150b077b3960",
+  "sourceRef": "lecture:y1-anat-112",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3956df4150b077b3961",
+  "sourceRef": "lecture:y1-anat-66",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3956df4150b077b3962",
+  "sourceRef": "lecture:y1-anat-67",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3966df4150b077b3963",
+  "sourceRef": "lecture:y1-anat-68",
+  "status": "published"
+ },
+ {
+  "id": "6afcf3986df4150b077b3964",
+  "sourceRef": "lecture:y1-phys-72",
+  "status": "published"
+ }
+]

@@ -160,6 +160,14 @@ def site_rows(recs, st):
             why.setdefault("no recording in the post", set()).add(r["id"])
             continue
         keep.append(r)
+    # A revision or mini lecture that carries the same video as one of the doctor's lectures is that lecture posted
+    # twice (Ammar's "All Cartilage" 231 = his Cartilage 2 video, owner 2026-11-21: "You have to deal"): left out.
+    lecture_videos = {(r["doctor"], machine.yt_id(r["youtube"])) for r in keep
+                      if KIND[r["role"]] == "lesson" and r["source"] == "youtube"}
+    for r in [r for r in keep if KIND[r["role"]] != "lesson" and r["source"] == "youtube"]:
+        if (r["doctor"], machine.yt_id(r["youtube"])) in lecture_videos:
+            keep.remove(r)
+            why.setdefault("same video as one of the doctor's lectures", set()).add(r["id"])
     keys = {site_key(r["id"]) for r in keep}
     spans, places = lesson_spans(recs[0]["module"]) if recs else {}, placement(recs[0]["module"]) if recs else {}
     chapters, order = {}, {}
