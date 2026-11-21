@@ -348,6 +348,10 @@ class GeminiReader(unittest.TestCase):
         self.assertEqual(flow.ask_gemini(d, ask=capped), "capped")
         self.assertFalse((d / "reply_failed.txt").exists())
         self.assertEqual(flow.CAPPED["until"], 123.0)
+        mixed = lambda prompt, model=None, attach=(), wait=None: (None, {"error": "no account ready. acct3: capped; "
+                                                                       "acct1: Locator.click: Timeout 10000ms exceeded."})
+        self.assertEqual(flow.ask_gemini(d, ask=mixed), "capped")       # waits too, instead of failing the job
+        self.assertFalse((d / "reply_failed.txt").exists())
         replies, slept = ["capped", "answered", "answered"], []
         with mock.patch.object(flow, "ask_gemini", lambda d: replies.pop(0)):
             self.assertEqual(flow.run(["L1"], say=lambda *a: None, wait_caps=True, sleep=slept.append),

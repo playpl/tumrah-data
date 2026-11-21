@@ -137,6 +137,12 @@ def ask_gemini(d, ask=None, tries=TRIES):
         if text is None and meta.get("until"):
             CAPPED["until"] = max(CAPPED["until"], float(meta["until"]))
             return "capped"
+        err = str(meta.get("error") or "")
+        if text is None and err.startswith("no account ready") and "capped" in err:
+            # some accounts capped, the rest failed to open (a menu click timing out as the cap lands, 2026-11-21):
+            # wait like a full cap, for the first renewal or 20 minutes
+            CAPPED["until"] = max(CAPPED["until"], time.time() + 1200)
+            return "capped"
         if text and any(segment.LINE.match(segment.norm(x)) for x in text.splitlines()):
             (d / "answer.txt").write_text(text, encoding="utf-8")
             (d / "reply_failed.txt").unlink(missing_ok=True)
