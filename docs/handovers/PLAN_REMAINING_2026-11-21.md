@@ -161,3 +161,16 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 - 2026-11-21 later (session 4). S1 DONE: every year 2 lecture has a transcript (fleet `hear2`: 260 pieces, 0 failed)
   and all 21 MSK Telegram records (fleet, 146 pieces); no 40+ word repeat. 14 more seg jobs written for the new
   transcripts. MSK p1 reader A done: 3,227 of 5,985 accepted, 2,041 one reader only (reader B running in chain2).
+- 2026-11-21 ~12:30 local (session 4). Chain2 done: p1 accepted CNS 6,589 of 7,154 and MSK 5,084 of 5,985 (readers
+  A+B+C; audits sampled and read: 1 doubtful link of 60, a two-column table row, right after all). New code links:
+  table cells (`engine.cell_links`, 451 links) and a jump whose text is found only there (A1/A2) is kept; `parity p1`
+  4 of 7 (ammar-hist-1 75%: many old links were loose; elsamahy open 2.6%; zahran 91%). p1 NOT primary yet.
+  Seg: 129 accepted, `parity p2` 112 of 129; the fails read (cns-142, cns-067) are old-placement errors, the segments
+  are right. Rejected 25 = the slice missed (Elsamahy's partial book has no reflex chapter, a prior on the wrong
+  pages, off placements): ladder `widen.json` (whole book -> handout -> Today card, `1a3acee`). Year 1 MSK records
+  segmented from their site lessons (34 lectures, 68 jobs). PRIMARY SWITCH: CNS lesson ranges come from accepted
+  segments unless the owner placed them (`lectures.site_ranges`, 107 of 193 lessons change, 286 handout pages
+  covered vs 284; question lessons unchanged); MSK ranges from segments, `placedRanges` keeps the placement for the
+  seg slice. Site import (real) run `logs/site_import_2026-11-21_c.log`. Chain3 (seg rounds with the widened slices,
+  both years) waits for the Gemini renewals (12:53-15:12). Open: YouTube re-hears need a yt-dlp step on the runner
+  (the PC must not download recordings); Nagib 1638 mother re-read after chain3; S9 dispatcher family untouched.
