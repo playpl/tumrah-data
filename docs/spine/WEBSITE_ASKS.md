@@ -39,3 +39,13 @@ other importer kinds. The data side has its half ready or ready to write once th
   module or lesson page that all first-year data is old data (owner, 2026-11-17).
 - Biochemistry: the MSK curriculum module exists, but `doctorRoster.ts` hides biochemistry from MSK students (owner
   rule of 2026-11-05). 72 biochemistry records wait on the data side until the owner says otherwise.
+
+## W6 (2026-11-21): question grades and a file question's poll votes
+- The owner's grades (CLAUDE.md 2026-11-20): 1 the lesson doctor's own quizzes, 2 his MCQ files (1 when that lecture
+  has no quiz from him), 3 other doctors' MCQ files, 4 polls, 5 archive (the AI-questions reservoir, not lesson
+  questions). Data side: `py -m spine questions grades` writes `modules/<m>/site/grades.jsonl`, one row per site
+  question `{source_id, lesson, grade, why, poll}` (CNS 2026-11-21: 944 grade 1, 147 grade 2, 11,444 grade 4; MSK 388
+  grade 4).
+- Needed: `Question.grade` (1-5) set by an importer from that file (keyed by `source_id`), and lessons sorting their
+  questions by grade; `poll` (`bank:<id>` or `poll:<chat>:<msg>`, 888 of 1,091 quiz/file questions) so a quiz or
+  file question shows the class's votes of the same poll.

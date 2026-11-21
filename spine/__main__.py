@@ -20,6 +20,7 @@ COMMANDS = [
     "spine.seg.cli",        # seg prior | audit
     "spine.site.cli",       # site export
     "spine.parity",         # parity mother | p1 | p2
+    "spine.questions.grades",  # questions grades
 ]
 
 
