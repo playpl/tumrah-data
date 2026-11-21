@@ -133,3 +133,28 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 - 2026-11-21 02:40 UTC (session that wrote this plan, paused at session limits). Still running at hand-off: Gemini
   `p1 run year1-musculoskeletal` (acct capped on Hydrogen -> Flash-Lite fallback), fleet `hear2` (36 transcripts done).
   Next session: section 0 checks, then S1.
+- 2026-11-21 ~07:45 local (session 4, owner: "accomplish the plan, do not stop to ask").
+  Readers: Gemini's mode menu no longer offers Flash-Lite (Hydrogen, Neon, Carbon, Adaptive): a capped account waits
+  (CLAUDE.md, memory). `p1 run` MSK had crashed (Playwright EPIPE) and web hearing died on cap clicks; both restarted.
+  Fleet `hear2` + web `hear2` share one queue (`cNN.claim`, `ad38cfe`); 6 year 2 lectures left at 07:40, the 5 pieces
+  the fleet gave up on heard on Gemini. Year 1 MSK `records transcribe --via fleet` running
+  (`logs/y1_transcribe_fleet_2026-11-21.log`). No transcript of either year has a 40+ word repeat (`looped`).
+  Background chain (scratchpad `chain1.sh` -> `chain2.sh`): MSK p1 reader A (67 left) -> accept -> MSK reader B (122 jobs
+  written) -> CNS p1 tail A/B/C (8/8/5) -> accept both -> `seg run --wait` (150 + 48 jobs written) -> `seg collect`.
+  Logs `logs/p1_msk_2026-11-21_b.log`, `logs/p1_2026-11-21_c.log`, `logs/seg_run_2026-11-21_b.log`.
+  S5 settled: Wagih 1631 was fixed by the doctor (list edited 11-20; no "Basal ganglia"/"Limbic system" revision items;
+  mother_check exact). Ammar 232: his own channel (Dr_Ammar59 post 233) calls video 7oRn923JeZo "the second Cartilage
+  lesson", so 232 Cartilage 2 is right and revision 231 "All Cartilage" is the same video: new rule in
+  `spine/records/flow.py` (a revision/mini carrying a lecture's video is left out), lesson `lecture:y1-hist-231`
+  hidden (undo `modules/year1-musculoskeletal/backups/hide_lessons_undo_2026-11-21T05-24-04-453Z.json`), MSK
+  questions re-filed (388 live, 38 lessons). Mother agent: two list items with the same words are two chapters (Nagib's
+  two "Internal capsule"); 1638 still needs a Gemini re-read for an agreed map.
+  S7: ZNU chapters from its index (graph check passes); `py -m spine graph twin nu-year1-musculoskeletal --from
+  year1-musculoskeletal`: 2,485 ZU sentences matched by code, every ZU lesson on one ZNU lesson, 38 lessons with ZNU
+  ranges (`modules/nu-year1-musculoskeletal/site/lessons.jsonl`), 640 question pointers (`site/points.json`). Waits
+  for W5 only.
+  S4: `py -m spine questions grades` -> `site/grades.jsonl` (CNS 944 grade 1, 147 grade 2, 11,444 grade 4; MSK 388
+  grade 4), 888 of 1,091 quiz/file questions matched to their poll; website ask W6 (Question.grade + poll link).
+  S9: `legacy/` started (fleet_pause, fleet_watch, oob_transcribe); the dispatcher family moves with page/control.
+  Next when the chain ends: `parity p1`, the audits, `seg dry`/audit, then `py site_import.py` (dry first) for the
+  new links; MSK lesson ranges from segments.
