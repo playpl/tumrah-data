@@ -119,8 +119,11 @@ def ask_gemini(d, ask=None, tries=TRIES):
     model's usage cap: "capped" (nothing written; CAPPED["until"] = the first renewal). Else the last reply is kept in
     reply_failed.txt. `ask` is gemini_browser.ask (tests pass a fake)."""
     if ask is None:
+        import functools
         import gemini_browser
-        ask = gemini_browser.ask
+        # Linking never runs on the free model (owner 2026-11-21: "We won't link with the light model"): a capped
+        # account is skipped and the job waits for a renewal instead of answering with Flash-Lite.
+        ask = functools.partial(gemini_browser.ask, fallback=False)
     task = (d / "task.txt").read_text(encoding="utf-8")
     head = task.partition("\nBOOK\n")[0] + "\nThe BOOK and TRANSCRIPT blocks are in the attached file task.txt."
     text, meta = None, {}

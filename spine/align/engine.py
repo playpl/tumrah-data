@@ -159,8 +159,11 @@ def ask_gemini(d, ask=None):
     """One job folder answered on Gemini web: result.json {"status": "SUCCESS", "response", "by": "gemini"}.
     "answered", "capped" (every account at its usage cap; meta "until" kept in CAPPED) or "failed"."""
     if ask is None:
+        import functools
         import gemini_browser
-        ask = gemini_browser.ask
+        # Linking never runs on the free model (owner 2026-11-21: "We won't link with the light model"): a capped
+        # account is skipped and the job waits for a renewal instead of answering with Flash-Lite.
+        ask = functools.partial(gemini_browser.ask, fallback=False)
     text, meta = ask((d / "prompt.md").read_text(encoding="utf-8"), model=MODEL, wait=WAIT)
     if text is None and meta.get("until"):
         CAPPED["until"] = max(CAPPED["until"], float(meta["until"]))
