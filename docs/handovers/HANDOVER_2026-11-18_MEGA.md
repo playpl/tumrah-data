@@ -246,3 +246,20 @@ Two sessions started from the records session were still working when this was w
      (stopped; 25 accepted, 65 waiting).
   5. Ammar "Cartilage 2" (232) wrong video: wait for the doctor. Polls job finished (restart with Polls.bat).
 
+- 2026-11-21 night (session 3). Owner mid-session: "burn the fleet" beside Gemini, Haiku last; "fleet is very stupid"
+  (question linking): fleet only on code-checkable work (CLAUDE.md "Fleet back"; `fleet.down` stays true for the old
+  flows). Done: Update data (`logs/update_2026-11-21_b.log`): agent added Zahran revisions cns-197/198 "Nervous
+  tissue part 1/2" (list 1635, read by hand: covers neuron..receptors, sit in the last covered chapter),
+  `mother_check` exact. `[cite: N]` stripped from 55 transcript files (`strip_cite.py`; 46 seg answers kept by
+  re-fingerprinting, 186 of 186 jobs current); `gemini_run.piece_text` strips them from now on. MSK lessons now carry
+  handout ranges: `modules/year1-musculoskeletal/site/placement.json` (record -> L01..L39, coarse by title / transcript
+  words) over the graph's lesson cuts (`spine/records/flow.py` `lesson_spans`, `ranges_of`); 18 live MSK lessons
+  changed on the site. `hear2 --via fleet` (zero, work, personal; "other" fails auth: `py C:\Users\Ahmed\agy-fleet\fleet.py
+  login other`), model flash, piece check + loop check (40+ repeated words), `cNN.fleet` markers and
+  `source.heard_by_fleet`. Six looped pieces (cns-010 c09, 037 c00, 034 c00, 038 c02, 043 c08, 045 c00) moved to
+  `backups_pre_update/rehear_loops_2026-11-21/` with their raw.txt: they are re-heard by the fleet run.
+  Records runs 44842878852 (cns-198 + 4 MSK uploaded; cns-197 Telegram timeout) and 44846091744 (max_mb 6000, the 17
+  MSK left). Seg run on Gemini (`logs/seg_run_2026-11-21.log`). Polls job restarted.
+  MSK doctors' books: none in `doctors/msk`; the lists carry them (Elazouny 157-160/172-175, Mosafer 179/184, Nagib
+  249 "full book" 16 MB, Mahmoud 213/225, Zahran 240 module book 33 MB, Ammar 228): not fetched (no heavy transfers
+  on the PC); W4 books wait for them (owner adds, or a runner step for PDFs).

@@ -130,6 +130,17 @@ def looped(text):
     return best
 
 
+MAX_CHARS_PER_MIN = 2400   # above every heard CNS piece (p99 1963, max 2409, 494 full pieces 2026-11-21): padding
+
+
+def retime(text, seconds):
+    """The fleet's paragraphs with its own [mm:ss] dropped (it stamps a 5-minute layout onto short pieces) and
+    code-set times, as for Gemini web (gemini_run.piece_text: by character position)."""
+    import gemini_run
+    body = STAMP.sub("", gemini_run.strip_cite(text or ""))
+    return gemini_run.piece_text(body, seconds) if body.strip() else ""
+
+
 def check_piece(text, seconds):
     """The year 2 piece check (PieceFlow.check): [] when the text is a whole transcript of `seconds`."""
     import checks
@@ -137,6 +148,10 @@ def check_piece(text, seconds):
         return []                      # a silent piece
     errors = checks.check_transcript(text, seconds, end_slack=90)
     errors = [e for e in errors if "before the end" not in e or seconds > 120]
+    import checks
+    rate = sum(len(b) for _, b in checks.paragraphs(text)) / max(seconds / 60, 1)
+    if rate > MAX_CHARS_PER_MIN:
+        errors.append(f"{rate:.0f} characters a minute (padded?)")
     if (n := looped(text)) >= LOOP_MAX:
         errors.append(f"a passage of {n} words is repeated (loop)")
     return errors
@@ -150,7 +165,8 @@ def hear_fleet(piece, account, runner=None, say=print, model="flash"):
     d.mkdir(parents=True, exist_ok=True)
     shutil.copy2(piece, d / "piece.ogg")
     (d / "piece.txt").unlink(missing_ok=True)
-    (d / "prompt.md").write_text(PIECE_PROMPT.format(minutes=PIECE // 60), encoding="utf-8")
+    seconds = lectures.duration(piece)
+    (d / "prompt.md").write_text(PIECE_PROMPT.format(minutes=f"{seconds / 60:.1f}".rstrip("0").rstrip(".")), encoding="utf-8")
     cmd = FLEET + ["run", "-a", account, "--cwd", str(d), "-f", str(d / "prompt.md"), "--out", str(d / "result.json"),
                    "--timeout", "20", "--model", model]
     (runner or (lambda c: subprocess.run(c, cwd=d, capture_output=True, text=True, encoding="utf-8", errors="replace")))(cmd)
@@ -159,13 +175,12 @@ def hear_fleet(piece, account, runner=None, say=print, model="flash"):
         res = read_result(d / "result.json")
         say(f"    {name} on {account}: no piece.txt ({res.get('error') or res.get('status') or 'no result'})"[:200])
         return None
-    text = (d / "piece.txt").read_text(encoding="utf-8")
-    errors = check_piece(text, lectures.duration(piece))
+    import gemini_run
+    text = retime((d / "piece.txt").read_text(encoding="utf-8"), seconds)
+    errors = check_piece(text, seconds)
     if errors:
         say(f"    {name} on {account}: check: {'; '.join(errors)[:150]}")
         return None
-    import gemini_run
-    text = gemini_run.strip_cite(text)
     piece.with_suffix(".fleet").write_text(json.dumps({"account": account, "model": model}), encoding="utf-8")
     piece.with_suffix(".txt").write_text(text, encoding="utf-8")
     return text
