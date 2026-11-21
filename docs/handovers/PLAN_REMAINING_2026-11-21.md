@@ -158,3 +158,6 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   S9: `legacy/` started (fleet_pause, fleet_watch, oob_transcribe); the dispatcher family moves with page/control.
   Next when the chain ends: `parity p1`, the audits, `seg dry`/audit, then `py site_import.py` (dry first) for the
   new links; MSK lesson ranges from segments.
+- 2026-11-21 later (session 4). S1 DONE: every year 2 lecture has a transcript (fleet `hear2`: 260 pieces, 0 failed)
+  and all 21 MSK Telegram records (fleet, 146 pieces); no 40+ word repeat. 14 more seg jobs written for the new
+  transcripts. MSK p1 reader A done: 3,227 of 5,985 accepted, 2,041 one reader only (reader B running in chain2).
