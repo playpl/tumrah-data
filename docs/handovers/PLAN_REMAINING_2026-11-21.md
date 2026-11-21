@@ -79,7 +79,13 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   Nagib 1638: the readers disagree on link 40 and "Internal capsule" twice: fix the agent's rule for a name used twice.
 - Edits and deletions (draft + undo, two-fetch rule, mass hold): code diff exists in `spine/tg/flow.py`; needs the
   website's W1/W2.
-- Done when: an edited or deleted list item reaches the site as draft with undo.
+- Doctors' wrong links, Claude fixes them (owner 2026-11-21: "I can't ask doctors to fix any links. You have to deal"):
+  Wagih list 1631: revision "Basal ganglia" links 1848 (gone) and "limbic system" links 1847 (the lecture itself): look
+  for the real revision posts by caption near those ids (`py tg_lists.py text 1631`); found -> `sources/lists/link_fixes.json`;
+  none -> leave the items out and say so. Ammar MSK "Cartilage 2" (ZAG59_Histo 232) holds the same YouTube as his
+  revision 231: find the right video (channel posts near 232, captions); none -> hide lesson `lecture:y1-hist-232`
+  (`backend/src/scripts/hideLessons.ts`) so students do not get the revision twice.
+- Done when: an edited or deleted list item reaches the site as draft with undo; the wrong links above are settled.
 
 ### S6. Website asks (another session, `C:\Users\Ahmed\Desktop\tumrah`; `docs/spine/WEBSITE_ASKS.md`)
 - W1 importer honours `status` and `--only-keys`; W2 lessons draft + undo; W3 whiteboard/file section
@@ -103,9 +109,8 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 ## 2. Owner tasks (things only the owner can do)
 - T1. Listen to the five pieces in `listen_2026-11-20/` (README inside) and say which transcript is right.
 - T2. Today screen: 24 cards wait (`py dm.py page`, first tab).
-- T3. Sign the fleet's `other` account in once: `py C:\Users\Ahmed\agy-fleet\fleet.py login other`.
-- T4. Wagih list 1631 wrong revision links (1848 gone, 1847 = the lecture) and Ammar "Cartilage 2" (232 = his revision
-  video): ask the doctors to fix the posts.
+- T3. (owner doing it 2026-11-21) Sign the fleet's `other` account in once: `py C:\Users\Ahmed\agy-fleet\fleet.py login other`.
+- (T4 moved to S5: the owner cannot ask doctors to fix links; Claude deals with them.)
 
 ## 3. Owner questions (asked 2026-11-21; answers go here)
 - Q1. Waiting MSK questions -> ANSWERED: link them to the handout, wait for a doctor's lecture on that area. The owner
@@ -121,6 +126,10 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   committed in the tumrah repo); undo file
   `modules/year1-musculoskeletal/backups/hide_lessons_undo_2026-11-21T02-23-33-609Z.json`
   (`hideLessons.ts --undo <file> --apply`). MSK now shows its 39 lessons. Permanent deletion only if the owner asks.
+- Q8. Other MSK poll/quiz channels -> ANSWERED: ZAG_59_Polls is all.
 - Q7. The rest of the MSK lectures -> ANSWERED "That's all I got": the 42 records are all; ~500 MSK questions wait.
 
 ## Progress
+- 2026-11-21 02:40 UTC (session that wrote this plan, paused at session limits). Still running at hand-off: Gemini
+  `p1 run year1-musculoskeletal` (acct capped on Hydrogen -> Flash-Lite fallback), fleet `hear2` (36 transcripts done).
+  Next session: section 0 checks, then S1.
