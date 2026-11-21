@@ -11,7 +11,11 @@ NONE), the slice missed: the doctor's book has no such chapter (a partial book),
 placement is off. `jobs/sp_seg/<lecture>/widen.json` then steps the lecture up the ladder, one step per rejection:
     step 1  the whole book (a book over WHOLE_MAX lines: the slice +- WIDE); no book: the handout +- WIDE
     step 2  a lecture with a book and a placement: the handout +- WIDE (the book does not have it)
-A lecture still rejected at its last step goes to the owner (a Today card, `decisions.py`).
+    top     the handout window the lecture's own words point at (`handout_prior`: the prior's densest run of
+            HANDOUT_DENSE handout sentences), for an old placement on the wrong pages (Azouny's Cerebrum part 1
+            was placed on the midbrain and receptor pages: every slice built from it missed)
+A lecture with no placement and no book starts at the top. A lecture still rejected at its last step goes to the
+owner (a Today card, `decisions.py`).
 """
 from spine import ROOT, graph_dir, read_json, read_jsonl
 from spine import ids
@@ -28,10 +32,10 @@ def widen_step(lid):
 
 
 def last_step(lid, module="year2-cns"):
-    """The top of the ladder for this lecture: 2 with a book and a placement, else 1."""
+    """The top of the ladder for this lecture (the handout prior): 3 with a book and a placement, else 2."""
     lec = lecture(lid)
     has_book = lec.get("doctor") in doctor_books(module)
-    return 2 if has_book and (lec.get("ranges") or lec.get("covers")) else 1
+    return 3 if has_book and (lec.get("ranges") or lec.get("covers")) else 2
 
 
 def doctor_books(module):
@@ -164,18 +168,14 @@ def densest(m, width=DENSE, margin=MARGIN):
 
 
 HANDOUT_MARGIN = 15
+HANDOUT_DENSE = 500
 
 
 def handout_target(lec, module="year2-cns", cache=None, margin=HANDOUT_MARGIN):
     """No split book (Azouny, Khaled, Mahmoud Elhusseiny): the reader maps the transcript straight onto the handout
     sentences of the lecture's placement (and its covered lectures'), +- HANDOUT_MARGIN sentences, in handout order.
     `book` is None and `target` is "handout"; the B numbers then stand for handout sentences. None without ranges."""
-    cache = cache if cache is not None else {}
-    if "handout_sents" not in cache:
-        cache["handout_sents"] = [s for s in read_jsonl(graph_dir(module) / "sentences.jsonl")
-                                  if s["kind"] != "figure" and (s.get("text") or "").strip() and s.get("rows")]
-        cache["index"] = cache.get("index") or _handout_index(module)
-    sents = cache["handout_sents"]
+    sents = _handout_sents(module, cache)
     ranges = list(lec.get("ranges") or [])
     for other in lec.get("covers") or []:
         try:
@@ -191,6 +191,33 @@ def handout_target(lec, module="year2-cns", cache=None, margin=HANDOUT_MARGIN):
             "how": f"handout placement ({len(pts)} sentences)" + (f", widened +-{margin}" if margin != HANDOUT_MARGIN else "")}
 
 
+def _handout_sents(module, cache):
+    if "handout_sents" not in cache:
+        cache["handout_sents"] = [s for s in read_jsonl(graph_dir(module) / "sentences.jsonl")
+                                  if s["kind"] != "figure" and (s.get("text") or "").strip() and s.get("rows")]
+        cache["index"] = cache.get("index") or _handout_index(module)
+    return cache["handout_sents"]
+
+
+def handout_prior(paras, module="year2-cns", cache=None, width=None):
+    """The top of the ladder: the handout window of `width` sentences the lecture's own words point at (the prior's
+    densest run over the whole handout), placement-free. None without paragraphs or a word in common."""
+    from spine.seg import prior
+    cache = cache if cache is not None else {}
+    sents = _handout_sents(module, cache)
+    if not paras or not sents:
+        return None
+    if "handout_lex" not in cache:
+        cache["handout_lex"] = prior.lexicon(sents)
+    m = prior.scores(paras, sents, cache["handout_lex"])
+    if not m.any():
+        return None
+    width = width or HANDOUT_DENSE
+    lo, hi = densest(m, width=width, margin=MARGIN)
+    return {"book": None, "target": "handout", "sents": sents, "lo": lo, "hi": hi,
+            "how": f"handout prior (densest {width} sentences, placement-free)"}
+
+
 def pick(lid, module="year2-cns", paras=None, cache=None):
     """{book, sents (whole book), lo, hi, how} for a lecture, or None when its doctor has no book."""
     from spine.seg import prior
@@ -198,10 +225,14 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
     lec = lecture(lid)
     step = widen_step(lid)
     book = doctor_books(module).get(lec.get("doctor"))
+    if step and step >= last_step(lid, module):
+        return handout_prior(paras, module, cache)
     if not book or step >= 2:
         hand = handout_target(lec, module, cache, WIDE if step else HANDOUT_MARGIN)
-        if hand or not book:
+        if hand:
             return hand
+        if not book:                                   # no placement to start from: the lecture's own words
+            return handout_prior(paras, module, cache)
     if book not in cache:
         cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book, cells=False),
                        "index": _handout_index(module)}

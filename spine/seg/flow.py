@@ -27,10 +27,13 @@ MODEL = "hydrogen"                  # Gemini web, 4 Hydrogen (owner 2026-11-18)
 WAIT = 900                          # seconds for one answer (a task is up to 170 KB)
 TRIES = 2                           # chats per job when a reply has no answer line (an attachment can fail)
 ACCEPT = 0.8                        # share of paragraphs the two readers must agree on
+TALKY_NONE = 0.7                    # a talky lecture: both readers may call up to this share NONE ...
+TALKY_MIN = 5                       # ... when they agree (ACCEPT) on at least this many paragraphs they did link
 SHADOW = ("segments.jsonl",)        # derived files collect owns: removed when a lecture is not accepted (any more)
 SHADOW_SPINE = ("links.jsonl", "ranges.json")    # compat shapes written from segments.jsonl (lectures/<id>/spine/)
 CAPPED = {"until": 0.0}              # the latest "every account is capped" renewal seen (epoch seconds)
-ANSWER_FILES = ("answer.txt", "reader.json", "browser.json", "reply_failed.txt", "result.json", "done", "prompt.md")
+ANSWER_FILES = ("answer.txt", "reader.json", "browser.json", "reply_failed.txt", "result.json", "done", "prompt.md",
+                "answer_rejected.txt")
 
 
 def fingerprint(task, sents):
@@ -174,13 +177,27 @@ def run(lids=None, say=print, limit=None, workers=1, wait_caps=False, sleep=time
     return stats
 
 
-def read_answer(d, n_paras, n_book):
-    """(per paragraph answer or None when unusable, problems)."""
+def read_answer(d, n_paras, n_book, raw=False):
+    """(per paragraph answer or None when unusable, problems); with `raw` the answer even when unusable."""
     if not answered(d):
         return None, ["no answer"]
     per, notes = segment.parse((d / "answer.txt").read_bytes().decode("utf-8", errors="replace"), n_paras, n_book)
     why = segment.problems(per, notes)
-    return (None if why else per), why
+    return (per if raw or not why else None), why
+
+
+def talky(a, b, why_a, why_b):
+    """Both answers are whole but call much of the lecture NONE (a doctor who talks around the text: questions,
+    stories, revision chat). Usable when NONE is their only problem, each reader's NONE share is at most TALKY_NONE,
+    and on the paragraphs either of them linked they agree (ACCEPT) on at least TALKY_MIN."""
+    if a is None or b is None or any(not x.startswith("NONE for") for x in why_a + why_b):
+        return False
+    n = len(a) or 1
+    if max(sum(x is None for x in a), sum(x is None for x in b)) / n > TALKY_NONE:
+        return False
+    linked = [(x, y) for x, y in zip(a, b) if x is not None or y is not None]
+    same = sum(segment.same(x, y) for x, y in linked)
+    return same >= TALKY_MIN and same / len(linked) >= ACCEPT
 
 
 def _judge_lecture(lid, module, cache):
@@ -198,8 +215,15 @@ def _judge_lecture(lid, module, cache):
     state = {"fp": fp[:12], "readers": {r: g[1][:4] for r, g in got.items()}}
     a, b = got["A"][0], got["B"][0]
     if a is None or b is None:
-        state["state"] = "waiting" if not all(answered(job_dir(lid, r)) for r in READERS) else "rejected"
-        return state, None
+        if not all(answered(job_dir(lid, r)) for r in READERS):
+            state["state"] = "waiting"
+            return state, None
+        raw = {r: read_answer(job_dir(lid, r), n, nb, raw=True) for r in READERS}
+        if not talky(raw["A"][0], raw["B"][0], raw["A"][1], raw["B"][1]):
+            state["state"] = "rejected"
+            return state, None
+        a, b = raw["A"][0], raw["B"][0]
+        state["talky"] = True
     per, share = segment.agreed(a, b)
     state["agree"] = round(share, 3)
     if share < ACCEPT:
@@ -240,6 +264,27 @@ def widen(lid, state, module="year2-cns"):
     return step + 1
 
 
+def retry(lid, state):
+    """One reader's answer unusable while the other's is whole: that reader is asked once more in a fresh chat (its
+    answer kept as answer_rejected.txt), once per answer pair. Returns the reader asked again, or None."""
+    readers = state.get("readers") or {}
+    bad = [r for r in READERS if readers.get(r)]
+    if state.get("state") != "rejected" or len(bad) != 1:
+        return None
+    f = JOBS / lid / "retry.json"
+    w = read_json(f) or {}
+    if w.get("after") == state.get("fp"):
+        return None
+    d = job_dir(lid, bad[0])
+    if not answered(d):
+        return None
+    (d / "answer_rejected.txt").write_bytes((d / "answer.txt").read_bytes())
+    for x in ("answer.txt", "reader.json", "browser.json"):
+        (d / x).unlink(missing_ok=True)
+    write_json(f, {"reader": bad[0], "after": state.get("fp"), "at": now(), "why": "; ".join(readers[bad[0]])})
+    return bad[0]
+
+
 def for_owner(module="year2-cns"):
     """Lectures rejected at the top of the ladder: the readers found nothing even in the widest slice."""
     return sorted(f.parent.name for f in JOBS.glob("*/widen.json") if (read_json(f) or {}).get("owner")
@@ -264,7 +309,8 @@ def _lids(lids, module="year2-cns"):
 
 
 def _line(lid, state):
-    return (f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%})" if "agree" in state else "")
+    return (f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%}" + (", talky" if state.get("talky") else "")
+                                             + ")" if "agree" in state else "")
             + (f" {state['why']}" if state.get("why") else "")
             + "".join(f"; {r}: {'; '.join(p[:2])}" for r, p in (state.get("readers") or {}).items() if p))
 
@@ -301,6 +347,9 @@ def collect(lids=None, module="year2-cns", say=print):
                 step = widen(lid, state, module)
                 if step:
                     state["why"] = f"the slice missed: widened to step {step}, run py -m spine seg jobs {lid}"
+                again = None if step else retry(lid, state)
+                if again:
+                    state["why"] = f"reader {again} asked again (its answer was unusable): py -m spine seg run {lid}"
         except Exception as e:
             _drop_shadow(lid)
             state = {"state": "error", "why": f"write: {type(e).__name__}: {e}"}

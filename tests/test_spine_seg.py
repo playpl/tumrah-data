@@ -430,7 +430,8 @@ class Widen(unittest.TestCase):
         self.assertIsNone(f.widen("L1", self.missed("fp1")))            # the same answers never step twice
         self.assertEqual(scope.widen_step("L1"), 1)
         self.assertEqual(f.widen("L1", self.missed("fp2")), 2)
-        self.assertIsNone(f.widen("L1", self.missed("fp3")))            # top of the ladder: the owner's card
+        self.assertEqual(f.widen("L1", self.missed("fp3")), 3)          # the handout prior
+        self.assertIsNone(f.widen("L1", self.missed("fp4")))            # top of the ladder: the owner's card
         from pathlib import Path
         (Path(self.tmp.name) / "L1" / "A").mkdir(parents=True)
         (Path(self.tmp.name) / "L1" / "A" / "meta.json").write_text('{"lecture": "L1"}')
@@ -449,6 +450,59 @@ class Widen(unittest.TestCase):
         self.flow.widen("L3", self.missed("b"))
         with mock.patch.object(scope, "handout_target", lambda lec, module, cache, margin: {"book": None, "margin": margin}):
             self.assertEqual(scope.pick("L3", "year2-cns", None, cache), {"book": None, "margin": scope.WIDE})
+
+    def test_the_top_step_reads_the_handout_window_the_lectures_words_point_at(self):
+        for fp in "abc":
+            self.flow.widen("L4", self.missed(fp))
+        sents = ([{"id": f"h{i}", "text": "Medial lemniscus of the midbrain", "kind": "fact", "rows": ["r"]} for i in range(40)]
+                 + [{"id": f"h{40 + i}", "text": "The frontal lobe and parietal lobe of the cerebrum", "kind": "fact", "rows": ["r"]}
+                    for i in range(10)])
+        paras = [{"text": "frontal lobe parietal lobe cerebrum"}] * 3
+        with mock.patch.object(scope, "HANDOUT_DENSE", 10), mock.patch.object(scope, "MARGIN", 0):
+            got = scope.pick("L4", "year2-cns", paras, {"handout_sents": sents, "index": []})
+        self.assertEqual((got["target"], got["lo"], got["hi"]), ("handout", 40, 49))
+
+    def test_no_book_and_no_placement_starts_at_the_handout_prior(self):
+        with mock.patch.object(scope, "lecture", lambda lid: {"doctor": "dr-none"}),                 mock.patch.object(scope, "handout_prior", lambda paras, module, cache: {"how": "prior"}):
+            self.assertEqual(scope.pick("L5", "year2-cns", [{"text": "x"}], {}), {"how": "prior"})
+            self.assertEqual(scope.last_step("L5"), 2)
+
+
+class TalkyAndRetry(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from spine.seg import flow
+        self.tmp, self.flow = tempfile.TemporaryDirectory(), flow
+        self.p = mock.patch.object(flow, "JOBS", Path(self.tmp.name))
+        self.p.start()
+
+    def tearDown(self):
+        self.p.stop()
+        self.tmp.cleanup()
+
+    def test_a_talky_lecture_both_readers_agree_on_is_usable(self):
+        a = [None] * 6 + [[(1, 2)]] * 3 + [[(5, 6)]] * 3
+        b = [None] * 6 + [[(1, 2)]] * 3 + [[(5, 5)]] * 3
+        none = ["NONE for 50% of paragraphs"]
+        self.assertTrue(self.flow.talky(a, b, none, []))
+        self.assertFalse(self.flow.talky(a, b, none + ["3 answers outside the BOOK lines"], []))
+        mostly = [None] * 10 + [[(1, 2)]] * 2
+        self.assertFalse(self.flow.talky(mostly, mostly, none, none))          # too much NONE, too few links
+        self.assertFalse(self.flow.talky(a, [None] * 6 + [[(90, 95)]] * 6, none, none))   # they link elsewhere
+
+    def test_one_unusable_reader_is_asked_once_more(self):
+        d = self.flow.job_dir("L1", "B")
+        d.mkdir(parents=True)
+        (d / "answer.txt").write_text("P1 = NONE")
+        st = {"state": "rejected", "fp": "f1", "readers": {"A": [], "B": ["NONE for 92% of paragraphs"]}}
+        self.assertEqual(self.flow.retry("L1", st), "B")
+        self.assertFalse((d / "answer.txt").exists())
+        self.assertEqual((d / "answer_rejected.txt").read_text(), "P1 = NONE")
+        (d / "answer.txt").write_text("P1 = NONE")
+        self.assertIsNone(self.flow.retry("L1", st))                           # once per answer pair
+        both = {"state": "rejected", "fp": "f2", "readers": {"A": ["x"], "B": ["y"]}}
+        self.assertIsNone(self.flow.retry("L1", both))
 
 
 if __name__ == "__main__":
