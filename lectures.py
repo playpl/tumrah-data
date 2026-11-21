@@ -153,6 +153,26 @@ def cover_ranges(meta):
     return meta
 
 
+def spine_ranges(lecture_id):
+    """The handout ranges of the lecture's accepted segments (`py -m spine seg collect` writes segments.jsonl and
+    spine/ranges.json only for an accepted lecture), or [] when it has none."""
+    d = folder(lecture_id)
+    if not (d / "segments.jsonl").exists() or not (d / "spine" / "ranges.json").exists():
+        return []
+    got = json.loads((d / "spine" / "ranges.json").read_text(encoding="utf-8"))
+    return [{"from": r["from"], "to": r["to"]} for r in got.get("ranges") or []]
+
+
+def site_ranges(meta):
+    """The ranges the site gets (primary switch, 2026-11-21): the owner's own placement wins; else the accepted
+    segments (what the doctor really explains); else the old placement in lecture.json. The segmentation slice keeps
+    reading lecture.json `ranges`, so this never makes a seg answer stale."""
+    own = [{"from": r["from"], "to": r["to"]} for r in meta.get("ranges") or []]
+    if meta.get("placed_by") == "owner":
+        return own
+    return spine_ranges(meta["id"]) or own
+
+
 def page_ranges(meta):
     """[[first_pdf_page, last_pdf_page], ...] from the lecture's line-ID ranges."""
     return [r["pages"] for r in meta.get("ranges") or []]

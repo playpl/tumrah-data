@@ -236,7 +236,7 @@ def lesson_rows(module):
                     "videoUrl": _re.sub(r"\?si=.*$", "", url) if url else None,
                     **({"oldData": True} if m.get("backup") else {}),  # the recording is the previous batch's: the site warns
                     "covers": [f"lecture:{c}" for c in m.get("covers") or []],
-                    "ranges": [{"from": r["from"], "to": r["to"]} for r in m.get("ranges") or []]})
+                    "ranges": lectures.site_ranges(m)})
     return sorted(out, key=lambda r: (r["kind"] != "lesson", r["key"]))
 
 
