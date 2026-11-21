@@ -136,6 +136,15 @@ def agreed(a, b):
     return out, (sum(v != "disputed" for v in out) / len(out) if out else 1.0)
 
 
+def agreed3(a, b, c):
+    """(per paragraph: the answer two of the three readers share, else "disputed"; share agreed). A third reader
+    breaks the ties of a disputed pair (mostly one reader linking where the other said NONE)."""
+    out = []
+    for x, y, z in zip(a, b, c):
+        out.append(x if same(x, y) or same(x, z) else y if same(y, z) else "disputed")
+    return out, (sum(v != "disputed" for v in out) / len(out) if out else 1.0)
+
+
 def segments(per):
     """Runs of paragraphs with the same answer: [{"p": [a, b], "b": [[c, d], ...] or None, "flag"?}]."""
     out = []

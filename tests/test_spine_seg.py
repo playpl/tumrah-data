@@ -504,6 +504,25 @@ class TalkyAndRetry(unittest.TestCase):
         both = {"state": "rejected", "fp": "f2", "readers": {"A": ["x"], "B": ["y"]}}
         self.assertIsNone(self.flow.retry("L1", both))
 
+    def test_two_of_three_readers_decide_a_disputed_paragraph(self):
+        from spine.seg import segment
+        a = [None, [(1, 2)], [(10, 11)], [(30, 31)]]
+        b = [[(5, 6)], None, [(10, 10)], [(60, 61)]]
+        c = [[(5, 6)], [(1, 1)], None, [(90, 91)]]
+        per, share = segment.agreed3(a, b, c)
+        self.assertEqual(per, [[(5, 6)], [(1, 2)], [(10, 11)], "disputed"])
+        self.assertEqual(share, 0.75)
+
+    def test_a_disputed_pair_writes_the_third_job_once(self):
+        a = self.flow.job_dir("L2", "A")
+        a.mkdir(parents=True)
+        (a / "task.txt").write_text("task")
+        (a / "meta.json").write_text('{"fp": "f1"}')
+        self.assertTrue(self.flow.ask_third("L2", {"state": "disputed"}))
+        self.assertEqual((self.flow.job_dir("L2", "C") / "task.txt").read_text(), "task")
+        self.assertFalse(self.flow.ask_third("L2", {"state": "disputed", "third": "waiting"}))
+        self.assertIn(("L2", "C"), [(lid, r) for lid, r, _ in self.flow.todo(["L2"])])
+
 
 if __name__ == "__main__":
     unittest.main()

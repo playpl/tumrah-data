@@ -11,7 +11,8 @@
 Rebuilt 2026-11-18 (owner: the fleet-era flow was over-engineered; Gemini web reads, the fleet is retired, Haiku
 reads no Arabic). Two readers per lecture (A, B: two separate Gemini chats). Each answers per paragraph
 (`segment.PROMPT`). A lecture is accepted when both answers are whole and they agree on `ACCEPT` of the paragraphs;
-the paragraphs they agree on carry reader A's lines, the rest are written as NONE flagged "disputed".
+the paragraphs they agree on carry reader A's lines, the rest are written as NONE flagged "disputed". A disputed
+pair gets a third reader (C, same task); two of the three then decide each paragraph (`segment.agreed3`).
 """
 import hashlib
 import json
@@ -23,6 +24,7 @@ from spine.seg import prior, scope, segment
 
 JOBS = ROOT / "jobs" / "sp_seg"
 READERS = ("A", "B")
+THIRD = "C"                         # a third chat for a disputed pair: two of three decide each paragraph
 MODEL = "hydrogen"                  # Gemini web, 4 Hydrogen (owner 2026-11-18)
 WAIT = 900                          # seconds for one answer (a task is up to 170 KB)
 TRIES = 2                           # chats per job when a reply has no answer line (an attachment can fail)
@@ -148,7 +150,7 @@ def ask_gemini(d, ask=None, tries=TRIES):
 def todo(lids=None):
     """[(lecture, reader, job dir)] of every job with a task and no answer."""
     lids = lids or sorted(p.name for p in JOBS.glob("*") if p.is_dir())
-    return [(lid, r, job_dir(lid, r)) for lid in lids for r in READERS
+    return [(lid, r, job_dir(lid, r)) for lid in lids for r in READERS + (THIRD,)
             if (job_dir(lid, r) / "task.txt").exists() and not answered(job_dir(lid, r))]
 
 
@@ -226,16 +228,45 @@ def _judge_lecture(lid, module, cache):
         state["talky"] = True
     per, share = segment.agreed(a, b)
     state["agree"] = round(share, 3)
+    readers = READERS
     if share < ACCEPT:
         state["state"] = "disputed"
-        return state, None
+        d3 = job_dir(lid, THIRD)
+        if (read_json(d3 / "meta.json") or {}).get("fp") != fp:
+            return state, None
+        if not answered(d3):
+            state["third"] = "waiting"
+            return state, None
+        c, why = read_answer(d3, n, nb)
+        state["third"] = why[:4] or "answered"
+        if c is None:
+            return state, None
+        per, share = segment.agreed3(a, b, c)
+        state["agree3"] = round(share, 3)
+        if share < ACCEPT:
+            return state, None
+        readers = READERS + (THIRD,)
     state["state"] = "accepted"
     if p["scope"].get("target") == "handout":           # read against the handout: B lines are handout sentences
         links = {x["id"]: [x["id"]] for x in p["slice"]}
     else:
         links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
-    by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in READERS)
+    by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in readers)
     return state, segment.record(segment.segments(per), p["paras"], p["slice"], links, by, round(share, 3))
+
+
+def ask_third(lid, state):
+    """A disputed pair gets a third reader: job folder C with the same task (A's), once per task. Returns True when
+    the folder was written now."""
+    if state.get("state") != "disputed" or "third" in state:
+        return False
+    a, d = job_dir(lid, "A"), job_dir(lid, THIRD)
+    d.mkdir(parents=True, exist_ok=True)
+    for f in ANSWER_FILES:
+        (d / f).unlink(missing_ok=True)
+    (d / "task.txt").write_bytes((a / "task.txt").read_bytes())
+    (d / "meta.json").write_bytes((a / "meta.json").read_bytes())
+    return True
 
 
 def slice_missed(state):
@@ -310,6 +341,7 @@ def _lids(lids, module="year2-cns"):
 
 def _line(lid, state):
     return (f"  {lid}: {state['state']}" + (f" (agree {state['agree']:.0%}" + (", talky" if state.get("talky") else "")
+                                             + (f", 2 of 3 agree {state['agree3']:.0%}" if "agree3" in state else "")
                                              + ")" if "agree" in state else "")
             + (f" {state['why']}" if state.get("why") else "")
             + "".join(f"; {r}: {'; '.join(p[:2])}" for r, p in (state.get("readers") or {}).items() if p))
@@ -350,6 +382,8 @@ def collect(lids=None, module="year2-cns", say=print):
                 again = None if step else retry(lid, state)
                 if again:
                     state["why"] = f"reader {again} asked again (its answer was unusable): py -m spine seg run {lid}"
+                if ask_third(lid, state):
+                    state["why"] = f"a third reader asked (C): py -m spine seg run {lid}"
         except Exception as e:
             _drop_shadow(lid)
             state = {"state": "error", "why": f"write: {type(e).__name__}: {e}"}
