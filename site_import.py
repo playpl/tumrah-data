@@ -14,6 +14,7 @@ Steps, in order (each prints one line; the first failure stops the run):
                   hub_import_lessons.py --module year1-musculoskeletal; lesson ids back into the records state.
                   Every year 1 lesson is `oldData`. Records whose doctor has no site id (trees.json `site`), whose
                   subject the module lacks on the site, or whose recording is not uploaded yet are reported, left out.
+  8 MSK questions msk_questions.py import: the batch 59 MSK polls onto the live MSK lessons (pointers, extras).
 
 Run `py update_data.py` first: it imports the new lectures and starts the upload of the new recordings
 (compressed to AAC mono 48 kbps before upload). Lessons whose doctor has no site id are left out.
@@ -67,6 +68,9 @@ def year1(env, dry):
     out = run(["py", "hub_import_lessons.py", "--module", "year1-musculoskeletal"] + ([] if dry else ["--apply"]), env=env)
     if not dry:
         print(f"   year 1: {flow.save_ids([l for l in out.splitlines() if l.strip()][-1])} lesson ids saved")
+        print("== 8 MSK questions", flush=True)
+        run(["py", "msk_questions.py", "import"], env=env, keep=["file questions", "question_inserted",
+                                                                "question_updated", "on_site", "recomputed"])
 
 
 def main(argv):
