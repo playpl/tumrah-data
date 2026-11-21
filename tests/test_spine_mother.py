@@ -140,6 +140,15 @@ class ToDoctor(unittest.TestCase):
             {"id": "x-005", "name": "Spinal part 1 (mini lecture)", "kind": "summary", "covers": ["x-001"], "post": 14}])
         self.assertEqual(doc["chapters"][2]["items"], [{"id": "x-004", "name": "Pons", "post": None}])
 
+    def test_two_list_items_with_the_same_words_are_two_chapters(self):
+        lst = make_list(extra_lecture="Spinal cord")        # Nagib 1638: "Internal capsule" twice, far apart
+        rows = [(1, "ignore", [])] + [(k, "lecture", []) for k in range(2, 7)] + \
+            [(7, "mini", [2]), (8, "revision", [4]), (9, "revision", [5])]
+        m, _ = mother.parse(answer(rows), lst)
+        doc = mother.to_doctor(lst, m, "dr-x", "anatomy", {**self.INDEX, ("post", 16): "x-007"})
+        self.assertEqual([c["title"] for c in doc["chapters"]], ["Spinal cord", "CSF", "Pons", "Spinal cord"])
+        self.assertEqual([i["id"] for i in doc["chapters"][3]["items"]], ["x-007"])
+
     def test_parity_is_exact_against_itself_and_sees_a_moved_lesson(self):
         hand = self.block()
         self.assertEqual(parity.compare(hand, self.block()), [])

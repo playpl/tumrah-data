@@ -93,19 +93,21 @@ def links(lst):
     [{k, section, item, group, label, post, kind, size, caption, wrong, missing}].
 
     `group` = the sub-heading the item stands under in a first-year list ("Chapter 1 (CHO)", "CELL"), else None.
+    `n` = the list item's number in the message (two items may carry the same words).
 
     A list item with no link at all (the doctor has not posted it yet) is kept with post None.
     `missing` = the link names a post the channel does not have (the doctor's link to nothing).
     `wrong` = the k of the link that really owns the post, when the doctor linked one post twice: the owner is
     the link whose section fits the caption (a "revision" caption -> Revisions, "mini" -> Mini lectures, else
     Lectures); with no such link, the first one."""
-    out = []
+    out, n = [], 0
     for section, items in lst["sections"].items():
         for it in items:
+            n += 1
             for p in (it.get("parts") or [{"label": it["title"], "post": None}]):
                 post = lst["posts"].get(str(p.get("post"))) or {}
                 out.append({"k": len(out) + 1, "section": section, "item": " ".join(it["title"].split()),
-                            "group": it.get("group"),
+                            "n": n, "group": it.get("group"),
                             "label": " ".join((p.get("label") or "").split()).lstrip("-•–— "), "post": p.get("post"),
                             "kind": post.get("kind") or ("youtube" if not p.get("post") and "youtu" in (p.get("url") or "") else None),
                             "url": None if p.get("post") else p.get("url"), "size": post.get("size"),
@@ -310,23 +312,33 @@ def to_doctor(lst, m, doctor, subject, index):
     lectures, then its mini lectures, then the revisions that end there."""
     ls = {l["k"]: l for l in links(lst)}
     ids = {k: lecture_id(ls[k], v["name"], doctor, lst, index) for k, v in m.items() if v["role"] != "ignore"}
+    def chapter(k):
+        """(title, list item): two list items with the same words are two chapters (Nagib's two "Internal
+        capsule" items, 1638); the items under one first-year sub-heading share it."""
+        v, l = m[k], ls.get(k) or {}
+        covered = [c for c in v["covers"] if c in m and m[c]["role"] == "lecture"] if v["role"] != "lecture" else []
+        if covered:
+            return chapter(max(covered) if v["role"] == "revision" else covered[0])
+        return v["chapter"], None if l.get("group") else l.get("n")
+
     chapters, order = {}, []
     for k in sorted(m):
         if m[k]["role"] == "lecture":
-            if m[k]["chapter"] not in chapters:
-                order.append(m[k]["chapter"])
-            chapters.setdefault(m[k]["chapter"], {"lecture": [], "mini": [], "revision": []})["lecture"].append(k)
+            if chapter(k) not in chapters:
+                order.append(chapter(k))
+            chapters.setdefault(chapter(k), {"lecture": [], "mini": [], "revision": []})["lecture"].append(k)
     for k in sorted(m):
         v = m[k]
         if v["role"] in ("mini", "revision") and v["chapter"]:
-            if v["chapter"] not in chapters:                   # a stand-alone mini or revision: a chapter of its own
-                order.append(v["chapter"])
-            chapters.setdefault(v["chapter"], {"lecture": [], "mini": [], "revision": []})[v["role"]].append(k)
+            if chapter(k) not in chapters:                     # a stand-alone mini or revision: a chapter of its own
+                order.append(chapter(k))
+            chapters.setdefault(chapter(k), {"lecture": [], "mini": [], "revision": []})[v["role"]].append(k)
     out = []
-    for title in order:
+    for key in order:
+        title = key[0]
         items = []
         for role in ("lecture", "mini", "revision"):
-            for k in chapters[title][role]:
+            for k in chapters[key][role]:
                 row = {"id": ids[k], "name": m[k]["name"]}
                 if role != "lecture":
                     row["kind"] = "summary" if role == "mini" else "revision"
