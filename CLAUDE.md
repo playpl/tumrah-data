@@ -34,7 +34,9 @@ and what is left), then `docs/handovers/HANDOVER_2026-11-10_PLAN.md` (Gemini web
 ## Owner answers (2026-11-20)
 - Mother agent is PRIMARY: it replaces writing `mother_lists.json` by hand (the by-hand sections below are history).
   Claude still reads every changed list message itself; `py mother_check.py` must print "exact". No chapters in a
-  list = one big chapter. Wrong links in a doctor's list: wait for the doctor (Wagih 1631, Elsamahy 1880).
+  list = one big chapter ("Lectures"; owner 11-21). A year 1 list names chapters only by sub-headings
+  ("Chapter 1", "🔻BONES🔻", "➤ Cartilage"); its items are lessons (`mother.one_chapter`). Year 2: an item
+  with parts = chapter; a list whose every item is one lecture (Khaled 1639) = one chapter (owner 11-21). Wrong links in a doctor's list: wait for the doctor (Wagih 1631, Elsamahy 1880).
 - Today screen cards stay the owner's (he answers them; Claude never clicks them).
 - Question grades: 1 own quizzes, 2 own MCQ files (1 when that lecture has no quiz from him), 3 other doctors' MCQ
   files, 4 polls, 5 archive. Every quiz/file question matched to its poll for votes.

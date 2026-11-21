@@ -135,13 +135,15 @@ def matches(d, ref, word):
 
 def records_of(year, module, d, lst, row):
     ls = {l["k"]: l for l in mother.links(lst)}
+    # chapter and name are code's (mother.finish): recomputed here so a rule change needs no new read
+    fresh = mother.finish({int(k): dict(v) for k, v in row["map"].items()}, lst)
     ids, out = {}, []
     for k in sorted(row["map"], key=int):
-        if row["map"][k]["role"] != "ignore":
+        if fresh[int(k)]["role"] != "ignore":
             l = ls[int(k)]
             ids[int(k)] = record_id(year, d["channel"], l["post"], l["url"])
     for k in sorted(row["map"], key=int):
-        v = row["map"][k]
+        v = fresh[int(k)]
         if v["role"] == "ignore":
             continue
         l = ls[int(k)]

@@ -32,7 +32,7 @@ SECTIONS_Y1 = (("المذكرات", "pdfs"), ("books", "pdfs"),
                ("قهوة", "other"), ("الجمعة", "other"),
                ("إسعاف", "other"))
 BULLETS = ("-", ".", "•", "●", "_")
-SUBHEAD = re.compile(r"(?i)chapter\b.*|\[.*\]|\U0001F53B.*\U0001F53B")
+SUBHEAD = re.compile(r"(?i)chapter\b.*|\[.*\]|\U0001F53B.*\U0001F53B|➤\s*\S.*")   # "➤ Cartilage" (Ammar, 219)
 
 
 def message_id(url):
@@ -112,7 +112,7 @@ def parse(msg, channel=None):
                     break
                 bare = lines[j][1].strip().lstrip("".join(BULLETS) + "# ").strip()
                 if j not in items and SUBHEAD.fullmatch(bare):
-                    it["group"] = bare.strip("🔻[] ").strip()
+                    it["group"] = bare.strip("🔻[]➤ ").strip()
                     break
     title = next((ln.strip() for _, ln in lines if ln.strip()), "")
     return {"id": msg.id, "date": msg.date.isoformat() if msg.date else None,

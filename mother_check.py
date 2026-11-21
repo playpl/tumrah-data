@@ -25,7 +25,9 @@ def norm(s):
 def check_doctor(doc, lst):
     out = []
     who = doc["doctor"]
-    want = [it["title"].strip() for it in lst["sections"].get("lectures", [])]
+    from spine.tg.mother import one_chapter   # a list that names no chapters is one chapter (owner 2026-11-21)
+    one = one_chapter(lst)
+    want = [one] if one else [it["title"].strip() for it in lst["sections"].get("lectures", [])]
     have = [ch["title"] for ch in doc["chapters"]]
     lecture_ch = [t for t in have if norm(t) in {norm(w) for w in want}]
     for w in want:
@@ -50,8 +52,8 @@ def check_doctor(doc, lst):
                 linked.add(p["post"])
                 if p["post"] not in items:
                     out.append(f"{who}: {sec[:-1]} '{it['title']}' {p['label']} (post {p['post']}) is not in the hand file")
-                elif sec == "lectures" and norm(items[p["post"]][0]) != norm(it["title"]):
-                    out.append(f"{who}: post {p['post']} sits under '{items[p['post']][0]}', the list puts it under '{it['title']}'")
+                elif sec == "lectures" and norm(items[p["post"]][0]) != norm(one or it["title"]):
+                    out.append(f"{who}: post {p['post']} sits under '{items[p['post']][0]}', the list puts it under '{one or it['title']}'")
     for post, (ch, it) in items.items():
         if post is not None and post not in linked:  # null: the list item has no link (noted in the hand file)
             out.append(f"{who}: {it['id']} '{it['name']}' (post {post}) is not linked by the list")

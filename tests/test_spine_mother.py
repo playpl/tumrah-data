@@ -155,6 +155,22 @@ class ToDoctor(unittest.TestCase):
         self.assertEqual([c["title"] for c in doc["chapters"]], ["Spinal cord", "CSF", "Pons", "Spinal cord"])
         self.assertEqual([i["id"] for i in doc["chapters"][3]["items"]], ["x-007"])
 
+    def test_a_first_year_list_with_no_sub_headings_is_one_big_chapter(self):
+        lst = {**make_list(), "channel": "ZAG59_Anatomy"}  # owner 2026-11-21: "Lecture 1", "Lecture 2" are lessons
+        m, _ = mother.parse(answer(GOOD), lst)
+        self.assertEqual({v["chapter"] for v in m.values() if v["role"] != "ignore"}, {mother.ONE_CHAPTER})
+        doc = mother.to_doctor(lst, m, "dr-x", "anatomy", self.INDEX)
+        self.assertEqual([c["title"] for c in doc["chapters"]], [mother.ONE_CHAPTER])
+        self.assertEqual([i["id"] for i in doc["chapters"][0]["items"]], ["x-001", "x-002", "x-003", "x-004", "x-005", "x-006"])
+
+    def test_a_first_year_list_with_sub_headings_keeps_them_as_chapters(self):
+        lst = json.loads(json.dumps({**make_list(), "channel": "ZAG59_Histo"}))
+        for it, g in zip(lst["sections"]["lectures"], ("Cartilage", "Cartilage", "Bone")):
+            it["group"] = g
+        m, _ = mother.parse(answer(GOOD), lst)
+        doc = mother.to_doctor(lst, m, "dr-x", "histology", self.INDEX)
+        self.assertEqual([c["title"] for c in doc["chapters"]], ["Cartilage", "Bone"])
+
     def test_parity_is_exact_against_itself_and_sees_a_moved_lesson(self):
         hand = self.block()
         self.assertEqual(parity.compare(hand, self.block()), [])

@@ -28,6 +28,21 @@ NOT_A_RECORD = ("pdf", "file", "photo", "image", "text", None)
 MAX_DRAFTS, MAX_SHARE = 3, 0.2
 VERSION = 3                               # of links() and PROMPT: a new number makes every cached map stale
 SECTION = {"pdfs": "PDFs", "lectures": "Lectures", "minis": "Mini lectures", "revisions": "Revisions", "other": "Other"}
+# Owner, 2026-11-20/21: a list that names no chapters is one big chapter with all its lessons. A first-year list
+# names chapters only by sub-headings ("Chapter 1 (CHO)", "🔻BONES🔻", "➤ Cartilage"); its items are lessons
+# ("Lecture 1", "Pectoral Region 2", "Axillary nerve Part 1"), never chapters. A year 2 list names a chapter by an
+# item with parts ("- Spinal cord  ➥ Part 1  ➥ Part 2", owner 11-14); a year 2 list whose every item is one lecture
+# (Khaled 1639) has no chapters (owner 11-21: "Yes, one chapter").
+ONE_CHAPTER = "Lectures"
+
+
+def one_chapter(lst, ls=None):
+    """The title of the single chapter of a list that names no chapters, else None."""
+    if (lst.get("channel") or CHANNEL) == CHANNEL:
+        return None if any(len(it.get("parts") or []) > 1 for it in lst["sections"].get("lectures", [])) else ONE_CHAPTER
+    ls = ls if ls is not None else links(lst)
+    headed = any(l["group"] for l in ls if l["section"] in ("lectures", "minis", "revisions"))
+    return None if headed else ONE_CHAPTER
 
 PROMPT = """You read one Telegram message in which a doctor lists his lectures, and you fill a small table.
 Do not open any file. Do not use tools. Do not start subagents. Reply with the answer lines only.
@@ -183,6 +198,7 @@ def finish(m, lst):
     for an item that has several parts. A mini or revision that carries a lecture's own name (or a part number,
     for a mini) gets " (mini lecture)" / " revision", so that no two lessons of a doctor read the same."""
     ls = {l["k"]: l for l in links(lst)}
+    one = one_chapter(lst, ls.values())
     for k, v in m.items():
         if k in ls and (ls[k]["wrong"] or ls[k]["missing"]):
             v["role"], v["covers"] = "ignore", []
@@ -203,7 +219,7 @@ def finish(m, lst):
             inside = re.search(r"\(([^)]+)\)", l["group"])   # "Chapter 1 (CHO)" + "Lect1" = "CHO Lect1"
             name = f"{(inside.group(1) if inside else l['group']).strip()} {name}"
         v["name"] = name[:1].upper() + name[1:]
-        v["chapter"] = (l["group"] or l["item"]) if v["role"] == "lecture" else ""
+        v["chapter"] = (l["group"] or one or l["item"]) if v["role"] == "lecture" else ""
     lectures = {_key(v["name"]) for v in m.values() if v["role"] == "lecture"}
     for k, v in m.items():
         if v["role"] not in ("mini", "revision"):
@@ -212,7 +228,7 @@ def finish(m, lst):
         if covered:
             v["chapter"] = m[max(covered) if v["role"] == "revision" else covered[0]]["chapter"]
         elif k in ls:
-            v["chapter"] = ls[k]["group"] or ls[k]["item"]      # it covers no lecture of this list: its own chapter
+            v["chapter"] = ls[k]["group"] or one or ls[k]["item"]   # it covers no lecture of this list: its own chapter
         if v["role"] == "mini" and "mini" not in v["name"].lower() \
                 and (_key(v["name"]) in lectures or re.search(r"(?i)\bpart\s*\d", v["name"])):
             v["name"] += " (mini lecture)"
@@ -314,6 +330,7 @@ def to_doctor(lst, m, doctor, subject, index):
     """One doctor's block in the shape of mother_lists.json: chapters in message order; under each its
     lectures, then its mini lectures, then the revisions that end there."""
     ls = {l["k"]: l for l in links(lst)}
+    m = finish({k: dict(v) for k, v in m.items()}, lst)    # chapter and name are code's: a cached map gets today's rules
     ids = {k: lecture_id(ls[k], v["name"], doctor, lst, index) for k, v in m.items() if v["role"] != "ignore"}
     def chapter(k):
         """(title, list item): two list items with the same words are two chapters (Nagib's two "Internal
@@ -322,7 +339,7 @@ def to_doctor(lst, m, doctor, subject, index):
         covered = [c for c in v["covers"] if c in m and m[c]["role"] == "lecture"] if v["role"] != "lecture" else []
         if covered:
             return chapter(max(covered) if v["role"] == "revision" else covered[0])
-        return v["chapter"], None if l.get("group") else l.get("n")
+        return v["chapter"], None if l.get("group") or v["chapter"] != l.get("item") else l.get("n")
 
     chapters, order = {}, []
     for k in sorted(m):

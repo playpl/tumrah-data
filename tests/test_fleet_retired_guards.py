@@ -34,7 +34,7 @@ class MotherCheckDeadLink(unittest.TestCase):
         lst = {"sections": {"lectures": [{"title": "A", "parts": [{"label": "A", "post": 10}]}],
                             "revisions": [{"title": "A", "parts": [{"label": "A", "post": 11}]}]},
                "posts": {"10": {"kind": "audio"}}}
-        doc = {"doctor": "d", "chapters": [{"title": "A", "items": [{"id": "c1", "name": "A", "post": 10}]}]}
+        doc = {"doctor": "d", "chapters": [{"title": "Lectures", "items": [{"id": "c1", "name": "A", "post": 10}]}]}  # no chapters: one (11-21)
         mother_check.DEAD.clear()
         self.assertEqual(mother_check.check_doctor(doc, lst), [])
         self.assertEqual(len(mother_check.DEAD), 1)
