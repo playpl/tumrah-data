@@ -34,12 +34,11 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 - Fleet run above finishes the year 2 lectures with no `raw.txt` and the six looped pieces
   (`backups_pre_update/rehear_loops_2026-11-21/`).
 - Year 1: `py -m spine records transcribe --via browser` for the MSK Telegram records (21; YouTube ones have captions).
-- Second hearing: every piece with a `cNN.fleet` marker is heard again on Hydrogen (or by the owner's choice, a sample;
-  section 3 Q4); disagreements over 4% of text go to a Today card.
+- No second hearing of fleet pieces (owner Q4: "None"); the code checks (length, loop, 2400 chars/min) are enough.
 - Quality report fixes left (`docs/spine/quality_2026-11-20/REPORT.md`): worst YouTube captions re-heard (cns-006, 001,
   158, 003, 002); a gold set of read paragraphs per book as a third check beside A=B agreement.
 - Done when: every recorded lecture of both years has a transcript (or a logged failure); `dup_scan.py` shows no
-  40+ word repeat; fleet pieces checked.
+  40+ word repeat.
 
 ### S2. Segmentation finished and primary (master prompt 4, step 2)
 - `py -m spine seg jobs` (new transcripts and the 6 stale), `seg run --workers 4 --wait`, `seg collect`.
@@ -56,8 +55,8 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
 ### S3. Books -> handout (master prompt 4, step 1)
 - CNS tail: about 470 open sentences (`py -m spine p1 jobs year2-cns`, `p1 run`, `p1 accept`), the 200-link audit per
   book (126 read, 0 wrong), `parity p1`, then `config.json` `"spine": {"p1": "primary"}`.
-- MSK: the run above; then the audit; Elazouny's book (`sources/lists_pdf/ZAG59_Anatomy/157-160,172-175`) is scans:
-  Gemini reads the pages to text first (section 3 Q3), then split and align like the others.
+- MSK: the run above; then the audit. Elazouny's books are SKIPPED in every module and year (owner Q3); his lectures
+  are segmented against the handout itself (`seg` with `handout=True`).
 - Known limits: `mossafer-anat-full` "P a g e | 99" lines; Ammar's tables (splitter).
 - Done when: every content sentence of every book has an accepted edge or a logged "no handout match"; audits read.
 
@@ -68,8 +67,11 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   (`zagexam59` 503, `ZMSUMcqs58` 2098) classified by position and caption; unclear = Today card.
 - Every question linked to handout sentences (scope by header/tree position, BM25, closed window; Gemini reads the
   hard ones). The "no quiz outside a lecture" check = 0.
-- MSK: `msk_questions.py` is the start (polls, grade 4). Add the archive (`polls/grade5/questions.jsonl`, MSK part)
-  per section 3 Q2; the waiting 600 per section 3 Q1.
+- MSK: `msk_questions.py` (polls, grade 4): 388 live; 508 wait with their handout link in
+  `modules/year1-musculoskeletal/site/msk_waiting.jsonl` (413 with a line) until a doctor's lecture covers that handout
+  area (owner Q1); `site_import.py` step 8 files them. Grade 5 is NOT imported as lesson questions: it is the site's
+  "AI questions" reservoir (owner Q2; brief `docs/handovers/TO_TAMRAH_BOOK_HELPER_2026-11-21.md`, for the
+  "Tamra book helper" session; a cross-session message was not delivered: paste the file there).
 - Done when: every site question has a grade, a lesson and a handout pointer; the check is 0.
 
 ### S5. Telegram sync completeness (master prompt 3A)
@@ -104,10 +106,12 @@ Numbers at hand-off: seg 73 accepted, 10 rejected, 4 disputed, 6 stale of 93; MS
   video): ask the doctors to fix the posts.
 
 ## 3. Owner questions (asked 2026-11-21; answers go here)
-- Q1. The ~600 MSK questions whose handout lesson has no doctor lecture yet: wait, or file them now (where)?
-- Q2. MSK archive questions (last year's `zagpolls58`, grade 5): put them on the site now, or later?
-- Q3. Elazouny's scanned MSK book: Gemini reads it (uses Hydrogen quota), or the owner finds a text PDF?
-- Q4. Fleet transcripts: second hearing of every fleet piece on Gemini, or a sample?
+- Q1. Waiting MSK questions -> ANSWERED: link them to the handout, wait for a doctor's lecture on that area. The owner
+  thinks year 1 data already covers everything: it does not (see Q7).
+- Q2. Grade 5 -> ANSWERED: the website's "fake AI questions" reservoir: served first when a student asks for AI
+  questions, real AI questions after he finishes them. Website session "Tamra book helper".
+- Q3. Elazouny -> ANSWERED: always skipped, all modules and years; his books are pictures.
+- Q4. Fleet re-hearing -> ANSWERED: none.
 - Q5. ZNU: its Telegram sources (doctor lists, polls, quiz channels) and when its site module comes.
 - Q6. The 170 first-term lessons put on the MSK module by mistake (2026-11-17): hide (draft), move, or delete?
 

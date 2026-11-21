@@ -9,7 +9,8 @@ Telegram's correct flag (the polls engine). Grade 4 (polls).
         and after as context, the fast_lessons.py scoring); a weak match keeps the header's lessons, no pointer
     -> the site lessons whose placement (modules/year1-musculoskeletal/site/placement.json) holds that handout lesson;
        the least loaded one gets it (fast_lessons.py: one lesson per question, spread)
-    A question whose handout lesson has no live site lesson yet waits (reported); a later run files it.
+    A question whose handout lesson has no live site lesson yet waits, with its handout link, in site/msk_waiting.jsonl
+    (owner 2026-11-21: link to the handout, wait for a doctor's lecture on that area); a later run files it.
 
     py msk_questions.py build      -> site/msk_questions.json (importSfQuestions, module "msk") + msk_points.json
     py msk_questions.py pointers   -> site/msk_pointers.jsonl (importHubData pointers; needs the questions on the site)
@@ -131,7 +132,7 @@ def build(say=print):
     idf = {w: math.log(len(toks) / (1 + n)) for w, n in df.items()}
     home, meta = site_lessons()
     qs, stats = msk_polls()
-    kept, pending, points = [], [], {}
+    kept, pending, points, waiting = [], [], {}, []
     for q, lessons, sights in qs:
         qw = Counter(F.words(q["question"]))
         for w in F.words(q["options"][q["key"]]):
@@ -152,11 +153,17 @@ def build(say=print):
             continue
         where = [k] if strong else lessons
         homes = sorted({h for x in where for h in home.get(x, [])})
-        if not homes:
-            stats["waits: no live lesson for " + "+".join(where)] += 1
-            continue
         wk = word_key(q["question"], q["options"])
         sid = "bank:" + L.short(wk)
+        if not homes:
+            stats["waits: no live lesson for " + "+".join(where)] += 1
+            span = None
+            if strong:
+                ids, j = at
+                span = [x for x in ids[max(0, j - 1):j + 2] if toks[x] & set(qw)] or [ids[j]]
+            waiting.append({"source_id": sid, "handout_lessons": where, "lines": span, "stem": q["question"],
+                            "score": round(score, 1)})
+            continue
         if strong:
             ids, j = at
             span = [x for x in ids[max(0, j - 1):j + 2] if toks[x] & set(qw)] or [ids[j]]
@@ -193,6 +200,9 @@ def build(say=print):
             "lessons": [{"key": k, "subject": meta[k][1], "id": meta[k][0]} for k in used], "questions": uniq}
     (SITE / "msk_questions.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (SITE / "msk_points.json").write_text(json.dumps(points, ensure_ascii=False), encoding="utf-8")
+    # Linked to the handout, waiting for a doctor's lecture on the same handout lessons (owner, 2026-11-21).
+    (SITE / "msk_waiting.jsonl").write_text("".join(json.dumps(w, ensure_ascii=False) + "\n" for w in waiting),
+                                            encoding="utf-8")
     stats["file questions"] = len(uniq)
     for h, n in sorted(load.items()):
         stats[f"lesson {meta[h][2]} ({h[-14:]})"] = n
