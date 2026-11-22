@@ -17,7 +17,8 @@
   Samahy moved "Extrapyramidal tracts" from empty post 1892 to 1924: cns-185 now points at 1924 (hand file and
   lecture.json; its recording, 52 min, already in the bucket, was kept). Parity mother 10 of 10, mother_check exact.
 - YouTube: the WARP run (45047182493) made all 6 hearing copies; `records rehear-youtube` done; hear2 of the 6
-  (78 pieces, Hydrogen) started: logs/hear2_youtube_2026-11-22.log.
+  (78 pieces, Hydrogen) done: 78 of 78 heard, 6 transcripts ready (logs/hear2_youtube_2026-11-22.log).
+  NEXT: segment the 6 again on the new transcripts (`py -m spine seg run`), then `py site_import.py`.
 - Site import run after Update data: logs/site_import_2026-11-22.log.
 
 # Progress 2026-11-22 (session 5, stopped at usage limit)
