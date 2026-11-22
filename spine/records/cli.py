@@ -117,6 +117,9 @@ def register(sub):
             q.add_argument("--workers", type=int, default=4, help="unused by fleet and browser (one worker per account)")
             q.add_argument("--via", choices=("fleet", "browser"), default="browser")
         q.set_defaults(run=fn)
+    q = rs.add_parser("rehear-youtube", help="YouTube lectures of cloud/rehear_youtube.json with a runner copy: "
+                                             "captions kept aside, ready for hear2")
+    q.set_defaults(run=lambda a: __import__("spine.records.lectures_hear", fromlist=["x"]).rehear_youtube())
     q = rs.add_parser("hear2", help="year 2 lectures with no transcript: pieces heard on Gemini web (4 Hydrogen)")
     q.add_argument("lectures", nargs="*")
     q.add_argument("--limit", type=int, help="at most N pieces this run")

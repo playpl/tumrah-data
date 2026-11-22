@@ -74,5 +74,11 @@ jobs:
       - name: Year 2
         continue-on-error: true
         run: python -u -m cloud.records --year 2 --max-mb "$MAX_MB" --max-minutes 30 --parallel "$PARALLEL" --connections "$CONNECTIONS"
+      - name: YouTube hearing copies
+        continue-on-error: true            # YouTube may refuse a datacenter address; the records steps still run
+        timeout-minutes: 20
+        run: |
+          pip install -q -U yt-dlp          # YouTube changes often: only the newest yt-dlp keeps working
+          python -u -m cloud.youtube
       - name: Year 1
         run: python -u -m cloud.records --year 1 --max-mb "$MAX_MB" --max-minutes 90 --parallel "$PARALLEL" --connections "$CONNECTIONS"

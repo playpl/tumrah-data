@@ -30,8 +30,41 @@ def _meta(lid):
 
 
 def hear_key(meta):
-    c = (meta.get("source") or {}).get("cloud")
+    src = meta.get("source") or {}
+    if src.get("rehear_key"):                  # a YouTube lecture heard again (cloud/youtube.py, rehear_youtube)
+        return src["rehear_key"]
+    c = src.get("cloud")
     return c.get("hear_key") if isinstance(c, dict) else None
+
+
+def rehear_youtube(say=print, size=None, get=None):
+    """The YouTube lectures in cloud/rehear_youtube.json whose runner copy is in the bucket: their caption transcript
+    is kept as raw_youtube.txt, the small copy fetched, and `hear2` then hears them like any other lecture."""
+    from cloud import youtube
+    if size is None or get is None:
+        from cloud import r2
+        size, get = size or r2.size, get or r2.get_file
+    n = 0
+    for row in json.loads(youtube.REHEAR.read_text(encoding="utf-8")):
+        lid = row["lecture"]
+        d, meta = LECTURES / lid, _meta(lid)
+        src = meta.get("source") or {}
+        if src.get("rehear_key"):
+            continue
+        if src.get("transcript") != "youtube" or not size(youtube.key(lid)):
+            say(f"  {lid}: waits (no runner copy yet)" if src.get("transcript") == "youtube" else f"  {lid}: not a caption transcript")
+            continue
+        if not get(youtube.key(lid), d / "hear.16k.ogg"):
+            say(f"  {lid}: fetch failed")
+            continue
+        if (d / "raw.txt").exists():
+            (d / "raw.txt").replace(d / "raw_youtube.txt")
+        meta["source"] = {**src, "rehear_key": youtube.key(lid), "transcript": "gemini (youtube heard again)"}
+        (d / "lecture.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+        n += 1
+        say(f"  {lid}: caption transcript -> raw_youtube.txt; hearing copy fetched")
+    say(f"rehear-youtube: {n} lectures ready for hear2")
+    return n
 
 
 def todo(module="year2-cns", lids=None):
