@@ -229,7 +229,26 @@ def _judge_lecture(lid, module, cache):
         raw = {r: read_answer(job_dir(lid, r), n, nb, raw=True) for r in READERS}
         if not talky(raw["A"][0], raw["B"][0], raw["A"][1], raw["B"][1]):
             state["state"] = "rejected"
-            return state, None
+            good = [r for r in READERS if got[r][0] is not None]
+            d3 = job_dir(lid, THIRD)
+            if len(good) != 1 or (read_json(d3 / "meta.json") or {}).get("fp") != fp:
+                return state, None
+            state["split"] = good[0]            # one reader linked, the other's answer stayed unusable
+            if not answered(d3):
+                state["third"] = "waiting"
+                return state, None
+            c, why = read_answer(d3, n, nb)
+            state["readers"][THIRD] = why[:4]
+            state["third"] = why[:4] or "answered"
+            if c is None:                       # two of three found the slice unusable (mostly NONE): widen
+                return state, None
+            per, share = segment.agreed(got[good[0]][0], c)
+            state["agree"] = round(share, 3)
+            if share < ACCEPT:
+                state["state"] = "disputed"
+                return state, None
+            state["state"] = "accepted"
+            return state, _record(lid, p, per, share, (good[0], THIRD), module, cache)
         a, b = raw["A"][0], raw["B"][0]
         state["talky"] = True
     per, share = segment.agreed(a, b)
@@ -253,18 +272,25 @@ def _judge_lecture(lid, module, cache):
             return state, None
         readers = READERS + (THIRD,)
     state["state"] = "accepted"
+    return state, _record(lid, p, per, share, readers, module, cache)
+
+
+def _record(lid, p, per, share, readers, module, cache):
     if p["scope"].get("target") == "handout":           # read against the handout: B lines are handout sentences
         links = {x["id"]: [x["id"]] for x in p["slice"]}
     else:
         links = cache.setdefault(("edges", p["scope"]["book"]), scope.edges(module, p["scope"]["book"]))
     by = "+".join(f"{answered_by(job_dir(lid, r))}{r}" for r in readers)
-    return state, segment.record(segment.segments(per), p["paras"], p["slice"], links, by, round(share, 3))
+    return segment.record(segment.segments(per), p["paras"], p["slice"], links, by, round(share, 3))
 
 
 def ask_third(lid, state):
-    """A disputed pair gets a third reader: job folder C with the same task (A's), once per task. Returns True when
-    the folder was written now."""
-    if state.get("state") != "disputed" or "third" in state:
+    """A disputed pair, or a split one (one reader linked, the other's answer stayed unusable after its retry), gets a
+    third reader: job folder C with the same task (A's), once per task. Returns True when the folder was written now."""
+    split = (state.get("state") == "rejected" and "third" not in state
+             and sum(bool((state.get("readers") or {}).get(r)) for r in READERS) == 1
+             and (read_json(JOBS / lid / "retry.json") or {}).get("after") == state.get("fp"))
+    if not split and (state.get("state") != "disputed" or "third" in state):
         return False
     a, d = job_dir(lid, "A"), job_dir(lid, THIRD)
     d.mkdir(parents=True, exist_ok=True)
@@ -276,10 +302,10 @@ def ask_third(lid, state):
 
 
 def slice_missed(state):
-    """Both readers answered and both found (almost) nothing of the lecture in the slice."""
+    """Two readers (of A, B and a third C) answered and found (almost) nothing of the lecture in the slice."""
     readers = state.get("readers") or {}
-    return state.get("state") == "rejected" and all(
-        any(x.startswith("NONE for") for x in readers.get(r) or []) for r in READERS)
+    none = sum(any(x.startswith("NONE for") for x in readers.get(r) or []) for r in readers)
+    return state.get("state") == "rejected" and none >= 2
 
 
 def widen(lid, state, module="year2-cns"):

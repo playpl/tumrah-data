@@ -66,10 +66,11 @@ def scores(paras, sents, lex=None):
     for j, ws in enumerate(bw):
         for w in ws:
             index.setdefault(w, []).append(j)
-    norm = np.array([math.sqrt(sum(idf[w] for w in ws)) or 1.0 for ws in bw])
+    # sums in sorted word order: a set's order changes with the process's hash seed, and so would the last bits
+    norm = np.array([math.sqrt(sum(idf[w] for w in sorted(ws))) or 1.0 for ws in bw])
     m = np.zeros((len(paras), n))
     for i, p in enumerate(paras):
-        for w in para_words(p, lex):
+        for w in sorted(para_words(p, lex)):
             for j in index.get(w, ()):
                 m[i, j] += idf[w]
         m[i] /= norm

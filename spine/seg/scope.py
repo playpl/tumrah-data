@@ -162,7 +162,7 @@ def densest(m, width=DENSE, margin=MARGIN):
     n = len(mass)
     if n <= width:
         return 0, n - 1
-    run = np.convolve(mass, np.ones(width), mode="valid")
+    run = np.round(np.convolve(mass, np.ones(width), mode="valid"), 6)   # near-ties: the first wins, every run
     lo = int(np.argmax(run))
     return max(0, lo - margin), min(n - 1, lo + width - 1 + margin)
 

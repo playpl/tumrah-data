@@ -527,6 +527,24 @@ class TalkyAndRetry(unittest.TestCase):
         self.assertFalse(self.flow.ask_third("L2", {"state": "disputed", "third": "waiting"}))
         self.assertIn(("L2", "C"), [(lid, r) for lid, r, _ in self.flow.todo(["L2"])])
 
+    def test_a_split_pair_gets_a_third_reader_after_the_retry(self):
+        a = self.flow.job_dir("L3", "A")
+        a.mkdir(parents=True)
+        (a / "task.txt").write_text("task")
+        (a / "meta.json").write_text('{"fp": "f1"}')
+        st = {"state": "rejected", "fp": "f1", "readers": {"A": [], "B": ["NONE for 85% of paragraphs"]}}
+        self.assertFalse(self.flow.ask_third("L3", st))                        # the retry comes first
+        self.flow.write_json(self.flow.JOBS / "L3" / "retry.json", {"reader": "B", "after": "f1"})
+        self.assertTrue(self.flow.ask_third("L3", st))
+        both = {"state": "rejected", "fp": "f1", "readers": {"A": ["x"], "B": ["y"]}}
+        self.assertFalse(self.flow.ask_third("L3", both))
+
+    def test_two_of_three_saying_none_is_a_missed_slice(self):
+        none = ["NONE for 90% of paragraphs"]
+        st = {"state": "rejected", "fp": "x", "readers": {"A": [], "B": none, "C": none}}
+        self.assertTrue(self.flow.slice_missed(st))
+        self.assertFalse(self.flow.slice_missed({**st, "readers": {"A": [], "B": none, "C": []}}))
+
 
 if __name__ == "__main__":
     unittest.main()
