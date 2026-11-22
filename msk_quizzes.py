@@ -145,6 +145,8 @@ def questions(items=None, tree=None, quizbot=None, channel="zagexam59"):
     out = []
     for post, (doctor, title, lessons, own) in sorted(items.items()):
         kind, ref = src.get(post, (None, None))
+        if kind == "form" and ref and not ref.startswith("http"):
+            ref = "https://" + ref                                      # a caption link written without its scheme
         rows = list((forms if kind == "form" else bot).get(ref, {}).values()) if kind else []
         for r in rows:
             if r.get("correct_index") is None:

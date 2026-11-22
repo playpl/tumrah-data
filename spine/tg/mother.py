@@ -250,7 +250,11 @@ def validate(m, lst):
             errors.append(f"link {k}: role {v['role']!r}")
         if v["role"] != "ignore" and ls[k]["post"] and ls[k]["kind"] in NOT_A_RECORD:
             errors.append(f"link {k}: a {ls[k]['kind'] or 'missing'} post cannot be a {v['role']}")
-        if v["role"] != "ignore" and names.setdefault(_key(v["name"]), k) != k:
+        first = names.setdefault(_key(v["name"]), k) if v["role"] != "ignore" else k
+        # two items of the message with the same words (Nagib 1638: "Internal capsule" twice, posts 1821 and 1895)
+        # are two lectures with one name; any other repeat is a reader's slip
+        same_words = first != k and ls[first]["n"] != ls[k]["n"] and _key(ls[first]["item"]) == _key(ls[k]["item"])
+        if first != k and not same_words:
             errors.append(f"link {k}: the name {v['name']!r} is used twice")
         # a mini or revision may stand alone: a first-year list has revisions of lectures the list does not hold
         want = {"lecture": (0, 0), "ignore": (0, 0), "mini": (0, 1), "revision": (0, 99)}.get(v["role"], (0, 99))

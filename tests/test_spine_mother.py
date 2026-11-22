@@ -101,6 +101,16 @@ class PdfNeverLecture(unittest.TestCase):
                                   "link 7: covers a link that is not a lecture of this message"])
 
 
+class SameWordsTwice(unittest.TestCase):
+    def test_two_items_with_the_same_words_are_two_lectures(self):
+        # Nagib 1638: "- Internal capsule" stands twice in his list (posts 1821 and 1895)
+        rows = [(1, "ignore", []), (2, "lecture", []), (3, "lecture", []), (4, "lecture", []), (5, "lecture", []),
+                (6, "lecture", []), (7, "mini", [2]), (8, "revision", [4]), (9, "revision", [5])]
+        m, errors = mother.parse(answer(rows), make_list(extra_lecture="CSF"))
+        self.assertEqual(errors, [])
+        self.assertEqual((m[4]["name"], m[6]["name"]), ("CSF", "CSF"))
+
+
 class Fixes(unittest.TestCase):
     def test_a_hand_fix_names_posts_or_an_item_with_no_post(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,3 +1,25 @@
+# Progress 2026-11-22 (session 6, after the chain)
+
+- The background chain finished: seg collect 186 accepted / 1 waiting / 8 rejected (cns-194 widened to step 2:
+  `py -m spine seg jobs cns-194`); p1 both modules accepted; msk_mcq collect 1059 agreed keyed book questions.
+- CNS quizzes: 5 forms had failed on URLError (refetched), and post 2192's caption link had no `https://`, so its
+  15 keys never joined (fixed in `msk_quizzes.questions`). Now 66 of 66 posts, 967 keyed, 941 filed into lecture.json
+  `required` (230 with the bank's votes kept, 26 wait: no lecture of that doctor on the topic).
+- MSK: `msk_questions.py build` with the book keys: 977 site questions (was 821); 936 rows wait for the arm/forearm
+  lessons that are not live yet (L08-L39 handout lessons).
+- Mother 1638 (Nagib): reader A's 11-20 answer was cut at link 40 and reused every run (moved aside to
+  `jobs/sp_mother/1638-5d6bcfc1a7e3-A/result.cut-2026-11-20.json`); the validator refused "Internal capsule" twice,
+  which is right: the list holds two items with those words (posts 1821, 1895). `mother.validate` now allows a repeat
+  name only for two list items with the same words. Hand names set to the list words: cns-167 "Cerebrum part 2 + lat.
+  Ventricle", cns-176 "Cerebral cortex part 2".
+- Update data: 12 new (cns-199..210: Mesafer Scalp part 1, Zahran Middle vascular layer, Samahy UMNL-LMNL lesion,
+  Spinal cord lesion + 3 revisions, Nagib Reticular formation + 4 revisions); recordings wait for the runner.
+  Samahy moved "Extrapyramidal tracts" from empty post 1892 to 1924: cns-185 now points at 1924 (hand file and
+  lecture.json; its recording, 52 min, already in the bucket, was kept). Parity mother 10 of 10, mother_check exact.
+- YouTube: the WARP run (45047182493) made all 6 hearing copies; `records rehear-youtube` done; hear2 of the 6
+  (78 pieces, Hydrogen) started: logs/hear2_youtube_2026-11-22.log.
+- Site import run after Update data: logs/site_import_2026-11-22.log.
+
 # Progress 2026-11-22 (session 5, stopped at usage limit)
 
 Done and committed:
