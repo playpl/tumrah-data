@@ -7,6 +7,8 @@ Nothing imports them and no command runs them. Moved 2026-11-21:
 - `fleet_watch.py`: half-hourly health count of running fleet jobs.
 - `oob_transcribe.py`: ran jobs outside the old dispatcher.
 - `extra_dispatcher.py`: a second fleet dispatcher for extra lanes (nothing imported it).
+- `haiku_run.py` (moved 2026-11-22): Haiku subagents on held queue.db rows of the old flows.
+- `haiku_audit.py` (moved 2026-11-22): Haiku audit of the fleet's old pointer answers (fleet-A).
 
 Still at the root and still wired to the retired fleet flows (refuse while `config.json` `fleet.down` is true, or
 are not run): `dm.py run`, `dispatch.py`, `queue_db.py` (queue.db lanes place,

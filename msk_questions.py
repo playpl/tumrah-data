@@ -12,6 +12,11 @@ Telegram's correct flag (the polls engine). Grade 4 (polls).
     A question whose handout lesson has no live site lesson yet waits, with its handout link, in site/msk_waiting.jsonl
     (owner 2026-11-21: link to the handout, wait for a doctor's lecture on that area); a later run files it.
 
+Since 2026-11-22 also the doctors' own quizzes (msk_quizzes.py: forms and QuizBot of the zagexam59 tree) and their
+MCQ books (msk_mcq.py): a doctor's question on his own lesson goes there (Required: his quiz, else his book; his book
+next to his quiz: the Doctor list); another doctor's goes where the polls go (grade 3). A poll of the same question
+only lends its votes.
+
     py msk_questions.py build      -> site/msk_questions.json (importSfQuestions, module "msk") + msk_points.json
     py msk_questions.py pointers   -> site/msk_pointers.jsonl (importHubData pointers; needs the questions on the site)
     py msk_questions.py import     build, importSfQuestions --apply, pointers, importHubData pointers --apply,
@@ -125,17 +130,20 @@ def msk_polls():
 
 
 def build(say=print):
+    import msk_quizzes
     lines, lesson_ids = handout()
     text = {ln["id"]: ln for ln in lines if ln.get("text")}
     toks = {i: set(F.words(ln["text"])) for i, ln in text.items()}
     df = Counter(w for t in toks.values() for w in t)
     idf = {w: math.log(len(toks) / (1 + n)) for w, n in df.items()}
     home, meta = site_lessons()
+    places = (json.loads((SITE / "placement.json").read_text(encoding="utf-8")) or {}).get("records") or {}
     qs, stats = msk_polls()
     kept, pending, points, waiting = [], [], {}, []
-    for q, lessons, sights in qs:
-        qw = Counter(F.words(q["question"]))
-        for w in F.words(q["options"][q["key"]]):
+
+    def best_line(stem, answer, lessons):
+        qw = Counter(F.words(stem))
+        for w in F.words(answer):
             qw[w] += 2
         best = (0.0, 0, None, None)
         for k in lessons:
@@ -148,25 +156,44 @@ def build(say=print):
                     best = (s, len(hit), k, (ids, j))
         score, nhit, k, at = best
         strong = k is not None and score >= F.MIN_SCORE and nhit >= F.MIN_WORDS
+        span = None
+        if strong:
+            ids, j = at
+            span = [x for x in ids[max(0, j - 1):j + 2] if toks[x] & set(qw)] or [ids[j]]
+        return strong, k, span, score
+
+    # The doctors' own quizzes (msk_quizzes.py): one row per question; a poll of the same question lends its votes.
+    # Their MCQ books (msk_mcq.py, two Gemini readers agreed): "mcq:" rows; a quiz of the same question wins.
+    import msk_mcq
+    quiz, twin = {}, {}
+    for x in msk_quizzes.questions():
+        quiz.setdefault("bank:" + L.short(word_key(x["stem"], x["options"])), dict(x, kind="quiz"))
+    for x in msk_mcq.questions():
+        wk = word_key(x["stem"], x["options"])
+        if "bank:" + L.short(wk) in quiz:
+            stats["book question also in a doctor's quiz"] += 1
+            continue
+        quiz.setdefault("mcq:" + L.short(wk), dict(x, kind="file", own=[], twin="bank:" + L.short(wk)))
+    by_twin = {x["twin"]: sid for sid, x in quiz.items() if x.get("twin")}
+    for q, lessons, sights in qs:
+        wk = word_key(q["question"], q["options"])
+        sid = "bank:" + L.short(wk)
+        if sid in quiz or sid in by_twin:
+            twin.setdefault(by_twin.get(sid, sid), q)
+            stats["poll also in a doctor's quiz or book"] += 1
+            continue
+        strong, k, span, score = best_line(q["question"], q["options"][q["key"]], lessons)
         if not strong and lessons == ALL:
             stats["case question with no strong line"] += 1
             continue
         where = [k] if strong else lessons
         homes = sorted({h for x in where for h in home.get(x, [])})
-        wk = word_key(q["question"], q["options"])
-        sid = "bank:" + L.short(wk)
         if not homes:
             stats["waits: no live lesson for " + "+".join(where)] += 1
-            span = None
-            if strong:
-                ids, j = at
-                span = [x for x in ids[max(0, j - 1):j + 2] if toks[x] & set(qw)] or [ids[j]]
             waiting.append({"source_id": sid, "handout_lessons": where, "lines": span, "stem": q["question"],
                             "score": round(score, 1)})
             continue
         if strong:
-            ids, j = at
-            span = [x for x in ids[max(0, j - 1):j + 2] if toks[x] & set(qw)] or [ids[j]]
             points[sid] = {"lecture_id": f"{MODULE}:{k}", "lines": span, "page": text[span[0]]["page"],
                            "printed": text[span[0]].get("printed"), "score": round(score, 1)}
             stats["pointed"] += 1
@@ -185,11 +212,65 @@ def build(say=print):
             **({"stats": {"attempts": total, "correct": votes[q["key"]]}} if total and q["key"] < len(votes) else {}),
         })
         pending.append(homes)
+    required, doctor_list, filed = {}, {}, {}
+    for sid, x in quiz.items():
+        strong, k, span, score = best_line(x["stem"], x["options"][x["key"]], x["lessons"])
+        if x["kind"] == "file" and not strong:      # a whole-module book: no strong line, no lesson
+            stats["book question with no strong line"] += 1
+            continue
+        own = [h for h in x["own"] if h in meta]
+        if own:                                     # grade 1: his quiz on his lesson (the one holding the line)
+            hold = [h for h in own if strong and k in (places.get(h.split(":", 1)[1]) or [])]
+            homes, fixed = (hold or own), True
+        else:                                       # grade 3: another doctor's quiz, where the polls go
+            where = [k] if strong else x["lessons"]
+            homes, fixed = sorted({h for w in where for h in home.get(w, [])}), False
+            mine = [h for h in homes if meta[h][3] == x["doctor"]]
+            if mine:                                # his own lesson on that line after all: grade 1, Required
+                homes, fixed = mine, True
+            if not homes:
+                stats["quiz waits: no live lesson for " + "+".join(where)] += 1
+                waiting.append({"source_id": sid, "handout_lessons": where, "lines": span, "stem": x["stem"],
+                                "score": round(score, 1), "quiz": f"zagexam59:{x['post']}", "doctorId": x["doctor"]})
+                continue
+        if strong:
+            points[sid] = {"lecture_id": f"{MODULE}:{k}", "lines": span, "page": text[span[0]]["page"],
+                           "printed": text[span[0]].get("printed"), "score": round(score, 1)}
+            stats["quiz pointed"] += 1
+        poll = twin.get(sid) or {}
+        votes, total = poll.get("votes") or [], poll.get("total") or 0
+        app = [{"source_name": x["title"], "source_type": "doctor_quiz" if x["kind"] == "quiz" else "doctor_file",
+                "doctor": x["doctor"], "year_or_exam": None, "source_url": x["url"],
+                "source_id": f"zagexam59:{x['post']}" + (f":p{x.get('page')}:{x.get('n')}" if x["kind"] == "file" else "")}]
+        app += [{"source_name": s.get("header"), "source_type": "telegram_poll", "doctor": None,
+                 "year_or_exam": (s.get("date") or "")[:10] or None,
+                 "source_url": f"https://t.me/{s.get('chat')}/{s.get('msg_id')}",
+                 "source_id": f"{s.get('chat')}:{s.get('msg_id')}"} for s in (poll.get("sightings") or [])[:29]]
+        kept.append({
+            "source_id": sid, "batch": "59", "lesson": homes[0], "subject": "", "doctorId": x["doctor"], "topic": None,
+            "stem": x["stem"], "options": x["options"], "correct_index": x["key"],
+            "explanation": x.get("solution") or poll.get("solution") or None, "importance": 3,
+            "repetition": 1 + len(poll.get("sightings") or []), "past_exam": False, "source_url": x["url"],
+            "appearances": app,
+            **({"stats": {"attempts": total, "correct": votes[x["key"]]}} if total and x["key"] < len(votes) else {}),
+            "_own": x["kind"] if fixed else None,
+        })
+        pending.append(homes)
+        stats[f"{x['kind']} {'own lesson' if fixed else 'another doctor'}"] += 1
     load = Counter()
     for i in sorted(range(len(kept)), key=lambda i: (len(pending[i]), kept[i]["source_id"])):
         h = min(pending[i], key=lambda h: (load[h], h))
         kept[i].update(lesson=h, subject=meta[h][1], topic=meta[h][2])
         load[h] += 1
+        own = kept[i].pop("_own", None)
+        if own:
+            filed.setdefault(h, []).append((own, kept[i]["source_id"]))
+    # Required = the doctor's own quiz on the lesson, else his own MCQ book's questions there (owner, 2026-11-12);
+    # his book next to his quiz goes on the Doctor list.
+    for h, rows in filed.items():
+        quizzed = any(kind == "quiz" for kind, _ in rows)
+        for kind, sid in rows:
+            (required if kind == "quiz" or not quizzed else doctor_list).setdefault(h, []).append(sid)
     seen, uniq = set(), []
     for x in kept:
         if x["source_id"] not in seen:
@@ -200,6 +281,9 @@ def build(say=print):
             "lessons": [{"key": k, "subject": meta[k][1], "id": meta[k][0]} for k in used], "questions": uniq}
     (SITE / "msk_questions.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (SITE / "msk_points.json").write_text(json.dumps(points, ensure_ascii=False), encoding="utf-8")
+    # The doctors' own quizzes: the Required list of the lesson each question was filed under (importHubData required).
+    (SITE / "msk_required.json").write_text(json.dumps(required, ensure_ascii=False, indent=0), encoding="utf-8")
+    (SITE / "msk_doctor_list.json").write_text(json.dumps(doctor_list, ensure_ascii=False, indent=0), encoding="utf-8")
     # Linked to the handout, waiting for a doctor's lecture on the same handout lessons (owner, 2026-11-21).
     (SITE / "msk_waiting.jsonl").write_text("".join(json.dumps(w, ensure_ascii=False) + "\n" for w in waiting),
                                             encoding="utf-8")
@@ -232,6 +316,27 @@ def pointers(say=print):
     say(json.dumps({"points": len(points), "on_site": len(ids), "rows": len(rows)}))
 
 
+def required(data, S, env):
+    """The doctors' own quiz (and MCQ book) questions onto the Required or Doctor list of their lesson (importHubData
+    required | doctor, add only)."""
+    import db
+    want = json.loads((SITE / "msk_required.json").read_text(encoding="utf-8"))
+    f = SITE / "msk_doctor_list.json"
+    other = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    lesson_id = {x["key"]: x["id"] for x in data["lessons"]}
+    sids = sorted({s for v in list(want.values()) + list(other.values()) for s in v})
+    ids, r = {}, db.Reader.live()
+    for i in range(0, len(sids), 400):
+        for d in r.find("questions", {"source_id": {"$in": sids[i:i + 400]}}, {"source_id": 1}, limit=500):
+            ids[d["source_id"]] = str(d["_id"])
+    for kind, lists in (("required", want), ("doctor", other)):
+        for key, rows in sorted(lists.items()):
+            f = SITE / f"tier_{kind}_{key.split(':', 1)[1]}.jsonl"
+            f.write_text("".join(json.dumps({"question_id": ids[s]}) + "\n" for s in rows if s in ids), encoding="utf-8")
+            S.run(S.TSX + ["src/scripts/importHubData.ts", kind, "--lesson", lesson_id[key], "--file", str(f),
+                           "--apply"], cwd=S.BACKEND, env=env, keep=["rows", "Error"])
+
+
 def run_import():
     import site_import as S
     env = S.node_env()
@@ -246,6 +351,7 @@ def run_import():
     S.run(S.TSX + ["src/scripts/importHubData.ts", "pointers", "--module", MODULE, "--file",
                    str(SITE / "msk_pointers.jsonl"), "--source", "script-index-" + time.strftime("%Y-%m-%d"), "--apply"],
           cwd=S.BACKEND, env=env)
+    required(data, S, env)
     ids = sorted({x["id"] for x in data["lessons"]})
     out = S.run(S.TSX + ["src/scripts/recomputeLessonExtras.ts"] + ids, cwd=S.BACKEND, env=env, keep=["\x00"])
     print(f"{len([l for l in out.splitlines() if l.strip()])} MSK lessons recomputed")
