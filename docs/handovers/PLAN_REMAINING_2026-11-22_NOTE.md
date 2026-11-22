@@ -42,3 +42,15 @@ Running in background at stop (one chain, same Gemini accounts): seg run -> seg 
 (logs/mother_1638_2026-11-22.log) -> msk_mcq run + collect (logs/msk_mcq_2026-11-22.log).
 After the chain: `py msk_questions.py build` again (book questions), then Update data (`py update_data.py`) and the
 site import. Seg 148/159 (Azouny, Khaled) are at the top of the ladder: Today cards.
+
+# Progress 2026-11-23 (session 7)
+
+- Parallel Gemini runs used ONE account: every worker of `seg run --workers 4` started on acct1 at the same moment and
+  waited on its lock (`take` blocks), so acct2-4 sat idle. `gemini_browser.ask` now takes the first account that is
+  free at that moment (`try_take`, never waits on one busy account); test `ParallelAccounts`. Seg run restarted:
+  all 4 accounts busy (logs/seg_run_2026-11-23.log; cns-001/002/003/006/124/125/175/194 + 158/159).
+- Records workflow cron had skipped since 17:48 UTC; run by hand (45076983272): cns-199..210 uploaded, hear copies
+  made; `cloud.year2.pull` put them in lecture.json. Fleet hear2 on zero,work,personal + a second run on `other`
+  (signs in again): logs/hear2_fleet_2026-11-23.log, logs/hear2_fleet_other_2026-11-23.log.
+- NEXT: when the hearing ends, `py -m spine seg jobs` for cns-199..210, `seg run --workers 4 --wait`, `seg collect`,
+  then `py update_data.py` and `py site_import.py`.

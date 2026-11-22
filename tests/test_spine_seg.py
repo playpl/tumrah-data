@@ -405,6 +405,43 @@ class CapFallback(unittest.TestCase):
             self.assertEqual(g.ask_on_fallback(None, 3, "p", model="hydrogen"), ("hydrogen", "Hydrogen"))
 
 
+class ParallelAccounts(unittest.TestCase):
+    """2026-11-23: four workers at once take four different accounts (before, all four waited on acct1's lock)."""
+
+    def test_four_calls_four_accounts(self):
+        import sys
+        import tempfile
+        import threading
+        import time
+        import types
+        from pathlib import Path
+        import gemini_browser as g
+        used, seen = [], threading.Lock()
+
+        def ask_on(pw, n, p, a, w, m, lock=None):
+            with seen:
+                used.append(n)
+            time.sleep(0.3)
+            lock.unlink()
+            return "ok"
+
+        class PW:
+            def __enter__(self):
+                return None
+
+            def __exit__(self, *a):
+                return False
+        api = types.ModuleType("playwright.sync_api")
+        api.sync_playwright = PW
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(g, "HOME", Path(tmp)),                 mock.patch.object(g, "capped_until", lambda n, m: None), mock.patch.object(g, "ask_on", ask_on),                 mock.patch.dict(sys.modules, {"playwright.sync_api": api}):
+            ts = [threading.Thread(target=g.ask, args=("p",), kwargs={"model": "hydrogen"}) for _ in range(4)]
+            for t in ts:
+                t.start()
+            for t in ts:
+                t.join()
+        self.assertEqual(sorted(used), [1, 2, 3, 4])
+
+
 class Widen(unittest.TestCase):
     """A rejection for a missed slice steps the lecture up the ladder: whole book, then the handout, then the owner."""
     def setUp(self):

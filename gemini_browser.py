@@ -36,6 +36,7 @@ MODELS = {"flash-lite": "Flash-Lite", "gemini-flash-lite": "Flash-Lite", "flash"
           "hydrogen": "Hydrogen"}
 # A capped account answers with its free model until the renewal (owner, 2026-11-20).
 FALLBACK = {"hydrogen": "flash-lite"}
+BUSY_WAIT = 1800          # seconds a call waits for any account to be free
 TYPES = {".ogg": "audio/ogg", ".opus": "audio/ogg", ".m4a": "audio/mp4", ".mp3": "audio/mpeg", ".wav": "audio/wav",
          ".pdf": "application/pdf", ".txt": "text/plain", ".md": "text/plain", ".jsonl": "text/plain",
          ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
@@ -167,10 +168,11 @@ def model_name(model):
     return MODELS.get((model or "flash-lite").lower(), model)
 
 
-def ask_on(pw, n, prompt, attach=(), wait=300, model="flash-lite"):
-    """The answer's text to `prompt` with `attach` pasted as files, on account n. Raises a named fault."""
+def ask_on(pw, n, prompt, attach=(), wait=300, model="flash-lite", lock=None):
+    """The answer's text to `prompt` with `attach` pasted as files, on account n. Raises a named fault. `lock` = the
+    account's lock already taken by `try_take` (freed here either way); None waits for the account."""
     b = driver()
-    lock = b.take(n)
+    lock = lock or b.take(n)
     pg = None
     try:
         pg = b.page(pw, n)
@@ -228,6 +230,30 @@ def _open(b, pg, n, model):
     _cap_file(n, model).unlink(missing_ok=True)
 
 
+def try_take(n):
+    """Account n's lock for this call, or None at once when another call holds it (the driver's `take` waits instead).
+    Same lock file and stale rules as `take`: a lock whose owner process is gone, or older than 15 minutes, is freed.
+    Threads of one process share its PID, so the lock file (created exclusively) is what keeps them apart."""
+    import os
+    lock = HOME / f"acct{n}.busy"
+    for _ in range(2):
+        try:
+            with open(lock, "x") as f:
+                f.write(str(os.getpid()))
+            return lock
+        except FileExistsError:
+            try:
+                pid = int(lock.read_text().strip() or 0)
+                age = time.time() - lock.stat().st_mtime
+            except (OSError, ValueError):
+                pid, age = 0, 0
+            if not pid and age > 60 or pid and not driver().alive(pid) or age > 900:
+                lock.unlink(missing_ok=True)
+                continue
+            return None
+    return None
+
+
 def free_first(accounts=ACCOUNTS):
     """Accounts with no live lock first, so a lone call does not wait behind a busy one."""
     def busy(n):
@@ -257,13 +283,21 @@ def ask(prompt, model="flash-lite", attach=(), wait=300, account=None, fallback=
     tries = [(n, model) for n in order if not caps[n]] + ([(n, alt) for n in order if caps[n]] if alt else [])
     errors = [f"acct{n}: capped" for n, u in caps.items() if u and not alt]
     t0 = time.time()
+    # 2026-11-23: each try takes the first account that is free NOW (try_take). Before, every worker of a parallel run
+    # started on acct1 at once and waited on its lock, so one account answered every job and the other three idled.
     with sync_playwright() as pw:
-        i = 0
-        while i < len(tries):
-            n, m = tries[i]
-            i += 1
+        while tries:
+            got = next(((t, lk) for t in tries for lk in [try_take(t[0])] if lk), None)
+            if got is None:
+                if time.time() - t0 > BUSY_WAIT:
+                    errors.append(f"every account busy for {BUSY_WAIT // 60} minutes")
+                    break
+                time.sleep(2)
+                continue
+            (n, m), lock = got
+            tries.remove((n, m))
             try:
-                text = ask_on(pw, n, prompt, attach, wait, m)
+                text = ask_on(pw, n, prompt, attach, wait, m, lock=lock)
                 return text, {"account": f"acct{n}", "model": model_name(m), "secs": round(time.time() - t0),
                               **({"fallback": True} if m != model else {})}
             except Capped as e:
