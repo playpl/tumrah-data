@@ -102,13 +102,14 @@ def read_jsonl(f):
     return [json.loads(x) for x in f.read_text(encoding="utf-8").splitlines() if x.strip()] if f.exists() else []
 
 
-def sources():
+def sources(items=None, tree=None):
     """{post: (kind, url or QuizBot param)} from the saved tree (nodes and the posts no list links to)."""
-    t = json.loads(TREE.read_text(encoding="utf-8"))
+    items, tree = items or ITEMS, tree or TREE
+    t = json.loads(tree.read_text(encoding="utf-8"))
     out = {}
     for x in t["nodes"] + t["unreached"]:
         for o in x.get("outer") or []:
-            if x["id"] in ITEMS and o.get("kind") in ("form", "quizbot"):
+            if x["id"] in items and o.get("kind") in ("form", "quizbot"):
                 url = o["url"]
                 if "/forms/d/" in url and "/forms/d/e/" not in url:    # an editor's link: its public page answers
                     url = re.sub(r"/(edit|viewform)\b.*$", "/viewform", url)
@@ -132,16 +133,17 @@ def clean(stem, options):
     return stem, [str(o).strip() for o in options]
 
 
-def questions():
+def questions(items=None, tree=None, quizbot=None, channel="zagexam59"):
     """[{post, doctor, title, lessons, own, kind, url, stem, options, key}] of every keyed question below."""
-    src = sources()
+    items, quizbot = items or ITEMS, quizbot or QUIZBOT
+    src = sources(items, tree)
     forms, bot = {}, {}
     for r in read_jsonl(FORM_KEYS):
         forms.setdefault(r["link"], {})[str(r["item_id"])] = r           # the latest key of an item wins
-    for r in read_jsonl(QUIZBOT):
+    for r in read_jsonl(quizbot):
         bot.setdefault(r["param"], {})[r.get("position")] = r
     out = []
-    for post, (doctor, title, lessons, own) in sorted(ITEMS.items()):
+    for post, (doctor, title, lessons, own) in sorted(items.items()):
         kind, ref = src.get(post, (None, None))
         rows = list((forms if kind == "form" else bot).get(ref, {}).values()) if kind else []
         for r in rows:
@@ -152,7 +154,7 @@ def questions():
                     or not 0 <= r["correct_index"] < len(options):
                 continue
             out.append({"post": post, "doctor": doctor, "title": title, "lessons": lessons, "own": own, "kind": kind,
-                        "url": f"https://t.me/zagexam59/{post}", "stem": stem, "options": options,
+                        "url": f"https://t.me/{channel}/{post}", "stem": stem, "options": options,
                         "key": r["correct_index"], "solution": r.get("solution")})
     return out
 
