@@ -231,7 +231,8 @@ def pick(lid, module="year2-cns", paras=None, cache=None):
         hand = handout_target(lec, module, cache, WIDE if step else HANDOUT_MARGIN)
         if hand:
             return hand
-        if not book:                                   # no placement to start from: the lecture's own words
+        if not book or step >= 2:                      # no placement to start from: the lecture's own words
+            # (2026-11-23: a revision at step 2 with no ranges of its own, cns-205, fell back to the book that missed)
             return handout_prior(paras, module, cache)
     if book not in cache:
         cache[book] = {"sents": book_sentences(module, book), "links": edges(module, book, cells=False),

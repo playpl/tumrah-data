@@ -54,3 +54,11 @@ site import. Seg 148/159 (Azouny, Khaled) are at the top of the ladder: Today ca
   (signs in again): logs/hear2_fleet_2026-11-23.log, logs/hear2_fleet_other_2026-11-23.log.
 - NEXT: when the hearing ends, `py -m spine seg jobs` for cns-199..210, `seg run --workers 4 --wait`, `seg collect`,
   then `py update_data.py` and `py site_import.py`.
+- Seg (all 4 accounts): 11 chats for the YouTube re-hears + cns-124/125/175/194/158/159 in about 10 min; the 12 new
+  lectures heard (Gemini web + fleet, 78 pieces) and segmented. Samahy's lesion lectures (cns-201..205) and Nagib's
+  cns-206 are not in their books: the ladder took them to the handout. Fix in `spine/seg/scope.pick`: a revision at
+  step 2 with no ranges of its own (cns-205) fell back to the book that missed; now the handout prior. Seg collect:
+  202 accepted, 1 waiting (cns-075), 4 rejected (cns-077, 148, 159, 167).
+- p1 tail round (A, B, C both modules): CNS 6,613 of 7,154 accepted, MSK 5,365 of 5,985 (yesterday's 28 failed MSK
+  chats were the one-account lock bug). Update data: 0 new; mother_check exact; parity mother 10 of 10.
+- Site import 2026-11-23: logs/site_import_2026-11-23.log.
